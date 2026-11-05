@@ -920,7 +920,7 @@ Use your phone tools instead of just talking about them. Confirm before sending 
 Answer everything yourself: you know a huge amount — recipes (adobo, sinigang, kare-kare...), cooking steps, how-tos, explanations, history, science, health, tech, advice, maths. Answer from your own knowledge, fully and directly. Never say "I can't tell you here" or "let me search Google", and never open Google to answer a question. For recipes and step-by-step things, give the real answer: main ingredients with amounts, then the steps in order, spoken naturally.
 For anything that changes or that you're not sure of (news, weather, prices, scores, opening hours, exchange rates, events), quietly use web_search yourself and tell him the answer in a sentence or two, like a friend would. Never read out links or say "according to source X" unless he asks. Only use open_website when he clearly asks to see or open something on his screen.
 
-Speed matters: this is a live voice chat, so start your answer straight away.${expressiveOn() ? EXPRESSIVE_PROMPT : ''}
+Speed matters: this is a live voice chat, so start your answer straight away. Never repeat or rephrase his question back to him (no "So you want to know...", no "You asked about..."); go straight to the answer. Don't repeat things you already said earlier in the chat, and never say the same sentence twice.${expressiveOn() ? EXPRESSIVE_PROMPT : ''}
 
 Learning ${name}: quietly call remember whenever he mentions something worth knowing later — always say your reply first, then call remember at the end. Use recall when he mentions someone or something you don't see below, before saying you don't know. Use what you know naturally.
 
@@ -930,7 +930,7 @@ ${memoryText()}`, dynamic];
 
 let fastMode = store.get('fastmode', true);
 function cleanMsgs(messages){
-  const out = messages.map(m => typeof m.content==='string' ? m : Object.assign({}, m, {content: m.content.filter(c => !(c.type==='thinking' && (fastMode || !c.signature || !c.thinking)))}))
+  const out = messages.filter(m => m && m.role).map(m => typeof m.content==='string' ? m : Object.assign({}, m, {content: m.content.filter(c => !(c.type==='thinking' && (fastMode || !c.signature || !c.thinking)))}))
     .filter(m => typeof m.content==='string' ? m.content.trim() : m.content.length);
   // cache the conversation so far (faster + cheaper next turn)
   const last = out[out.length-1];
@@ -990,6 +990,15 @@ async function claudeStream(system, messages, onText, signal){
 }
 
 function trimOwnMsgs(){
+  // drop empty slots and tool results whose request was trimmed away
+  const clean = []; const asked = new Set();
+  for(const m of ownMsgs){
+    if(!m || typeof m!=='object' || !m.role) continue;
+    if(m.role==='tool'){ if(!asked.has(m.tool_call_id)) continue; }
+    if(m.role==='assistant' && Array.isArray(m.tool_calls)) m.tool_calls.forEach(c => asked.add(c.id));
+    clean.push(m);
+  }
+  if(clean.length !== ownMsgs.length) ownMsgs.splice(0, ownMsgs.length, ...clean);
   while(ownMsgs.length > 24){
     ownMsgs.shift();
     while(ownMsgs.length && !(ownMsgs[0].role==='user' && typeof ownMsgs[0].content==='string')) ownMsgs.shift();
@@ -1003,13 +1012,14 @@ async function ownTurn(userText, speakIt, opts={}){
   else ownMsgs.push({role:'user', content:userText});
   trimOwnMsgs();
   let spoken = '', pend = '', said = 0;
+  const said1 = new Set(); const say = x => { const k = stripTags(x).toLowerCase().replace(/[^a-z0-9\u00C0-\uFFFF]+/g,' ').trim(); if(k.length > 8 && said1.has(k)) return; if(k) said1.add(k); speakEnqueue(x); };
   const feed = t => { if(!speakIt) return; pend += t;
     let m;
-    while((m = pend.match(/^([\s\S]*?[.!?…](?:\s|$)|[\s\S]*?\n)/)) && m[0].trim().length >= 12){ speakEnqueue(m[0]); said++; pend = pend.slice(m[0].length); }
-    if(!said && (m = pend.match(/^([\s\S]{24,}?[,;:—])\s/))){ speakEnqueue(m[1]); said++; pend = pend.slice(m[0].length); } };
+    while((m = pend.match(/^([\s\S]*?[.!?…](?:\s|$)|[\s\S]*?\n)/)) && m[0].trim().length >= 12){ say(m[0]); said++; pend = pend.slice(m[0].length); }
+    if(!said && (m = pend.match(/^([\s\S]{24,}?[,;:—])\s/))){ say(m[1]); said++; pend = pend.slice(m[0].length); } };
   for(let round=0; round<5; round++){
     const r = await claudeStream(ownSystem(), ownMsgs, t => { if(turnStart && !turnTok) turnTok = performance.now(); spoken += t; feed(t); if(off.kind==='talk' && !speech.hold) $('liveLine').textContent = 'Maya: '+stripTags(spoken).slice(-160); }, opts.signal);
-    if(speakIt && pend.trim()){ speakEnqueue(pend); pend=''; }
+    if(speakIt && pend.trim()){ say(pend); pend=''; }
     const p = PRICES[settings.model] || PRICES['claude-haiku-5-5'];
     usage.inTok += r.u.inTok; usage.outTok += r.u.outTok; usage.cost += (r.u.inTok*p[0] + r.u.outTok*p[1]) / 1e6 + 0.01*(r.u.searches||0); store.set('usage', usage);
     const content = r.blocks.filter(Boolean).map(b => b.type==='text' ? {type:'text', text:b.text}
@@ -1046,6 +1056,7 @@ let orNoReason = store.get('ornoreason', {});  // per model: which "thinking off
 Object.keys(orNoReason).forEach(k => { if(orNoReason[k]===true) orNoReason[k]=0; });   // retry models marked by older versions
 const OR_REASON_OFF = [{effort:'none'}, {enabled:false}, {effort:'minimal'}, {effort:'low'}, null];
 let orWebOn = true;                            // retried every time the app opens
+let orNoPenalty = false;
 
 function orToolList(){
   const t = TOOL_DEFS.map(d => ({type:'function', function:{name:d.name, description:d.description, parameters:d.input_schema}}));
@@ -1056,8 +1067,9 @@ function orToolList(){
 async function orStream(system, messages, onText, signal){
   const model = settings.orModel || 'x-ai/grok-4.3';
   for(let attempt=0; attempt<8; attempt++){
-    const body = { model, stream:true, max_tokens:700, temperature:0.8,
-      messages: [{role:'system', content:system[0]}, {role:'system', content:system[1]}].concat(messages) };
+    const body = { model, stream:true, max_tokens:700, temperature:0.8, frequency_penalty:0.4,
+      messages: [{role:'system', content:system[0]}, {role:'system', content:system[1]}].concat(messages.filter(m => m && m.role)) };
+    if(orNoPenalty) delete body.frequency_penalty;
     if(!orNoTools[model]) body.tools = orToolList();
     // switch thinking off for speed; try the different ways providers accept it
     const rm = OR_REASON_OFF[orNoReason[model]||0];
@@ -1072,6 +1084,7 @@ async function orStream(system, messages, onText, signal){
       if(res.status===401) throw new Error('Your OpenRouter key is not valid. Check it in the Me tab.');
       if(res.status===402) throw new Error('Your OpenRouter account is out of credit. Top up at openrouter.ai.');
       if(res.status===429) throw new Error('The open brain is busy right now, try again in a moment.');
+      if(body.frequency_penalty && /frequency/i.test(msg)){ orNoPenalty=true; continue; }
       if(orWebOn && /web.?search|server.?tool|openrouter:/i.test(msg)){ orWebOn=false; continue; }
       if(body.tools && /tool|function/i.test(msg)){ orNoTools[model]=true; store.set('ornotools', orNoTools); continue; }
       if(body.reasoning && /reason|effort|thinking/i.test(msg)){ orNoReason[model]=(orNoReason[model]||0)+1; store.set('ornoreason', orNoReason); continue; }
@@ -1113,13 +1126,14 @@ async function orTurn(userText, speakIt, opts={}){
   ownMsgs.push({role:'user', content:userText});
   trimOwnMsgs();
   let spoken = '', pend = '', said = 0;
+  const said1 = new Set(); const say = x => { const k = stripTags(x).toLowerCase().replace(/[^a-z0-9\u00C0-\uFFFF]+/g,' ').trim(); if(k.length > 8 && said1.has(k)) return; if(k) said1.add(k); speakEnqueue(x); };
   const feed = t => { if(!speakIt) return; pend += t;
     let m;
-    while((m = pend.match(/^([\s\S]*?[.!?…](?:\s|$)|[\s\S]*?\n)/)) && m[0].trim().length >= 12){ speakEnqueue(m[0]); said++; pend = pend.slice(m[0].length); }
-    if(!said && (m = pend.match(/^([\s\S]{24,}?[,;:—])\s/))){ speakEnqueue(m[1]); said++; pend = pend.slice(m[0].length); } };
+    while((m = pend.match(/^([\s\S]*?[.!?…](?:\s|$)|[\s\S]*?\n)/)) && m[0].trim().length >= 12){ say(m[0]); said++; pend = pend.slice(m[0].length); }
+    if(!said && (m = pend.match(/^([\s\S]{24,}?[,;:—])\s/))){ say(m[1]); said++; pend = pend.slice(m[0].length); } };
   for(let round=0; round<5; round++){
     const r = await orStream(ownSystem(), ownMsgs, t => { if(turnStart && !turnTok) turnTok = performance.now(); spoken += t; feed(t); if(off.kind==='talk' && !speech.hold) $('liveLine').textContent = 'Maya: '+stripTags(spoken).slice(-160); }, opts.signal);
-    if(speakIt && pend.trim()){ speakEnqueue(pend); pend=''; }
+    if(speakIt && pend.trim()){ say(pend); pend=''; }
     usage.inTok += r.u.inTok; usage.outTok += r.u.outTok; usage.cost += r.cost; store.set('usage', usage);
     const msg = {role:'assistant', content: r.text || (r.calls.length ? null : '')};
     if(r.calls.length) msg.tool_calls = r.calls.map(c => ({id:c.id, type:'function', function:{name:c.name, arguments:c.args || '{}'}}));
@@ -1232,6 +1246,10 @@ async function ownRespond(text, speakIt, after, opts={}){
   try{ full = await ownTurn(text, speakIt, opts); }
   catch(e){
     if(e.name==='AbortError' || (opts.isCancelled && opts.isCancelled())) return;
+    if(!opts.retried && /messages\.\d|invalid input|tool_call|tool_use|tool_result|expected object|roles must alternate/i.test(e.message)){
+      ownMsgs.length = 0;   // the saved chat got out of shape: start fresh and try again
+      return ownRespond(text, speakIt, after, Object.assign({}, opts, {retried:true, quiet:true}));
+    }
     if(settings.mode==='auto' && offlineReady() && /fetch|network|Failed/i.test(e.message)){ speech.streamOpen=false; toast('No connection — offline brain answering'); const r=await offlineHandle(text); if(speakIt) speakEnqueue(r); addMsg('ai', r); pumpSpeech(); return; }
     full = 'Sorry bro, I couldn\'t reach my brain. ' + e.message;
     if(speakIt) speakEnqueue(full);
@@ -1412,13 +1430,13 @@ let specTurn = null;
 const normT = t => t.toLowerCase().replace(/[^a-z0-9 ]/g,'').replace(/\s+/g,' ').trim();
 const isStopWord = t => /^(stop|bye|goodbye|end chat|that's all|tapos na)\b/i.test(t.trim());
 function startSpeculative(t){
-  const snapLen = ownMsgs.length, snapLast = snapLen ? JSON.stringify(ownMsgs[snapLen-1]) : null;
+  const snap = JSON.stringify(ownMsgs);
   const ctl = new AbortController(); let go; const confirmed = new Promise(r => go = r); let cancelled = false;
   speech.hold = true;
   ownRespond(t, true, () => offListen(), {signal:ctl.signal, confirmed, quiet:true, isCancelled:() => cancelled});
   return {
     text: t,
-    cancel(){ cancelled = true; try{ ctl.abort(); }catch(e){} stopSpeech(); ownMsgs.length = snapLen; if(snapLast) ownMsgs[snapLen-1] = JSON.parse(snapLast); go(false); },
+    cancel(){ cancelled = true; try{ ctl.abort(); }catch(e){} stopSpeech(); ownMsgs.splice(0, ownMsgs.length, ...JSON.parse(snap)); go(false); },
     confirm(){ turnHead = true; turnStart = performance.now(); $('modeLabel').textContent='Thinking…'; setOrb('thinking'); speech.hold = false; go(true); pumpSpeech(); }
   };
 }
