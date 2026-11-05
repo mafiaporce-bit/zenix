@@ -24,6 +24,7 @@ class MainActivity : Activity() {
     private lateinit var webView: WebView
     lateinit var brain: OfflineBrain
     lateinit var updater: Updater
+    lateinit var ears: DeepgramEars
     private var pendingWebPermission: PermissionRequest? = null
 
     companion object {
@@ -69,6 +70,7 @@ class MainActivity : Activity() {
         }
         brain = OfflineBrain(this)
         updater = Updater(this)
+        ears = DeepgramEars(this)
         webView.addJavascriptInterface(ZenixBridge(this), "ZenixNative")
 
         webView.webViewClient = object : WebViewClient() {
@@ -137,6 +139,7 @@ class MainActivity : Activity() {
 
     override fun onDestroy() {
         if (::brain.isInitialized) brain.shutdown()
+        if (::ears.isInitialized) ears.close()
         stopService(android.content.Intent(this, VoiceService::class.java))
         super.onDestroy()
     }

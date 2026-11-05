@@ -45,4 +45,5 @@ dependencies {
     implementation("androidx.webkit:webkit:1.11.0")
     implementation("com.google.mediapipe:tasks-genai:0.10.24")
     implementation("androidx.core:core:1.13.1")
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
 }

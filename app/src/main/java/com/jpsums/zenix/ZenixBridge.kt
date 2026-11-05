@@ -58,6 +58,12 @@ class ZenixBridge(private val activity: MainActivity) {
     @JavascriptInterface fun stopListening(): String { activity.brain.stopListening(); return ok("stopped") }
     @JavascriptInterface fun speak(text: String, lang: String): String { activity.brain.speak(text, lang); return ok("speaking") }
     @JavascriptInterface fun stopSpeaking(): String { activity.brain.stopSpeaking(); return ok("stopped") }
+    // ---------- Deepgram ears (native) ----------
+    @JavascriptInterface fun dgOpen(key: String, lang: String): String { activity.ears.open(key, lang); return ok("opening") }
+    @JavascriptInterface fun dgSending(on: String): String { activity.ears.setSending(on == "true"); return ok("ok") }
+    @JavascriptInterface fun dgClose(): String { activity.ears.close(); return ok("closed") }
+    @JavascriptInterface fun dgTest(key: String): String { activity.ears.test(key); return ok("testing") }
+
     /** Deepgram Aura voice: fetches MP3 in the background, returns it via window.zenixDG(id, base64, error). */
     @JavascriptInterface fun dgSpeak(id: String, text: String, model: String, key: String): String {
         kotlin.concurrent.thread {

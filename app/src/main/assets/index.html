@@ -656,7 +656,7 @@ function startOffline(kind, brain='offline'){
   const goMe = () => document.querySelector('nav button[data-view="settings"]').click();
   if(brain==='offline' && !offlineReady()){ toast('Download the offline brain first (Me tab)'); goMe(); return false; }
   if(brain==='own' && !getKey()){ toast('Add your Claude API key in the Me tab first'); goMe(); return false; }
-  off.active=true; off.kind=kind; off.brain=brain; off.endAfterSpeak=false;
+  off.active=true; off.kind=kind; off.brain=brain; off.endAfterSpeak=false; if(typeof dg!=='undefined') dg.failed=false;
   if(brain==='own'){ $('dot').className='dot on'; $('statusText').textContent='Online'; }
   else { $('dot').className='dot busy'; $('statusText').textContent='Offline'; }
   addMsg('sys', (brain==='own'?'':'Offline ') + (kind==='talk'?'voice chat started':'chat'));
@@ -978,7 +978,7 @@ if(settings.engine==='own' && settings.voice!=='phone' && !settings.voice.starts
 /* ---------- Deepgram: fast cloud ears + Aura voices (middle option) ---------- */
 if(!settings.ears) settings.ears='phone';
 const dgKey = () => (store.get('dgkey','')||'').trim();
-const useDGEars = () => settings.ears==='deepgram' && !!dgKey() && settings.offlineLang!=='fil-PH';
+const useDGEars = () => settings.ears==='deepgram' && !!dgKey() && settings.offlineLang!=='fil-PH' && !(typeof dg!=='undefined' && dg.failed);
 const DG_VOICES = [['dg:aura-2-thalia-en','Thalia'],['dg:aura-2-andromeda-en','Andromeda'],['dg:aura-2-helena-en','Helena'],['dg:aura-2-luna-en','Luna'],['dg:aura-2-asteria-en','Asteria']];
 const dgWait = {}; let dgSeq = 0;
 function dgTTS(text){
@@ -996,60 +996,53 @@ window.zenixDG = (id, b64, err) => {
   w.resolve({ toBlob: () => new Blob([arr], {type:'audio/mpeg'}) });
 };
 
-const dg = { ws:null, rec:null, stream:null, buf:'', ka:null, active:false, paused:true, t0:0 };
-async function dgOpen(){
-  dg.stream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true, noiseSuppression:true, autoGainControl:true}});
-  const qs = new URLSearchParams({model:'nova-3', language:'en', smart_format:'true', interim_results:'true', endpointing:'350', utterance_end_ms:'1000', vad_events:'true'});
-  dg.ws = new WebSocket('wss://api.deepgram.com/v1/listen?'+qs.toString(), ['token', dgKey()]);
-  await new Promise((res, rej) => { dg.ws.onopen = res; dg.ws.onerror = () => rej(new Error('Could not connect to Deepgram')); setTimeout(() => rej(new Error('Deepgram timed out')), 8000); });
-  dg.ws.onmessage = (e) => {
-    let m; try{ m = JSON.parse(e.data); }catch(x){ return; }
-    if(m.type==='Results'){
-      const alt = m.channel && m.channel.alternatives && m.channel.alternatives[0];
-      const t = (alt && alt.transcript) || '';
-      if(m.is_final && t) dg.buf += (dg.buf ? ' ' : '') + t;
-      if(!dg.paused && off.kind==='talk') $('liveLine').textContent = 'You: ' + (dg.buf + (m.is_final ? '' : ' ' + t)).trim();
-      if(m.speech_final && dg.buf.trim()) dgFinish();
-    } else if(m.type==='UtteranceEnd' && dg.buf.trim()) dgFinish();
-  };
-  dg.ws.onclose = () => { const was = dg.active; dgClose(); if(was && off.active && off.brain==='own'){ toast('Deepgram disconnected, using phone listening'); offListen(); } };
-  const mime = window.MediaRecorder && MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : '';
-  dg.rec = new MediaRecorder(dg.stream, mime ? {mimeType:mime} : undefined);
-  dg.rec.ondataavailable = (e) => { if(e.data && e.data.size && dg.ws && dg.ws.readyState===1) dg.ws.send(e.data); };
-  dg.rec.start(250); dg.rec.pause(); dg.paused = true; dg.active = true;
-  dg.ka = setInterval(() => { if(dg.ws && dg.ws.readyState===1) dg.ws.send(JSON.stringify({type:'KeepAlive'})); }, 5000);
+const dg = { active:false, paused:true, buf:'', t0:0, opening:null, failed:false };
+window.zenixDGMsg = (txt) => {
+  let m; try{ m = JSON.parse(txt); }catch(x){ return; }
+  if(m.type==='Results'){
+    const alt = m.channel && m.channel.alternatives && m.channel.alternatives[0];
+    const t = (alt && alt.transcript) || '';
+    if(dg.paused) return;
+    if(m.is_final && t) dg.buf += (dg.buf ? ' ' : '') + t;
+    if(off.kind==='talk') $('liveLine').textContent = 'You: ' + (dg.buf + (m.is_final ? '' : ' ' + t)).trim();
+    if(m.speech_final && dg.buf.trim()) dgFinish();
+  } else if(m.type==='UtteranceEnd' && !dg.paused && dg.buf.trim()) dgFinish();
+};
+window.zenixDGOpen = (ok, err) => { const w=dg.opening; dg.opening=null; if(!w) return; ok ? w.resolve() : w.reject(new Error(/401|403/.test(err||'') ? 'Deepgram key not accepted' : ('Could not connect to Deepgram '+(err||'')).trim())); };
+window.zenixDGClosed = () => { const was=dg.active; dg.active=false; dg.paused=true; if(was && off.active && off.brain==='own' && off.kind==='talk'){ dg.failed=true; toast('Deepgram disconnected, using phone listening'); offListen(); } };
+window.zenixDGTest = (ok, msg) => { $('dgState').textContent = ok ? 'Deepgram key works ✓' : ('✗ '+msg); if(!ok) toast(msg); };
+function dgOpen(){
+  return new Promise((res, rej) => {
+    if(!Native || !Native.dgOpen) return rej(new Error('Deepgram needs the Android app'));
+    dg.opening = {resolve:res, reject:rej}; Native.dgOpen(dgKey(), 'en');
+    setTimeout(() => { if(dg.opening){ dg.opening=null; rej(new Error('Deepgram timed out')); } }, 10000);
+  }).then(() => { dg.active=true; dg.paused=true; });
 }
 function dgTrackTime(){ if(dg.t0){ usage.cost += (Date.now()-dg.t0)/60000 * 0.0048; store.set('usage', usage); dg.t0=0; } }
-function dgPause(){ if(dg.rec && dg.rec.state==='recording') dg.rec.pause(); dg.paused = true; dgTrackTime(); }
-function dgResume(){ dg.buf=''; if(dg.rec && dg.rec.state==='paused') dg.rec.resume(); dg.paused = false; dg.t0 = Date.now(); }
-function dgFinish(){ const t = dg.buf.trim(); dg.buf=''; dgPause(); if(t && window.zenixOnSpeech) window.zenixOnSpeech(t); }
-function dgClose(){
-  dgTrackTime(); dg.active=false; dg.paused=true;
-  clearInterval(dg.ka); dg.ka=null;
-  try{ if(dg.ws && dg.ws.readyState===1){ dg.ws.send(JSON.stringify({type:'CloseStream'})); } }catch(e){}
-  try{ dg.ws && dg.ws.close(); }catch(e){} dg.ws=null;
-  try{ dg.rec && dg.rec.state!=='inactive' && dg.rec.stop(); }catch(e){} dg.rec=null;
-  try{ dg.stream && dg.stream.getTracks().forEach(t=>t.stop()); }catch(e){} dg.stream=null;
-}
+function dgPause(){ if(Native && Native.dgSending) Native.dgSending('false'); dg.paused=true; dgTrackTime(); }
+function dgResume(){ dg.buf=''; if(Native && Native.dgSending) Native.dgSending('true'); dg.paused=false; dg.t0=Date.now(); }
+function dgFinish(){ const t=dg.buf.trim(); dg.buf=''; dgPause(); if(t && window.zenixOnSpeech) window.zenixOnSpeech(t); }
+function dgClose(){ dgTrackTime(); const was=dg.active; dg.active=false; dg.paused=true; if(was && Native && Native.dgClose) Native.dgClose(); }
 /* Called by offListen for Own brain when Deepgram ears are on */
 function dgListen(){
   setOrb('listening'); $('modeLabel').textContent='Listening…'; if(Native.setOrbMode) Native.setOrbMode('listening');
   if(dg.active){ dgResume(); return; }
   dgOpen().then(() => { if(off.active && off.kind==='talk') dgResume(); })
-    .catch(e => { dgClose(); toast(e.message+' — using phone listening'); if(Native.startListeningOnline) Native.startListeningOnline(settings.offlineLang); });
+    .catch(e => { dgClose(); dg.failed=true; toast(e.message+' — using phone listening'); if(Native.startListeningOnline) Native.startListeningOnline(settings.offlineLang); });
 }
 
 function renderDG(){
   document.querySelectorAll('[data-ears]').forEach(b => b.classList.toggle('sel', b.dataset.ears===settings.ears));
-  $('dgState').textContent = dgKey() ? 'Deepgram key saved on this phone ✓' : 'No Deepgram key yet';
+  $('dgState').textContent = dgKey() ? 'Deepgram key saved on this phone' : 'No Deepgram key yet';
 }
 document.querySelectorAll('[data-ears]').forEach(b => b.onclick = () => {
   if(b.dataset.ears==='deepgram' && !dgKey()){ toast('Add your Deepgram key first'); return; }
   settings.ears=b.dataset.ears; store.set('settings',settings); renderDG();
   toast(settings.ears==='deepgram' ? 'Deepgram ears on: faster and more accurate' : 'Using phone listening (free)');
 });
-$('dgSave').onclick = () => { const v=$('dgInput').value.trim(); if(v.length<20){ toast('That does not look like a Deepgram key'); return; } store.set('dgkey', v); $('dgInput').value=''; settings.ears='deepgram'; if(!settings.voice.startsWith('dg:')) settings.voice='dg:aura-2-thalia-en'; store.set('settings',settings); renderDG(); renderBrain(); toast('Deepgram key saved. Ears and voice switched to Deepgram.'); };
+$('dgSave').onclick = () => { const v=$('dgInput').value.trim(); if(v.length<20){ toast('That does not look like a Deepgram key'); return; } store.set('dgkey', v); $('dgInput').value=''; dg.failed=false; $('dgState').textContent='Checking key with Deepgram…'; if(Native && Native.dgTest) Native.dgTest(v); settings.ears='deepgram'; if(!settings.voice.startsWith('dg:')) settings.voice='dg:aura-2-thalia-en'; store.set('settings',settings); renderDG(); renderBrain(); toast('Deepgram key saved, checking it…'); };
 renderDG();
+if(dgKey() && Native && Native.dgTest) setTimeout(()=>Native.dgTest(dgKey()), 2000);
 
 /* ---------- Chat ---------- */
 function sendText(text){
