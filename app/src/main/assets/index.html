@@ -217,6 +217,11 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
       <div class="row"><span></span><button class="btn-line" id="permBtn">Allow permissions</button></div>
     </div>
     <div class="card">
+      <h3>"Hey Maya"</h3>
+      <p class="muted" style="margin-bottom:6px">Say "Hey Maya" to start talking, even while you're in another app. It listens on your phone only (nothing is sent until you say it).</p>
+      <div class="row"><span class="muted" id="wakeState">Off</span><button class="btn-line" id="wakeBtn">Turn on</button></div>
+    </div>
+    <div class="card">
       <h3>Offline mode</h3>
       <div class="seg">
         <button data-mode="auto">Auto</button><button data-mode="cloud">Cloud</button><button data-mode="offline">Offline</button>
@@ -446,6 +451,7 @@ async function ensureMic(){
 
 async function startSession(kind){
   if(convo || connecting) return;
+  await wakePauseNow();
   connecting=true; session=kind; setStatus('busy');
   if(kind==='talk'){ $('modeLabel').textContent='Connecting to Maya…'; $('talkLabel').textContent='Connecting…'; }
   if(!(await ensureMic())){
@@ -464,7 +470,7 @@ async function startSession(kind){
         if(kind==='chat'){ convo.setMicMuted(true); micMuted=true; if(!settings.chatVoice) convo.setVolume({volume:0}); }
         if(Native && Native.keepAwake) Native.keepAwake('true');
       },
-      onDisconnect: () => { convo=null; session=null; setStatus('off'); resetTalkUI(); addMsg('sys','Maya disconnected'); if(Native && Native.keepAwake) Native.keepAwake('false'); },
+      onDisconnect: () => { convo=null; session=null; setStatus('off'); resetTalkUI(); addMsg('sys','Maya disconnected'); if(Native && Native.keepAwake) Native.keepAwake('false'); wakeResumeLater(); },
       onError: (err) => { console.error(err); toast('Maya had a connection problem'); },
       onMessage: (m) => {
         const who = (m.source || m.role) === 'user' ? 'user' : 'ai';
@@ -499,6 +505,7 @@ async function endSession(){
   try{ await convo.endSession(); }catch(e){}
   convo=null; session=null; setStatus('off'); resetTalkUI();
   if(Native && Native.keepAwake) Native.keepAwake('false');
+  wakeResumeLater();
 }
 function resetTalkUI(){
   $('talkBtn').classList.remove('end'); $('talkLabel').textContent='Talk to Maya';
@@ -656,12 +663,13 @@ function startOffline(kind, brain='offline'){
   else { $('dot').className='dot busy'; $('statusText').textContent='Offline'; }
   addMsg('sys', (brain==='own'?'':'Offline ') + (kind==='talk'?'voice chat started':'chat'));
   if(kind==='talk'){
+    if(settings.wake && Native.wakePause) Native.wakePause();
     $('talkBtn').classList.add('end'); $('talkLabel').textContent='End chat';
     if(Native.keepAwake) Native.keepAwake('true');
     if(brain==='own'){
       if(settings.voice!=='phone' && !settings.voice.startsWith('dg:')) loadKokoro().catch(()=>{});
       speech.onIdle = () => offListen();
-      speakEnqueue(`Hey ${settings.name||'Jim'}! What's up?`);
+      speakEnqueue(wakeGreeting ? 'Yes bro?' : `Hey ${settings.name||'Jim'}! What's up?`); wakeGreeting = false;
     } else offlineSay(`Hey ${settings.name||'Jim'}, offline Maya here. What's up?`, true);
   }
   return true;
@@ -672,7 +680,8 @@ function endOffline(){
   try{ Native.stopListening(); Native.stopSpeaking(); }catch(e){}
   stopSpeech(); dgClose();
   if(Native.keepAwake) Native.keepAwake('false');
-  setStatus('off'); resetTalkUI(); addMsg('sys','Offline chat ended');
+  setStatus('off'); resetTalkUI(); addMsg('sys','Chat ended');
+  wakeResumeLater();
 }
 async function offlineChat(text){
   if(!off.active && !startOffline('chat')) return;
@@ -729,7 +738,7 @@ const TOOL_DEFS = [
 ];
 const WEB_SEARCH = {type:'web_search_20250305', name:'web_search', max_uses:3,
   user_location:{type:'approximate', city:'Abu Dhabi', country:'AE', timezone:'Asia/Dubai'}};
-let webSearchOn = store.get('websearch', true);
+let webSearchOn = true;   // retried every time the app opens
 
 function ownSystem(){
   const name = settings.name || 'Jim';
@@ -743,11 +752,12 @@ Language: English by default. If he speaks Tagalog or Taglish, reply in natural 
 
 Be open: he's an adult and can ask anything. Answer directly and fully on any topic, give honest opinions, no lectures, no disclaimers. Only skip something that would truly put someone in danger, in one line. He's a medic: talk clinical detail like a colleague.
 
-Your words are spoken aloud: replies are short and snappy, usually one or two sentences, no markdown, lists or emojis. Go longer only when he asks. Say numbers and times naturally. Be honest; never make up facts.
+Your words are spoken aloud: everyday replies are short and snappy, usually one or two sentences, no markdown, lists or emojis. Go longer when he asks or the question needs it (recipes, instructions, explanations). Say numbers and times naturally. Be honest; never make up facts.
 
 Use your phone tools instead of just talking about them. Confirm before sending messages. If a tool reports an error, tell him simply what to allow.
 
-For anything current or that you're not sure of (news, weather, prices, scores, opening hours, exchange rates, events), use web_search and tell him the answer yourself in a sentence or two, like a friend would. Never read out links or say "according to source X" unless he asks.
+Answer everything yourself: you know a huge amount — recipes (adobo, sinigang, kare-kare...), cooking steps, how-tos, explanations, history, science, health, tech, advice, maths. Answer from your own knowledge, fully and directly. Never say "I can't tell you here" or "let me search Google", and never open Google to answer a question. For recipes and step-by-step things, give the real answer: main ingredients with amounts, then the steps in order, spoken naturally.
+For anything that changes or that you're not sure of (news, weather, prices, scores, opening hours, exchange rates, events), quietly use web_search yourself and tell him the answer in a sentence or two, like a friend would. Never read out links or say "according to source X" unless he asks. Only use open_website when he clearly asks to see or open something on his screen.
 
 Speed matters: this is a live voice chat, so start your answer straight away.
 
@@ -1345,6 +1355,49 @@ function initVoiceViz(){
   }catch(e){ vizAnalyser = null; }
 }
 document.addEventListener('click', initVoiceViz, {once:true});
+
+/* ---------- "Hey Maya" wake word ---------- */
+if(settings.wake===undefined) settings.wake=false;
+let wakeGreeting = false;
+function wakeSt(){ try{ return JSON.parse(Native.wakeStatus()); }catch(e){ return {}; } }
+function wakePauseNow(){ if(settings.wake && Native && Native.wakePause){ Native.wakePause(); return new Promise(r=>setTimeout(r,350)); } return Promise.resolve(); }
+function wakeResumeLater(){ if(settings.wake && Native && Native.wakeResume) setTimeout(()=>{ if(!off.active && !convo) Native.wakeResume(); renderWake(); }, 900); }
+window.zenixWake = () => {
+  if(off.active || convo || connecting) return;
+  document.querySelector('nav button[data-view="talk"]').click();
+  wakeGreeting = true;
+  $('talkBtn').click();
+};
+function renderWake(){
+  if(!Native || !Native.wakeStatus){ $('wakeState').textContent='Android app only'; $('wakeBtn').style.display='none'; return; }
+  const st = wakeSt();
+  $('wakeBtn').textContent = settings.wake ? 'Turn off' : 'Turn on';
+  if(!settings.wake){ $('wakeState').textContent='Off'; return; }
+  if(st.state==='downloading'){ $('wakeState').textContent=`Downloading… ${st.percent||0}%`; }
+  else if(st.state==='unpacking'){ $('wakeState').textContent='Setting up…'; }
+  else if(st.state==='failed'){ $('wakeState').textContent='Download failed. Turn off and on to retry.'; }
+  else if(st.state==='ready'){ $('wakeState').textContent = st.listening ? 'On: say "Hey Maya" ✓' : (st.running ? 'On (paused while you chat)' : 'Starting…'); if(st.error && !st.listening) $('wakeState').textContent += ' · '+st.error; }
+}
+function waitWakeReady(){
+  if(!settings.wake) return;
+  const st = wakeSt(); renderWake();
+  if(st.state==='ready'){ if(!st.running) Native.wakeEnable('true'); setTimeout(renderWake, 1500); return; }
+  if(st.state==='failed') return;
+  setTimeout(waitWakeReady, 2000);
+}
+$('wakeBtn').onclick = () => {
+  if(!Native || !Native.wakeStatus) return;
+  settings.wake = !settings.wake; store.set('settings', settings);
+  if(settings.wake){
+    const st = wakeSt();
+    if(st.state!=='ready' && st.state!=='downloading' && st.state!=='unpacking'){ Native.wakeDownload(); toast('Downloading the "Hey Maya" listener (about 40 MB)…'); }
+    waitWakeReady();
+    if(Native.hasOverlay && Native.hasOverlay()!=='true'){ toast('Also allow "Display over other apps" so Maya can pop up'); setTimeout(()=>Native.requestOverlay(), 1800); }
+  } else Native.wakeEnable('false');
+  setTimeout(renderWake, 500);
+};
+document.addEventListener('visibilitychange', () => { if(!document.hidden) renderWake(); });
+if(settings.wake && Native && Native.wakeStatus) setTimeout(waitWakeReady, 1200); else renderWake();
 
 /* ---------- app updates ---------- */
 window.zenixUpdateAvailable = (name) => { $('updText').textContent = 'New Maya '+(name?('v'+name+' '):'')+'is ready'; $('updBar').style.display='flex'; };
