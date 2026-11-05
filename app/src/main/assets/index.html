@@ -732,7 +732,8 @@ let webSearchOn = store.get('websearch', true);
 function ownSystem(){
   const name = settings.name || 'Jim';
   const now = new Date().toLocaleString('en-GB', {timeZone:'Asia/Dubai', weekday:'long', day:'numeric', month:'long', year:'numeric', hour:'2-digit', minute:'2-digit'});
-  return `You are Maya, ${name} Porce's personal AI assistant. You are female. ${name} is a Filipino medic in EMS under Civil Defence in the UAE, and builds and sells apps as JPSums. You live in an app on his Samsung phone and can control it. Right now it is ${now} (Dubai).
+  const dynamic = `Right now it is ${now} (Dubai).` + (ownMsgs.length <= 1 ? `\n\nRecent chat from before (context only):\n${recentChatText()}` : '');
+  return [`You are Maya, ${name} Porce's personal AI assistant. You are female. ${name} is a Filipino medic in EMS under Civil Defence in the UAE, and builds and sells apps as JPSums. You live in an app on his Samsung phone and can control it.
 
 Personality: funny, witty and playful, his best buddy who's also super capable. Tease him, banter, puns, cheeky humour — but get the job done first. Calm and serious when it matters. He calls you "bro"; match his energy.
 
@@ -746,33 +747,44 @@ Use your phone tools instead of just talking about them. Confirm before sending 
 
 For anything current or that you're not sure of (news, weather, prices, scores, opening hours, exchange rates, events), use web_search and tell him the answer yourself in a sentence or two, like a friend would. Never read out links or say "according to source X" unless he asks.
 
-Learning ${name}: quietly call remember whenever he mentions something worth knowing later. Use recall when he mentions someone or something you don't see below, before saying you don't know. Use what you know naturally.
+Speed matters: this is a live voice chat, so start your answer straight away.
+
+Learning ${name}: quietly call remember whenever he mentions something worth knowing later — always say your reply first, then call remember at the end. Use recall when he mentions someone or something you don't see below, before saying you don't know. Use what you know naturally.
 
 What you know about ${name} (most recent):
-${memoryText()}
-
-Recent chat (context only):
-${recentChatText()}`;
+${memoryText()}`, dynamic];
 }
 
+let fastMode = store.get('fastmode', true);
 function cleanMsgs(messages){
-  return messages.map(m => typeof m.content==='string' ? m : Object.assign({}, m, {content: m.content.filter(c => !((c.type==='thinking' && (!c.signature || !c.thinking)) ))}))
+  const out = messages.map(m => typeof m.content==='string' ? m : Object.assign({}, m, {content: m.content.filter(c => !(c.type==='thinking' && (fastMode || !c.signature || !c.thinking)))}))
     .filter(m => typeof m.content==='string' ? m.content.trim() : m.content.length);
+  // cache the conversation so far (faster + cheaper next turn)
+  const last = out[out.length-1];
+  if(last){
+    const blocks = typeof last.content==='string' ? [{type:'text', text:last.content}] : last.content.map(c => Object.assign({}, c));
+    const tail = blocks[blocks.length-1];
+    if(tail && tail.type!=='thinking') tail.cache_control = {type:'ephemeral'};
+    out[out.length-1] = Object.assign({}, last, {content:blocks});
+  }
+  return out;
 }
 async function claudeStream(system, messages, onText){
   messages = cleanMsgs(messages);
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method:'POST',
     headers:{'content-type':'application/json','x-api-key':getKey(),'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-    body: JSON.stringify({ model:settings.model, max_tokens:700, stream:true,
-      system:[{type:'text', text:system, cache_control:{type:'ephemeral'}}],
-      tools: webSearchOn ? TOOL_DEFS.concat([WEB_SEARCH]) : TOOL_DEFS, messages })
+    body: JSON.stringify(Object.assign({ model:settings.model, max_tokens:700, stream:true,
+      system:[{type:'text', text:system[0], cache_control:{type:'ephemeral'}}, {type:'text', text:system[1]}],
+      tools: webSearchOn ? TOOL_DEFS.concat([WEB_SEARCH]) : TOOL_DEFS, messages },
+      fastMode ? { thinking:{type:'disabled'}, output_config:{effort:'low'} } : {}))
   });
   if(!res.ok){
     let msg = res.status+''; try{ const j=await res.json(); msg = (j.error&&j.error.message)||msg; }catch(e){}
     if(res.status===401) msg='Your Claude API key is not valid. Check it in the Me tab.';
     if(res.status===400 && /credit/i.test(msg)) msg='Your Claude API account is out of credit. Top up at platform.claude.com.';
     if(res.status===400 && webSearchOn && /web.?search/i.test(msg)){ webSearchOn=false; store.set('websearch', false); return claudeStream(system, messages, onText); }
+    if(res.status===400 && fastMode && /thinking|effort|output_config/i.test(msg)){ fastMode=false; store.set('fastmode', false); return claudeStream(system, messages, onText); }
     throw new Error(msg);
   }
   const reader = res.body.getReader(); const dec = new TextDecoder();
@@ -812,7 +824,10 @@ function trimOwnMsgs(){
 }
 
 async function ownTurn(userText, speakIt){
-  ownMsgs.push({role:'user', content:userText}); trimOwnMsgs();
+  const lastMsg = ownMsgs[ownMsgs.length-1];
+  if(lastMsg && lastMsg.role==='user' && Array.isArray(lastMsg.content)) lastMsg.content.push({type:'text', text:userText});
+  else ownMsgs.push({role:'user', content:userText});
+  trimOwnMsgs();
   let spoken = '', pend = '', said = 0;
   const feed = t => { if(!speakIt) return; pend += t;
     let m;
@@ -830,12 +845,15 @@ async function ownTurn(userText, speakIt){
     if(content.length) ownMsgs.push({role:'assistant', content});
     if(r.stop === 'pause_turn') continue;
     if(r.stop !== 'tool_use') break;
+    const calls = content.filter(c => c.type==='tool_use');
     const results = [];
-    for(const c of content.filter(c => c.type==='tool_use')){
+    for(const c of calls){
       let out; try{ out = clientTools[c.name] ? await clientTools[c.name](c.input||{}) : 'Unknown tool'; }catch(e){ out = 'Error: '+e.message; }
       results.push({type:'tool_result', tool_use_id:c.id, content:String(out)});
     }
     ownMsgs.push({role:'user', content:results});
+    // she already answered and only saved a memory: no need to wait for Claude again
+    if(spoken.trim() && calls.length && calls.every(c => c.name==='remember')) break;
     spoken += ' ';
   }
   return spoken.trim();
@@ -893,6 +911,7 @@ async function pumpSpeech(){
   const item = speech.q.shift();
   if(!item){ if(!speech.streamOpen && speech.onIdle){ const f=speech.onIdle; speech.onIdle=null; f(); } return; }
   if(typeof dg!=='undefined' && dg.active && !dg.paused) dgPause();
+  if(turnStart){ const d=(performance.now()-turnStart)/1000; turnStart=0; if(off.kind==='talk') $('actionLine').textContent = `⚡ replied in ${d.toFixed(1)}s`; }
   speech.playing = true; setOrb('speaking'); $('modeLabel').textContent='Maya is speaking'; if(Native && Native.setOrbMode) Native.setOrbMode('speaking');
   try{
     const audio = item.wav ? await item.wav : null;
@@ -911,7 +930,9 @@ async function pumpSpeech(){
 }
 function stopSpeech(){ speech.q=[]; speech.streamOpen=false; speech.onIdle=null; try{ speech.audio.pause(); }catch(e){} try{ Native.stopSpeaking(); }catch(e){} if(nativeSpeakResolve){ const r=nativeSpeakResolve; nativeSpeakResolve=null; r(); } speech.playing=false; }
 
+let turnStart = 0;
 async function ownRespond(text, speakIt, after){
+  turnStart = performance.now();
   speech.streamOpen = true; speech.onIdle = after || null;
   $('modeLabel').textContent = 'Thinking…'; setOrb('thinking');
   let full = '';
