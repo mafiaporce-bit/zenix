@@ -66,7 +66,50 @@ class ZenixBridge(private val activity: MainActivity) {
                 if (best == null) best = Contact(name, num)
             }
         }
-        return best
+        if (best != null) return best
+        // Try each word on its own ("call Mark from work" -> "Mark")
+        for (word in q.split(" ").filter { it.length >= 3 }) {
+            activity.contentResolver.query(uri, proj,
+                "${ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME} LIKE ?", arrayOf("%$word%"), null)?.use { c ->
+                if (c.moveToFirst()) {
+                    val name = c.getString(0); val num = c.getString(1)
+                    if (name != null && num != null && c.count == 1) return Contact(name, num)
+                }
+            }
+        }
+        return null
+    }
+
+    /** Close-match contact names, so ZeniX can ask "did you mean…". */
+    private fun suggestContacts(query: String): List<String> {
+        if (!has(Manifest.permission.READ_CONTACTS)) return emptyList()
+        val out = LinkedHashSet<String>()
+        val words = query.trim().split(" ").filter { it.length >= 2 }
+        for (w in words) {
+            val key = if (w.length > 3) w.substring(0, 3) else w
+            activity.contentResolver.query(ContactsContract.Contacts.CONTENT_URI,
+                arrayOf(ContactsContract.Contacts.DISPLAY_NAME_PRIMARY),
+                "${ContactsContract.Contacts.DISPLAY_NAME_PRIMARY} LIKE ? AND ${ContactsContract.Contacts.HAS_PHONE_NUMBER} = 1",
+                arrayOf("%$key%"), null)?.use { c ->
+                while (c.moveToNext() && out.size < 5) c.getString(0)?.let { out.add(it) }
+            }
+        }
+        return out.toList()
+    }
+
+    private fun notFound(contact: String): String {
+        if (!has(Manifest.permission.READ_CONTACTS)) return fail("Allow Contacts permission so I can find $contact.")
+        val s = suggestContacts(contact)
+        return if (s.isEmpty()) fail("I couldn't find $contact in your contacts.")
+               else fail("I couldn't find exactly $contact. Close matches: ${s.joinToString(", ")}. Ask Jim which one.")
+    }
+
+    @JavascriptInterface
+    fun openCallHistory(): String {
+        val i = Intent(Intent.ACTION_VIEW).setType(android.provider.CallLog.Calls.CONTENT_TYPE)
+        if (launch(i)) return ok("Your call history is open on the screen.")
+        return if (launch(Intent(Intent.ACTION_DIAL))) ok("The Phone app is open. Tap Recents for your call history.")
+               else fail("Couldn't open the Phone app.")
     }
 
     private fun nameForNumber(number: String): String {
@@ -144,8 +187,7 @@ class ZenixBridge(private val activity: MainActivity) {
     // ---------- calls & messages ----------
     @JavascriptInterface
     fun makeCall(contact: String): String {
-        val c = findContact(contact) ?: return fail(
-            if (has(Manifest.permission.READ_CONTACTS)) "I couldn't find $contact in your contacts." else "Allow Contacts permission so I can find $contact.")
+        val c = findContact(contact) ?: return notFound(contact)
         val uri = Uri.parse("tel:" + Uri.encode(c.number))
         val i = if (has(Manifest.permission.CALL_PHONE)) Intent(Intent.ACTION_CALL, uri) else Intent(Intent.ACTION_DIAL, uri)
         return if (launch(i)) ok("Calling ${c.name}.") else fail("Couldn't start the call.")
@@ -160,7 +202,7 @@ class ZenixBridge(private val activity: MainActivity) {
                 else fail("Messenger isn't installed.")
             }
             "whatsapp" -> {
-                val c = findContact(contact) ?: return fail("I couldn't find $contact's number.")
+                val c = findContact(contact) ?: return notFound(contact)
                 val url = "https://api.whatsapp.com/send?phone=${intlDigits(c.number)}&text=${Uri.encode(message)}"
                 val i = Intent(Intent.ACTION_VIEW, Uri.parse(url)).setPackage("com.whatsapp")
                 return if (launch(i) ) ok("WhatsApp chat with ${c.name} is open with the message. Tap send.")
@@ -168,7 +210,7 @@ class ZenixBridge(private val activity: MainActivity) {
                 else fail("WhatsApp isn't installed.")
             }
             else -> {
-                val c = findContact(contact) ?: return fail("I couldn't find $contact's number.")
+                val c = findContact(contact) ?: return notFound(contact)
                 if (has(Manifest.permission.SEND_SMS)) {
                     return try {
                         val sms: SmsManager = if (Build.VERSION.SDK_INT >= 31) activity.getSystemService(SmsManager::class.java)
