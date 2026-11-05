@@ -28,6 +28,7 @@ class MainActivity : Activity() {
         const val CHANNEL_ID = "zenix_reminders"
         const val VOICE_CHANNEL_ID = "zenix_voice"
         @Volatile var instance: java.lang.ref.WeakReference<MainActivity>? = null
+        @Volatile var inForeground = false
         private const val PERM_REQUEST = 42
         val ALL_PERMISSIONS: Array<String>
             get() {
@@ -112,6 +113,18 @@ class MainActivity : Activity() {
     /** "End chat" tapped in the notification. */
     fun endChatFromNotification() {
         runOnUiThread { webView.evaluateJavascript("window.zenixEnd && window.zenixEnd()", null) }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        inForeground = true
+        VoiceService.current?.hideOrb()
+    }
+
+    override fun onPause() {
+        inForeground = false
+        VoiceService.current?.showOrb()
+        super.onPause()
     }
 
     override fun onDestroy() {

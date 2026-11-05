@@ -177,6 +177,11 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
       <div class="row"><span></span><button class="btn-line" id="permBtn">Allow permissions</button></div>
     </div>
     <div class="card">
+      <h3>Floating orb</h3>
+      <p class="muted" id="orbText">Shows ZeniX's orb over other apps while you talk. Drag it anywhere, tap it to come back.</p>
+      <div class="row"><span></span><button class="btn-line" id="orbBtn">Turn on orb</button></div>
+    </div>
+    <div class="card">
       <h3>Voice in chat</h3>
       <div class="row">
         <div><p>ZeniX speaks chat replies</p><small>Turn off for silent text replies</small></div>
@@ -379,6 +384,7 @@ async function startSession(kind){
         if(session==='talk') $('liveLine').textContent = (who==='ai'?'ZeniX: ':'You: ') + text;
       },
       onModeChange: ({mode}) => {
+        if(Native && Native.setOrbMode) Native.setOrbMode(mode);
         if(session!=='talk') return;
         if(mode==='speaking'){ setOrb('speaking'); $('modeLabel').textContent='ZeniX is speaking'; }
         else { setOrb('listening'); $('modeLabel').textContent = micMuted ? 'Mic muted' : 'Listening…'; }
@@ -413,6 +419,12 @@ window.zenixEnd = () => endSession(); // called from the phone notification
 $('talkBtn').onclick = async () => {
   if(convo && session==='talk') return endSession();
   if(convo && session==='chat') await endSession();
+  if(Native && Native.hasOverlay && Native.hasOverlay()!=='true' && !store.get('askedOverlay', false)){
+    store.set('askedOverlay', true);
+    toast('Turn on "Display over other apps" for ZeniX, then come back and tap Talk');
+    setTimeout(()=>Native.requestOverlay(), 1200);
+    return;
+  }
   startSession('talk');
 };
 $('muteBtn').onclick = () => { if(!convo) return; micMuted=!micMuted; convo.setMicMuted(micMuted); $('muteBtn').classList.toggle('off',micMuted); $('modeLabel').textContent = micMuted?'Mic muted':'Listening…'; };
@@ -441,6 +453,10 @@ document.querySelectorAll('nav button').forEach(b => b.onclick = () => {
 
 /* ---------- Me tab ---------- */
 $('memAdd').onclick = () => { const v=$('memInput').value.trim(); if(!v) return; memories.push(v); store.set('memories',memories); $('memInput').value=''; renderMem(); toast('ZeniX will remember that'); };
+function refreshOrbBtn(){ if(Native && Native.hasOverlay && Native.hasOverlay()==='true'){ $('orbBtn').textContent='On ✓'; } }
+$('orbBtn').onclick = () => { if(Native && Native.requestOverlay){ Native.requestOverlay(); } else toast('The orb is for the Android app'); };
+document.addEventListener('visibilitychange', () => { if(!document.hidden) refreshOrbBtn(); });
+refreshOrbBtn();
 $('permBtn').onclick = () => { if(Native && Native.requestPermissions){ Native.requestPermissions(); } else toast('Permissions are for the Android app'); };
 if(!Native){ $('permText').textContent='You are using the web version. Install the Android app for alarms, calls, messages and calendar.'; }
 $('nameInput').value = settings.name || '';

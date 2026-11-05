@@ -38,6 +38,14 @@ class ZenixBridge(private val activity: MainActivity) {
     @JavascriptInterface fun requestPermissions(): String { activity.runOnUiThread { activity.requestAllPermissions() }; return ok("Asking for permissions.") }
     @JavascriptInterface fun keepAwake(on: String): String { activity.setKeepAwake(on == "true"); return ok("ok") }
 
+    // ---------- floating orb ----------
+    @JavascriptInterface fun hasOverlay(): String = android.provider.Settings.canDrawOverlays(activity).toString()
+    @JavascriptInterface fun requestOverlay(): String {
+        val i = Intent(android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + activity.packageName))
+        return if (launch(i)) ok("Opening the setting.") else fail("Couldn't open the setting.")
+    }
+    @JavascriptInterface fun setOrbMode(mode: String): String { VoiceService.current?.setSpeaking(mode == "speaking"); return ok("ok") }
+
     // ---------- contacts ----------
     private data class Contact(val name: String, val number: String)
 
