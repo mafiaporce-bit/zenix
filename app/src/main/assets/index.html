@@ -128,6 +128,7 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
   <div class="status"><span class="dot" id="dot"></span><span id="statusText">Offline</span></div>
 </header>
 
+<div id="updBar" style="display:none;margin:0 16px 8px;padding:10px 12px;border-radius:14px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;font-size:14px;align-items:center;gap:10px"><span style="flex:1" id="updText">New ZeniX update available</span><button id="updBtn" style="background:#fff;color:#6D28D9;font-weight:600;border-radius:10px;padding:8px 14px;min-height:40px">Update now</button></div>
 <main>
   <section class="view active" id="view-talk">
     <div class="hero">
@@ -643,6 +644,18 @@ $('nameInput').addEventListener('input', e => { settings.name=e.target.value.tri
 const vt=$('chatVoiceToggle'); vt.classList.toggle('on', settings.chatVoice);
 vt.onclick = () => { settings.chatVoice=!settings.chatVoice; vt.classList.toggle('on',settings.chatVoice); store.set('settings',settings); if(convo && session==='chat') convo.setVolume({volume:settings.chatVoice?1:0}); };
 $('clearBtn').onclick = () => { if(confirm('Clear all chat history?')){ history=[]; store.set('history',history); renderChat(); toast('History cleared'); } };
+
+/* ---------- app updates ---------- */
+window.zenixUpdateAvailable = (name) => { $('updText').textContent = 'New ZeniX '+(name?('v'+name+' '):'')+'is ready'; $('updBar').style.display='flex'; };
+window.zenixUpdateFailed = () => { toast('Update download failed. Try again on Wi-Fi.'); $('updBtn').textContent='Retry'; };
+$('updBtn').onclick = () => {
+  const r = Native && Native.startUpdate ? Native.startUpdate() : '';
+  if(r==='permission'){ toast('Allow "Install unknown apps" for ZeniX, then tap Update now again'); }
+  else if(r==='downloading'){ $('updBtn').textContent='Downloading…'; toast('Downloading the update, the install screen will pop up'); }
+  else toast('Could not start the update');
+};
+if(Native && Native.checkUpdate){ Native.checkUpdate(); document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) Native.checkUpdate(); }); }
+if(Native && Native.appVersion){ try{ document.querySelector('#view-settings .card:last-child .muted').textContent = 'ZeniX runs on ElevenLabs voice with a Claude brain, plus an optional on-phone brain. Version '+Native.appVersion(); }catch(e){} }
 
 greet(); renderChat(); renderMem(); setInterval(greet, 60000);
 </script>

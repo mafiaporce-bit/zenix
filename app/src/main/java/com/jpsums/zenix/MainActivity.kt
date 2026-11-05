@@ -23,6 +23,7 @@ class MainActivity : Activity() {
 
     private lateinit var webView: WebView
     lateinit var brain: OfflineBrain
+    lateinit var updater: Updater
     private var pendingWebPermission: PermissionRequest? = null
 
     companion object {
@@ -67,6 +68,7 @@ class MainActivity : Activity() {
             cacheMode = WebSettings.LOAD_DEFAULT
         }
         brain = OfflineBrain(this)
+        updater = Updater(this)
         webView.addJavascriptInterface(ZenixBridge(this), "ZenixNative")
 
         webView.webViewClient = object : WebViewClient() {

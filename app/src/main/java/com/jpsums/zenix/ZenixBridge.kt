@@ -38,6 +38,11 @@ class ZenixBridge(private val activity: MainActivity) {
     @JavascriptInterface fun requestPermissions(): String { activity.runOnUiThread { activity.requestAllPermissions() }; return ok("Asking for permissions.") }
     @JavascriptInterface fun keepAwake(on: String): String { activity.setKeepAwake(on == "true"); return ok("ok") }
 
+    // ---------- app updates ----------
+    @JavascriptInterface fun checkUpdate(): String { activity.updater.check(); return ok("checking") }
+    @JavascriptInterface fun startUpdate(): String = activity.updater.start()
+    @JavascriptInterface fun appVersion(): String = activity.updater.currentName()
+
     // ---------- offline brain ----------
     @JavascriptInterface fun offlineStatus(): String = activity.brain.status()
     @JavascriptInterface fun offlineDownload(): String = activity.brain.download()

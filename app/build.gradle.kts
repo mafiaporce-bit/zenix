@@ -11,8 +11,9 @@ android {
         applicationId = "com.jpsums.zenix"
         minSdk = 26
         targetSdk = 34
-        versionCode = 2
-        versionName = "2.1"
+        val run = (System.getenv("GITHUB_RUN_NUMBER") ?: "0").toInt()
+        versionCode = run + 100
+        versionName = "2.$run"
     }
 
     signingConfigs {
@@ -43,4 +44,5 @@ android {
 dependencies {
     implementation("androidx.webkit:webkit:1.11.0")
     implementation("com.google.mediapipe:tasks-genai:0.10.24")
+    implementation("androidx.core:core:1.13.1")
 }

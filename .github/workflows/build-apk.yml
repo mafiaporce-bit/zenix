@@ -32,7 +32,10 @@ jobs:
         run: gradle :app:assembleDebug --no-daemon --stacktrace
 
       - name: Rename APK
-        run: cp app/build/outputs/apk/debug/app-debug.apk ZeniX.apk
+        run: |
+          cp app/build/outputs/apk/debug/app-debug.apk ZeniX.apk
+          echo "{\"versionCode\": $((GITHUB_RUN_NUMBER + 100)), \"versionName\": \"2.$GITHUB_RUN_NUMBER\"}" > version.json
+          cat version.json
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -47,4 +50,6 @@ jobs:
           name: ZeniX (latest build)
           body: "Download ZeniX.apk below on your phone and tap it to install."
           make_latest: true
-          files: ZeniX.apk
+          files: |
+            ZeniX.apk
+            version.json
