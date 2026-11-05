@@ -207,6 +207,8 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
         <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line)">
           <h3 style="font-size:15px">ElevenLabs voices</h3>
           <p class="muted" style="margin:4px 0 8px">The best-sounding voices, including your own from ElevenLabs, with any brain above. Uses your ElevenLabs credits (about half a credit per letter spoken). Speaks Tagalog too.</p>
+          <p class="muted" style="margin:0 0 6px">Emotions &amp; breathing (laughs, sighs, whispers, breaths)</p>
+          <div class="seg small" style="margin-bottom:10px"><button data-expr="on">On · more human</button><button data-expr="off">Off · fastest</button></div>
           <div class="seg small" id="elVoiceBtns" style="flex-wrap:wrap"></div>
           <p class="muted" id="elState" style="margin:10px 0 6px"></p>
           <div class="row"><input type="password" id="elInput" placeholder="Paste ElevenLabs API key" autocomplete="off" style="width:100%;height:46px;border-radius:12px;border:1px solid var(--line);background:var(--surface2);color:var(--text);padding:0 12px;font:14px Inter,sans-serif"><button class="btn-line" id="elSave">Save</button></div>
@@ -333,7 +335,9 @@ function renderChat(){
   c.scrollTop=c.scrollHeight;
   $('histCount').textContent = `${history.filter(m=>m.who!=='sys').length} messages saved`;
 }
+const stripTags = t => String(t||'').replace(/\[[a-z][a-z ,'-]{0,28}\]\s*/gi, '').replace(/\s{2,}/g,' ').trim();
 function addMsg(who, text){
+  if(who==='ai') text = stripTags(text);
   if(!text) return;
   history.push({who, text, ts:Date.now()});
   if(history.length>3000) history = history.slice(-3000);
@@ -498,7 +502,7 @@ async function startSession(kind){
         const text = m.message || m.text || '';
         if(who==='user' && session==='chat') return;
         addMsg(who, text);
-        if(session==='talk') $('liveLine').textContent = (who==='ai'?'Maya: ':'You: ') + text;
+        if(session==='talk') $('liveLine').textContent = (who==='ai'?'Maya: ':'You: ') + (who==='ai' ? stripTags(text) : text);
       },
       onModeChange: ({mode}) => {
         if(Native && Native.setOrbMode) Native.setOrbMode(mode);
@@ -744,6 +748,10 @@ const getKey = () => (store.get('apikey','')||'').trim();
 if(!settings.provider) settings.provider='claude';
 if(!settings.orModel) settings.orModel='x-ai/grok-4.3';
 const orKey = () => (store.get('orkey','')||'').trim();
+const expressiveOn = () => !!settings.expressive && settings.engine==='own' && String(settings.voice||'').startsWith('el:') && !!(store.get('elkey','')||'').trim();
+const EXPRESSIVE_PROMPT = `
+
+Sound like a real woman, not a robot: your voice performs emotions and breaths when you put a short tag in square brackets right before the words it affects. Use them like a real person would — usually one, at most two per reply, none in serious or emergency moments. Laughing: [laughs], [giggles], [chuckles]. Breathing: [exhales] before a thought, [sighs] for relief, tiredness or mock exasperation. Tone: [whispers] for secrets or cheeky intimate moments, [softly] or [warmly] when he's tired or down, [excited], [mischievously], [playful], [curious], [sarcastic], [surprised]. Use "..." for natural pauses and little fillers like "hmm", "oh", "wait", "ay nako". Example: "[giggles] Bro, you're asking ME that at 3 AM? ... [exhales] Okay fine, here's the deal." Never say the tags as words and don't tag every sentence.`;
 const brainKey = () => settings.provider==='openrouter' ? orKey() : getKey();
 let ownMsgs = [];
 
@@ -784,7 +792,7 @@ Use your phone tools instead of just talking about them. Confirm before sending 
 Answer everything yourself: you know a huge amount — recipes (adobo, sinigang, kare-kare...), cooking steps, how-tos, explanations, history, science, health, tech, advice, maths. Answer from your own knowledge, fully and directly. Never say "I can't tell you here" or "let me search Google", and never open Google to answer a question. For recipes and step-by-step things, give the real answer: main ingredients with amounts, then the steps in order, spoken naturally.
 For anything that changes or that you're not sure of (news, weather, prices, scores, opening hours, exchange rates, events), quietly use web_search yourself and tell him the answer in a sentence or two, like a friend would. Never read out links or say "according to source X" unless he asks. Only use open_website when he clearly asks to see or open something on his screen.
 
-Speed matters: this is a live voice chat, so start your answer straight away.
+Speed matters: this is a live voice chat, so start your answer straight away.${expressiveOn() ? EXPRESSIVE_PROMPT : ''}
 
 Learning ${name}: quietly call remember whenever he mentions something worth knowing later — always say your reply first, then call remember at the end. Use recall when he mentions someone or something you don't see below, before saying you don't know. Use what you know naturally.
 
@@ -872,7 +880,7 @@ async function ownTurn(userText, speakIt, opts={}){
     while((m = pend.match(/^([\s\S]*?[.!?…](?:\s|$)|[\s\S]*?\n)/)) && m[0].trim().length >= 12){ speakEnqueue(m[0]); said++; pend = pend.slice(m[0].length); }
     if(!said && (m = pend.match(/^([\s\S]{24,}?[,;:—])\s/))){ speakEnqueue(m[1]); said++; pend = pend.slice(m[0].length); } };
   for(let round=0; round<5; round++){
-    const r = await claudeStream(ownSystem(), ownMsgs, t => { if(turnStart && !turnTok) turnTok = performance.now(); spoken += t; feed(t); if(off.kind==='talk' && !speech.hold) $('liveLine').textContent = 'Maya: '+spoken.slice(-160); }, opts.signal);
+    const r = await claudeStream(ownSystem(), ownMsgs, t => { if(turnStart && !turnTok) turnTok = performance.now(); spoken += t; feed(t); if(off.kind==='talk' && !speech.hold) $('liveLine').textContent = 'Maya: '+stripTags(spoken).slice(-160); }, opts.signal);
     if(speakIt && pend.trim()){ speakEnqueue(pend); pend=''; }
     const p = PRICES[settings.model] || PRICES['claude-haiku-5-5'];
     usage.inTok += r.u.inTok; usage.outTok += r.u.outTok; usage.cost += (r.u.inTok*p[0] + r.u.outTok*p[1]) / 1e6 + 0.01*(r.u.searches||0); store.set('usage', usage);
@@ -982,7 +990,7 @@ async function orTurn(userText, speakIt, opts={}){
     while((m = pend.match(/^([\s\S]*?[.!?…](?:\s|$)|[\s\S]*?\n)/)) && m[0].trim().length >= 12){ speakEnqueue(m[0]); said++; pend = pend.slice(m[0].length); }
     if(!said && (m = pend.match(/^([\s\S]{24,}?[,;:—])\s/))){ speakEnqueue(m[1]); said++; pend = pend.slice(m[0].length); } };
   for(let round=0; round<5; round++){
-    const r = await orStream(ownSystem(), ownMsgs, t => { if(turnStart && !turnTok) turnTok = performance.now(); spoken += t; feed(t); if(off.kind==='talk' && !speech.hold) $('liveLine').textContent = 'Maya: '+spoken.slice(-160); }, opts.signal);
+    const r = await orStream(ownSystem(), ownMsgs, t => { if(turnStart && !turnTok) turnTok = performance.now(); spoken += t; feed(t); if(off.kind==='talk' && !speech.hold) $('liveLine').textContent = 'Maya: '+stripTags(spoken).slice(-160); }, opts.signal);
     if(speakIt && pend.trim()){ speakEnqueue(pend); pend=''; }
     usage.inTok += r.u.inTok; usage.outTok += r.u.outTok; usage.cost += r.cost; store.set('usage', usage);
     const msg = {role:'assistant', content: r.text || (r.calls.length ? null : '')};
@@ -1040,7 +1048,9 @@ const speech = { q:[], playing:false, streamOpen:false, onIdle:null, audio:new A
 let nativeSpeakResolve = null;
 function nativeSay(text, lang){ return new Promise(res => { nativeSpeakResolve = res; Native.speak(text, lang); setTimeout(()=>{ if(nativeSpeakResolve===res){ nativeSpeakResolve=null; res(); } }, 4000 + text.length*120); }); }
 function speakEnqueue(text){
-  text = text.replace(/[*_#`>]/g,'').replace(/\s+/g,' ').trim(); if(!text) return;
+  text = text.replace(/[*_#`>]/g,'').replace(/\s+/g,' ').trim();
+  if(!expressiveOn()) text = stripTags(text);
+  if(!text || !/[a-z0-9\u00C0-\uFFFF\]]/i.test(text)) return;
   const item = { text, wav:null };
   if(settings.voice.startsWith('el:') && elKey()){ item.wav = elTTS(text).catch(()=>null); speech.q.push(item); pumpSpeech(); return; }
   if(settings.voice.startsWith('dg:') && dgKey() && !isTagalog(text)){ item.wav = dgTTS(text).catch(()=>null); speech.q.push(item); pumpSpeech(); return; }
@@ -1072,7 +1082,7 @@ async function pumpSpeech(){
       await new Promise(res => { speech.audio.onended = res; speech.audio.onerror = res; speech.audio.src = url; speech.audio.play().catch(res); });
       URL.revokeObjectURL(url);
     } else if(Native && Native.speak){
-      await nativeSay(item.text, isTagalog(item.text) ? 'fil-PH' : 'en-US');
+      const plain = stripTags(item.text); if(plain) await nativeSay(plain, isTagalog(plain) ? 'fil-PH' : 'en-US');
     }
   }catch(e){}
   speech.playing = false;
@@ -1328,12 +1338,23 @@ const EL_JESSICA = 'cgSgspJ2msm6clMCkdW9';   // same voice as the ElevenLabs May
 const EL_NATASHA = 'j05EIz3iI3JmBTWC3CsA';   // Jim's pick: Natasha, whispery ASMR
 const EL_DEFAULT = [{id:EL_NATASHA, name:'Natasha', gender:'female'}, {id:EL_JESSICA, name:'Jessica', gender:'female'}, {id:'hpp4J3VqNfWAUOO0d1Us', name:'Bella', gender:'female'}, {id:'EXAVITQu4vr4xnSDxMaL', name:'Sarah', gender:'female'}, {id:'FGY2WhTYpPnrIDTdsKH5', name:'Laura', gender:'female'}];
 let elModel = store.get('elmodel', 'eleven_flash_v2_5');   // fastest + half the credits
+const EL_EXPR_MODELS = ['eleven_v4', 'eleven_v3', 'eleven_multilingual_v2'];   // emotions + breathing (audio tags)
+let elExprModel = store.get('elexpr', 'eleven_v4');
+if(settings.expressive === undefined) settings.expressive = true;
+function renderExpr(){ document.querySelectorAll('[data-expr]').forEach(b => b.classList.toggle('sel', (b.dataset.expr==='on') === !!settings.expressive)); }
+document.querySelectorAll('[data-expr]').forEach(b => b.onclick = () => {
+  settings.expressive = b.dataset.expr==='on'; store.set('settings', settings); renderExpr();
+  if(settings.expressive){ elExprModel = 'eleven_v4'; store.set('elexpr', elExprModel); }
+  toast(settings.expressive ? 'Emotions on: she laughs, sighs, breathes (a bit slower)' : 'Emotions off: fastest voice');
+  if(settings.voice.startsWith('el:') && elKey()){ stopSpeech(); speakEnqueue(settings.expressive ? '[giggles] Hi bro... [exhales] can you hear me breathing now?' : 'Hi bro, this is my fast voice.'); }
+});
+renderExpr();
 const elWait = {}; let elSeq = 0;
 function elTTS(text){
   return new Promise((resolve, reject) => {
     if(!Native || !Native.elSpeak) return reject(new Error('ElevenLabs voice needs the Android app'));
     const id = 'e'+(++elSeq); elWait[id] = {resolve, reject};
-    Native.elSpeak(id, text, settings.voice.slice(3), elKey(), elModel);
+    Native.elSpeak(id, text, settings.voice.slice(3), elKey(), expressiveOn() ? elExprModel : elModel);
     usage.elChars = (usage.elChars||0) + text.length; store.set('usage', usage);
   });
 }
@@ -1342,7 +1363,12 @@ window.zenixEL = (id, b64, err) => {
   const w = elWait[id]; if(!w) return; delete elWait[id];
   if(err){
     const now = Date.now(), warn = now - elWarned > 20000; if(warn) elWarned = now;
-    if(/^40[0-9]/.test(err) && /model/i.test(err) && elModel!=='eleven_turbo_v2_5'){ elModel='eleven_turbo_v2_5'; store.set('elmodel', elModel); }
+    if(/^4[0-9][0-9]/.test(err) && /model/i.test(err) && expressiveOn()){
+      const i = EL_EXPR_MODELS.indexOf(elExprModel);
+      if(i < EL_EXPR_MODELS.length-1){ elExprModel = EL_EXPR_MODELS[i+1]; store.set('elexpr', elExprModel); }
+      else { settings.expressive = false; store.set('settings', settings); renderExpr(); if(warn) toast('Emotions are not available for this voice, using the normal voice'); }
+    }
+    else if(/^40[0-9]/.test(err) && /model/i.test(err) && elModel!=='eleven_turbo_v2_5'){ elModel='eleven_turbo_v2_5'; store.set('elmodel', elModel); }
     else if(warn && /quota|credit/i.test(err)) toast('ElevenLabs is out of credits, using the phone voice');
     else if(warn && /permission/i.test(err)) toast('Your ElevenLabs key needs the "Text to Speech" permission');
     else if(warn && /voice_not_found|not found/i.test(err)) toast('That voice isn\'t in your ElevenLabs library yet. Add it on elevenlabs.io first.');

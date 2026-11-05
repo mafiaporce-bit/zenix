@@ -116,8 +116,10 @@ class ZenixBridge(private val activity: MainActivity) {
                 c.setRequestProperty("xi-api-key", key)
                 c.setRequestProperty("Content-Type", "application/json")
                 c.setRequestProperty("Accept", "audio/mpeg")
-                val body = JSONObject().put("text", text).put("model_id", model)
-                    .put("voice_settings", JSONObject().put("stability", 0.45).put("similarity_boost", 0.75).put("speed", 1.05))
+                val expressive = model.startsWith("eleven_v3") || model.startsWith("eleven_v4")
+                val vs = if (expressive) JSONObject().put("stability", 0.5)
+                         else JSONObject().put("stability", 0.45).put("similarity_boost", 0.75).put("speed", 1.05)
+                val body = JSONObject().put("text", text).put("model_id", model).put("voice_settings", vs)
                 c.outputStream.use { it.write(body.toString().toByteArray()) }
                 val code = c.responseCode
                 if (code !in 200..299) {
