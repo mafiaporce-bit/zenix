@@ -364,10 +364,20 @@ class ZenixBridge(private val activity: MainActivity) {
 
     @JavascriptInterface
     fun sendMessage(contact: String, message: String, app: String): String {
-        when (app.lowercase(Locale.ROOT)) {
+        val group = app.lowercase(Locale.ROOT).endsWith("_group")
+        val base = app.lowercase(Locale.ROOT).removeSuffix("_group")
+        if (group && base == "whatsapp") {
+            // groups have no phone number: use WhatsApp's "Send to" list and pick the group by name
+            val i = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, message).setPackage("com.whatsapp")
+            val auto = SendHelperService.arm(activity, "whatsapp", contact, message, true)
+            return if (launch(i)) ok(if (auto) "Sending it to the $contact group on WhatsApp now." else "WhatsApp is open with the message. Pick the $contact group and tap send.")
+            else fail("WhatsApp isn't installed.")
+        }
+        if (group && base != "messenger") return fail("Group texts only work on WhatsApp or Messenger.")
+        when (base) {
             "messenger" -> {
                 val i = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, message).setPackage("com.facebook.orca")
-                val auto = SendHelperService.arm(activity, "messenger", contact, message)
+                val auto = SendHelperService.arm(activity, "messenger", contact, message, group)
                 return if (launch(i)) ok(if (auto) "Sending it to $contact on Messenger now." else "Messenger is open with the message ready. Pick $contact and tap send.")
                 else fail("Messenger isn't installed.")
             }

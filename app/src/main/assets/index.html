@@ -391,7 +391,7 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
       <details class="set-item" data-sec="autosend">
         <summary><span class="ico green"><svg viewBox="0 0 24 24"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg></span><span class="set-t"><b>Auto-send messages</b><span id="sumAuto"></span></span><svg class="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></summary>
         <div class="set-body">
-          <p class="hint">After Maya reads your message back and you say <b>yes</b>, she taps Send for you in WhatsApp, Messenger and Messages. Without it, the chat opens ready and you tap Send.</p>
+          <p class="hint">After Maya reads your message back and you say <b>yes</b>, a bubble shows <b>"Sending to Jen in 3s · Tap to cancel"</b>, then she taps Send for you in WhatsApp, Messenger and Messages. Works for group chats on WhatsApp and Messenger too. Without it, the chat opens ready and you tap Send.</p>
           <div class="toggle-row"><span class="status-line" style="margin:0" id="autoState">Off</span><button class="btn-line" id="autoBtn">Turn on</button></div>
           <p class="hint" style="margin-top:12px">Turn on: tap <b>Turn on</b> → <b>Installed apps</b> → <b>Maya auto-send</b> → switch it on. If it's greyed out, tap <b>Allow restricted settings</b> below first (⋮ menu, top right of Maya's app info), then try again.</p>
           <div class="toggle-row" style="margin-top:0"><span></span><button class="btn-line" id="autoInfo">Allow restricted settings</button></div>
@@ -754,9 +754,10 @@ const clientTools = {
     showAction('🕘 Opening call history');
     return reply(callNative('openCallHistory') || {ok:false, message:'Call history only works in the Android app.'});
   },
-  send_message: async ({contact, message, app}) => {
-    showAction(`💬 ${app} to ${contact}`);
-    return reply(callNative('sendMessage', contact, message, app) || {ok:false, message:'Messaging only works in the Android app.'});
+  send_message: async ({contact, message, app, group}) => {
+    const isGroup = group===true || group==='true';
+    showAction(`💬 ${app} to ${contact}${isGroup ? ' (group)' : ''}`);
+    return reply(callNative('sendMessage', contact, message, isGroup ? (app||'whatsapp')+'_group' : app) || {ok:false, message:'Messaging only works in the Android app.'});
   },
   read_messages: async ({contact, count}) => {
     showAction('📨 Reading messages');
@@ -1200,7 +1201,7 @@ const TOOL_DEFS = [
   {name:'open_app', description:'Open an app on the phone by name (Facebook, Claude, Gemini, YouTube, Maps...).', input_schema:{type:'object', properties:{app_name:{type:'string'}}, required:['app_name']}},
   {name:'make_call', description:'Call a contact name or phone number. If it returns close matches, ask Jim which one.', input_schema:{type:'object', properties:{contact:{type:'string'}}, required:['contact']}},
   {name:'open_call_history', description:"Show the phone's recent/missed calls on screen (you can't read them).", input_schema:{type:'object', properties:{}}},
-  {name:'send_message', description:'Send a WhatsApp, Messenger or SMS message. ALWAYS read the message and the person back to Jim and wait for a clear yes BEFORE calling this. If auto-send is on, Maya taps Send herself; otherwise the chat opens ready and Jim taps Send. The result tells you which.', input_schema:{type:'object', properties:{contact:{type:'string'}, message:{type:'string'}, app:{type:'string', enum:['whatsapp','messenger','sms']}}, required:['contact','message','app']}},
+  {name:'send_message', description:'Send a WhatsApp, Messenger or SMS message. ALWAYS read the message and the person back to Jim and wait for a clear yes BEFORE calling this. If auto-send is on, Maya taps Send herself; otherwise the chat opens ready and Jim taps Send. The result tells you which.', input_schema:{type:'object', properties:{contact:{type:'string', description:'Person or group name'}, message:{type:'string'}, app:{type:'string', enum:['whatsapp','messenger','sms']}, group:{type:'boolean', description:'true when sending to a group chat'}}, required:['contact','message','app']}},
   {name:'compose_email', description:'Open the email app with an email filled in for Jim to send.', input_schema:{type:'object', properties:{to:{type:'string'}, subject:{type:'string'}, body:{type:'string'}}, required:['subject','body']}},
   {name:'check_calendar', description:"Read Jim's calendar. days_from_today 0=today, 1=tomorrow.", input_schema:{type:'object', properties:{days_from_today:{type:'integer'}, num_days:{type:'integer'}}, required:['days_from_today','num_days']}},
   {name:'add_calendar_event', description:'Add an event to the calendar. start_iso like 2026-11-06T09:00:00+04:00.', input_schema:{type:'object', properties:{title:{type:'string'}, start_iso:{type:'string'}, duration_minutes:{type:'integer'}, location:{type:'string'}}, required:['title','start_iso']}},
