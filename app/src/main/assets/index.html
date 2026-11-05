@@ -184,6 +184,7 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
         <div class="row"><input type="password" id="keyInput" placeholder="Paste Claude API key (sk-ant-…)" autocomplete="off" style="width:100%;height:46px;border-radius:12px;border:1px solid var(--line);background:var(--surface2);color:var(--text);padding:0 12px;font:14px Inter,sans-serif"><button class="btn-line" id="keySave">Save</button></div>
         <p class="muted" style="margin:10px 0 6px">Voice (tap to hear)</p>
         <div class="seg small" id="voiceBtns" style="flex-wrap:wrap"></div>
+        <p class="muted" id="voiceProg" style="display:none;margin-top:6px"></p>
         <div class="row" style="margin-top:6px"><p class="muted" id="usageText"></p><button class="btn-line" id="usageReset">Reset</button></div>
         <div class="row"><span></span><button class="btn-line red" id="keyClear">Remove key</button></div>
       </div>
@@ -820,14 +821,34 @@ async function ownTurn(userText, speakIt){
 /* ---------- voice: Kokoro (free, on phone) with phone-voice fallback ---------- */
 const KOKORO_VOICES = [['af_heart','Heart'],['af_bella','Bella'],['af_nicole','Nicole'],['af_sarah','Sarah'],['af_sky','Sky'],['bf_emma','Emma (UK)'],['phone','Phone voice']];
 let kokoro=null, kokoroLoading=null, genChain=Promise.resolve();
+let kWorker=null, kSeq=0; const kWait={};
+function kokoroWorker(){
+  if(kWorker) return kWorker;
+  kWorker = new Worker('kokoro-worker.js', {type:'module'});
+  kWorker.onmessage = (e) => {
+    const m = e.data||{};
+    if(m.type==='progress'){ kokoroProgress(m.p); }
+    else if(m.type==='ready'){ const w=kWait.load; delete kWait.load; w && w.resolve(); }
+    else if(m.type==='audio'){ const w=kWait[m.id]; delete kWait[m.id]; w && w.resolve({toBlob:()=>m.blob}); }
+    else if(m.type==='error'){ const w=kWait[m.id||'load']; delete kWait[m.id||'load']; w && w.reject(new Error(m.msg)); }
+  };
+  kWorker.onerror = (e) => { const w=kWait.load; delete kWait.load; w && w.reject(new Error('Voice engine failed')); };
+  return kWorker;
+}
+function kokoroProgress(p){
+  const el=$('voiceProg'); if(!el) return;
+  el.style.display = p>=100 ? 'none' : 'block';
+  el.textContent = 'Downloading natural voices… '+p+'% (first time only)';
+}
 function loadKokoro(){
   if(kokoro) return Promise.resolve(kokoro);
   if(!kokoroLoading){
-    kokoroLoading = (async () => {
-      const { KokoroTTS } = await import('https://cdn.jsdelivr.net/npm/kokoro-js/+esm');
-      kokoro = await KokoroTTS.from_pretrained('onnx-community/Kokoro-82M-v1.0-ONNX', { dtype:'q8', device:'wasm' });
-      return kokoro;
-    })().catch(e => { kokoroLoading=null; throw e; });
+    kokoroLoading = new Promise((resolve, reject) => { kWait.load = {resolve, reject}; kokoroWorker().postMessage({type:'load'}); })
+      .then(() => {
+        kokoro = { generate: (text, opts) => new Promise((resolve, reject) => { const id='g'+(++kSeq); kWait[id]={resolve, reject}; kWorker.postMessage({type:'gen', id, text, voice:(opts&&opts.voice)||'af_heart'}); }) };
+        kokoroProgress(100); return kokoro;
+      })
+      .catch(e => { kokoroLoading=null; kokoroProgress(100); throw e; });
   }
   return kokoroLoading;
 }
@@ -900,7 +921,12 @@ document.querySelectorAll('[data-engine]').forEach(b => b.onclick = () => { sett
 document.querySelectorAll('[data-model]').forEach(b => b.onclick = () => { settings.model=b.dataset.model; store.set('settings',settings); renderBrain(); });
 document.querySelectorAll('[data-voice]').forEach(b => b.onclick = async () => {
   settings.voice=b.dataset.voice; store.set('settings',settings); renderBrain();
-  if(settings.voice!=='phone' && !kokoro){ toast('Downloading natural voices (about 90 MB, first time only)…'); try{ await loadKokoro(); }catch(e){ toast('Could not load Kokoro voices'); return; } }
+  if(speech.playing || speech.q.length) stopSpeech();
+  if(settings.voice!=='phone' && !kokoro){
+    kokoroProgress(0); toast('Getting the natural voices ready, you can keep using ZeniX');
+    loadKokoro().then(()=>speakEnqueue(`Hi ${settings.name||'Jim'}, I'm ZeniX. How do I sound?`)).catch(()=>toast('Could not load the natural voices. Check your internet.'));
+    return;
+  }
   speakEnqueue(`Hi ${settings.name||'Jim'}, I'm ZeniX. How do I sound?`);
 });
 $('keySave').onclick = () => { const v=$('keyInput').value.trim(); if(!/^sk-ant-/.test(v)){ toast('That does not look like a Claude API key (starts with sk-ant-)'); return; } store.set('apikey', v); $('keyInput').value=''; renderBrain(); toast('API key saved on this phone only'); };
