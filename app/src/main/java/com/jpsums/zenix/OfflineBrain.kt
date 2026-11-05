@@ -185,17 +185,47 @@ class OfflineBrain(private val activity: MainActivity) {
         }
     }
 
+    /** Stop now and deliver what was heard (faster than waiting for silence detection). */
+    fun finishListening() = activity.runOnUiThread {
+        try { recognizer?.stopListening() } catch (_: Exception) {}
+        try { netRecognizer?.stopListening() } catch (_: Exception) {}
+    }
+
     fun stopListening() = activity.runOnUiThread {
         try { recognizer?.cancel() } catch (_: Exception) {}
         try { netRecognizer?.cancel() } catch (_: Exception) {}
     }
 
     // ---------- speaking ----------
+    /** Optional chosen Google/Samsung voice name (e.g. "en-us-x-tpf-network"). */
+    @Volatile var voiceName: String = ""
+    @Volatile var rate: Float = 1.05f
+
     fun speak(text: String, lang: String) {
         val t = tts
         if (t == null || !ttsReady) { js("window.zenixOnSpeakDone && window.zenixOnSpeakDone()"); return }
-        try { t.language = Locale.forLanguageTag(lang) } catch (_: Exception) {}
+        try {
+            val chosen = if (voiceName.isNotEmpty() && !lang.startsWith("fil")) t.voices?.firstOrNull { it.name == voiceName } else null
+            if (chosen != null) t.voice = chosen else t.language = Locale.forLanguageTag(lang)
+            t.setSpeechRate(rate)
+        } catch (_: Exception) {}
         t.speak(text, TextToSpeech.QUEUE_FLUSH, null, "z" + System.currentTimeMillis())
+    }
+
+    /** High-quality English voices installed on the phone, best first. */
+    fun listVoices(): String {
+        val arr = org.json.JSONArray()
+        val t = tts ?: return arr.toString()
+        try {
+            t.voices?.filter { it.locale.language == "en" && !it.features.contains(TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED) }
+                ?.sortedWith(compareByDescending<android.speech.tts.Voice> { it.quality }.thenBy { it.isNetworkConnectionRequired })
+                ?.take(16)
+                ?.forEach { v ->
+                    arr.put(JSONObject().put("name", v.name).put("locale", v.locale.toLanguageTag())
+                        .put("quality", v.quality).put("network", v.isNetworkConnectionRequired))
+                }
+        } catch (_: Exception) {}
+        return arr.toString()
     }
 
     fun stopSpeaking() { try { tts?.stop() } catch (_: Exception) {} }

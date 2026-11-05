@@ -58,6 +58,11 @@ class ZenixBridge(private val activity: MainActivity) {
     @JavascriptInterface fun stopListening(): String { activity.brain.stopListening(); return ok("stopped") }
     @JavascriptInterface fun speak(text: String, lang: String): String { activity.brain.speak(text, lang); return ok("speaking") }
     @JavascriptInterface fun stopSpeaking(): String { activity.brain.stopSpeaking(); return ok("stopped") }
+    @JavascriptInterface fun finishListening(): String { activity.brain.finishListening(); return ok("ok") }
+    @JavascriptInterface fun listVoices(): String = activity.brain.listVoices()
+    @JavascriptInterface fun setPhoneVoice(name: String, rate: String): String {
+        activity.brain.voiceName = name; activity.brain.rate = rate.toFloatOrNull() ?: 1.05f; return ok("ok")
+    }
 
     // ---------- floating orb ----------
     @JavascriptInterface fun hasOverlay(): String = android.provider.Settings.canDrawOverlays(activity).toString()

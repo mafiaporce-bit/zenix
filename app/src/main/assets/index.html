@@ -185,6 +185,8 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
         <p class="muted" style="margin:10px 0 6px">Voice (tap to hear)</p>
         <div class="seg small" id="voiceBtns" style="flex-wrap:wrap"></div>
         <p class="muted" id="voiceProg" style="display:none;margin-top:6px"></p>
+        <p class="muted" style="margin:10px 0 6px">Google HD voices (instant, recommended for speed)</p>
+        <div class="seg small" id="hdVoices" style="flex-wrap:wrap"></div>
         <div class="row" style="margin-top:6px"><p class="muted" id="usageText"></p><button class="btn-line" id="usageReset">Reset</button></div>
         <div class="row"><span></span><button class="btn-line red" id="keyClear">Remove key</button></div>
       </div>
@@ -217,7 +219,7 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
       <p class="muted" style="margin:10px 0 6px">Auto uses the cloud when you have internet and the on-phone brain when you don't.</p>
       <p class="muted" id="brainText">Checking…</p>
       <div id="brainBar" style="display:none;height:8px;border-radius:99px;background:var(--surface2);margin:10px 0;overflow:hidden"><div id="brainFill" style="height:100%;width:0;background:linear-gradient(90deg,var(--accent),var(--accent2))"></div></div>
-      <div class="row"><span class="muted">Listening language</span><div class="seg small"><button data-lang="en-US">English</button><button data-lang="fil-PH">Tagalog</button></div></div>
+      <div class="row"><span class="muted">Listening language</span><div class="seg small"><button data-lang="en-PH">English (PH)</button><button data-lang="en-US">English (US)</button><button data-lang="fil-PH">Tagalog</button></div></div>
       <div class="row"><span></span><button class="btn-line" id="brainBtn">Download</button></div>
     </div>
     <div class="card">
@@ -521,7 +523,7 @@ $('volBtn').onclick = () => { if(!convo) return; voiceMuted=!voiceMuted; convo.s
 
 /* ---------- Offline mode (on-phone brain) ---------- */
 if(!settings.mode) settings.mode='auto';
-if(!settings.offlineLang) settings.offlineLang='en-US';
+if(!settings.offlineLang || (settings.offlineLang==='en-US' && !settings.langMigrated)){ settings.offlineLang='en-PH'; settings.langMigrated=true; }
 const off = { active:false, kind:null, waiting:{}, seq:0, thinking:false };
 function offlineReady(){ if(!Native || !Native.offlineStatus) return false; try{ return JSON.parse(Native.offlineStatus()).state==='ready'; }catch(e){ return false; } }
 function wantOffline(){ return settings.mode==='offline' || (settings.mode==='auto' && !navigator.onLine); }
@@ -604,8 +606,15 @@ function offListen(){
   else Native.startListening(settings.offlineLang);
 }
 window.zenixOnListening = () => { if(off.active && off.kind==='talk') $('modeLabel').textContent = off.brain==='own' ? 'Listening…' : 'Listening… (offline)'; };
-window.zenixOnPartial = (t) => { if(off.active && off.kind==='talk') $('liveLine').textContent='You: '+t; };
+let partialTimer=null;
+window.zenixOnPartial = (t) => {
+  if(!(off.active && off.kind==='talk')) return;
+  $('liveLine').textContent='You: '+t;
+  clearTimeout(partialTimer);
+  if(t && t.trim().split(/\s+/).length>=1) partialTimer = setTimeout(()=>{ if(Native.finishListening) Native.finishListening(); }, 900);
+};
 window.zenixOnSpeech = async (t) => {
+  clearTimeout(partialTimer);
   if(!off.active || off.kind!=='talk') return;
   if(!t){ offListen(); return; }
   addMsg('user', t); $('liveLine').textContent='You: '+t;
@@ -920,7 +929,7 @@ KOKORO_VOICES.forEach(([id,label]) => { const b=document.createElement('button')
 document.querySelectorAll('[data-engine]').forEach(b => b.onclick = () => { settings.engine=b.dataset.engine; store.set('settings',settings); renderBrain(); toast(settings.engine==='own'?'Own brain: Claude direct, ElevenLabs credits not used':'ElevenLabs: premium Jessica voice (uses credits)'); });
 document.querySelectorAll('[data-model]').forEach(b => b.onclick = () => { settings.model=b.dataset.model; store.set('settings',settings); renderBrain(); });
 document.querySelectorAll('[data-voice]').forEach(b => b.onclick = async () => {
-  settings.voice=b.dataset.voice; store.set('settings',settings); renderBrain();
+  settings.voice=b.dataset.voice; store.set('settings',settings); renderBrain(); renderHD();
   if(speech.playing || speech.q.length) stopSpeech();
   if(settings.voice!=='phone' && !kokoro){
     kokoroProgress(0); toast('Getting the natural voices ready, you can keep using ZeniX');
@@ -932,6 +941,21 @@ document.querySelectorAll('[data-voice]').forEach(b => b.onclick = async () => {
 $('keySave').onclick = () => { const v=$('keyInput').value.trim(); if(!/^sk-ant-/.test(v)){ toast('That does not look like a Claude API key (starts with sk-ant-)'); return; } store.set('apikey', v); $('keyInput').value=''; renderBrain(); toast('API key saved on this phone only'); };
 $('keyClear').onclick = () => { store.set('apikey',''); renderBrain(); };
 $('usageReset').onclick = () => { usage={inTok:0,outTok:0,cost:0}; store.set('usage',usage); renderBrain(); };
+function renderHD(){
+  const box=$('hdVoices'); if(!box) return; box.innerHTML='';
+  let list=[]; try{ list = Native && Native.listVoices ? JSON.parse(Native.listVoices()) : []; }catch(e){}
+  if(!list.length){ box.innerHTML='<p class="muted">No extra voices found. Install "Speech Services by Google" from the Play Store for HD voices.</p>'; return; }
+  list.slice(0,10).forEach((v,i)=>{
+    const b=document.createElement('button');
+    b.textContent = `${v.locale.replace('en-','')} ${i+1}${v.quality>=400?' HD':''}`;
+    b.classList.toggle('sel', settings.voice==='phone' && settings.phoneVoice===v.name);
+    b.onclick=()=>{ settings.voice='phone'; settings.phoneVoice=v.name; store.set('settings',settings); applyPhoneVoice(); stopSpeech(); renderBrain(); renderHD(); speakEnqueue(`Hi ${settings.name||'Jim'}, I'm ZeniX. How do I sound?`); };
+    box.appendChild(b);
+  });
+}
+function applyPhoneVoice(){ if(Native && Native.setPhoneVoice) Native.setPhoneVoice(settings.phoneVoice||'', '1.05'); }
+applyPhoneVoice();
+setTimeout(renderHD, 1500);
 renderBrain();
 if(settings.engine==='own' && settings.voice!=='phone' && navigator.onLine) setTimeout(()=>loadKokoro().catch(()=>{}), 3000);
 
