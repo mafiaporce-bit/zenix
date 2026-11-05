@@ -86,6 +86,9 @@ class ZenixBridge(private val activity: MainActivity) {
     @JavascriptInterface fun stopSpeaking(): String { activity.brain.stopSpeaking(); return ok("stopped") }
     // ---------- "Hey Maya" wake word ----------
     @JavascriptInterface fun wakeStatus(): String = WakeWordService.status(activity)
+    @JavascriptInterface fun isLocked(): String = if (activity.isLocked()) "true" else "false"
+    @JavascriptInterface fun askUnlock(): String { activity.askUnlock(); return ok("asking") }
+    @JavascriptInterface fun wakeChatEnded(): String { activity.wakeChatEnded(); return ok("ok") }
     @JavascriptInterface fun wakeDownload(): String { WakeWordService.download(activity); return WakeWordService.status(activity) }
     @JavascriptInterface fun wakeEnable(on: String): String {
         if (on == "true") activity.wakeCommand(null) else activity.wakeCommand(WakeWordService.ACTION_OFF)

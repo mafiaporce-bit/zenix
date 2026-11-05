@@ -198,6 +198,13 @@ class WakeWordService : Service() {
 
     private fun triggered() {
         pause()   // free the microphone for the conversation
+        try {   // wake the screen if the phone is asleep (Maya then shows over the lock screen)
+            val pm = getSystemService(PowerManager::class.java)
+            if (!pm.isInteractive) {
+                @Suppress("DEPRECATION")
+                pm.newWakeLock(PowerManager.SCREEN_BRIGHT_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP or PowerManager.ON_AFTER_RELEASE, "maya:screen").acquire(8000)
+            }
+        } catch (_: Exception) { }
         val i = Intent(this, MainActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
             .putExtra("wake", true)

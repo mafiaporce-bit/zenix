@@ -29,6 +29,7 @@ class MainActivity : Activity() {
     private var pageReady = false
     private var pendingWake = false
     private var pendingUpdate = false
+    private var overLock = false
 
     companion object {
         const val CHANNEL_ID = "zenix_reminders"
@@ -104,7 +105,7 @@ class MainActivity : Activity() {
             }
         }
 
-        if (intent?.getBooleanExtra("wake", false) == true) pendingWake = true
+        if (intent?.getBooleanExtra("wake", false) == true) { pendingWake = true; showOverLock(true) }
         if (intent?.getBooleanExtra("update", false) == true) pendingUpdate = true
         webView.loadUrl("https://appassets.androidplatform.net/assets/index.html")
         requestAllPermissions()
@@ -113,8 +114,46 @@ class MainActivity : Activity() {
     override fun onNewIntent(intent: android.content.Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        if (intent.getBooleanExtra("wake", false)) { if (pageReady) onWake() else pendingWake = true }
+        if (intent.getBooleanExtra("wake", false)) { showOverLock(true); if (pageReady) onWake() else pendingWake = true }
         if (intent.getBooleanExtra("update", false)) { if (pageReady) runJs("window.zenixStartUpdate && window.zenixStartUpdate()") else pendingUpdate = true }
+    }
+
+    /** Lets Maya appear (and wake the screen) on top of the lock screen after "Hey Maya", without unlocking. */
+    fun showOverLock(on: Boolean) {
+        runOnUiThread {
+            overLock = on
+            if (Build.VERSION.SDK_INT >= 27) { setShowWhenLocked(on); setTurnScreenOn(on) }
+            else {
+                @Suppress("DEPRECATION")
+                val f = WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
+                if (on) window.addFlags(f) else window.clearFlags(f)
+            }
+        }
+    }
+
+    fun isLocked(): Boolean = getSystemService(android.app.KeyguardManager::class.java).isKeyguardLocked
+
+    /** Shows the fingerprint / face / PIN prompt; the page hears back via window.zenixUnlocked(ok). */
+    fun askUnlock() {
+        runOnUiThread {
+            val km = getSystemService(android.app.KeyguardManager::class.java)
+            if (!km.isKeyguardLocked) { runJs("window.zenixUnlocked && window.zenixUnlocked(true)"); return@runOnUiThread }
+            if (Build.VERSION.SDK_INT >= 26) km.requestDismissKeyguard(this, object : android.app.KeyguardManager.KeyguardDismissCallback() {
+                override fun onDismissSucceeded() { runJs("window.zenixUnlocked && window.zenixUnlocked(true)") }
+                override fun onDismissCancelled() { runJs("window.zenixUnlocked && window.zenixUnlocked(false)") }
+                override fun onDismissError() { runJs("window.zenixUnlocked && window.zenixUnlocked(false)") }
+            })
+        }
+    }
+
+    /** The chat that "Hey Maya" started is over: hand the screen back to the lock screen. */
+    fun wakeChatEnded() {
+        runOnUiThread {
+            if (!overLock) return@runOnUiThread
+            val locked = isLocked()
+            showOverLock(false)
+            if (locked) moveTaskToBack(true)
+        }
     }
 
     /** "Hey Maya" was heard: start a voice chat. */

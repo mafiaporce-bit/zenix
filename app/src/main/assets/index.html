@@ -997,6 +997,24 @@ clientTools.show_route = async ({from, to}) => {
 };
 clientTools.close_map = async () => { MapView.close(); return 'Map closed.'; };
 window.MayaTools = clientTools;
+/* On the lock screen, private actions need Jim's fingerprint / face first */
+const PRIVATE_TOOLS = ['make_call','send_message','open_call_history','check_calendar','add_calendar_event','compose_email','open_app','open_website','web_search'];
+let unlockWait = null;
+window.zenixUnlocked = (ok) => { const w = unlockWait; unlockWait = null; if(w) w(!!ok); };
+function unlockFirst(){
+  return new Promise(res => { unlockWait = res; Native.askUnlock(); setTimeout(() => { if(unlockWait === res){ unlockWait = null; res(false); } }, 30000); });
+}
+PRIVATE_TOOLS.forEach(name => {
+  const run = clientTools[name]; if(!run) return;
+  clientTools[name] = async (args) => {
+    if(Native.isLocked && Native.isLocked()==='true'){
+      showAction('🔒 Unlock to continue');
+      const ok = await unlockFirst();
+      if(!ok) return 'The phone is still locked, so this was not done. Tell Jim in one short sentence to unlock with his fingerprint or face and ask again.';
+    }
+    return run(args);
+  };
+});
 
 /* ---------- Offline mode (on-phone brain) ---------- */
 if(!settings.mode) settings.mode='auto';
@@ -2135,7 +2153,10 @@ if(settings.wake===undefined) settings.wake=false;
 let wakeGreeting = false;
 function wakeSt(){ try{ return JSON.parse(Native.wakeStatus()); }catch(e){ return {}; } }
 function wakePauseNow(){ if(settings.wake && Native && Native.wakePause){ Native.wakePause(); return new Promise(r=>setTimeout(r,350)); } return Promise.resolve(); }
-function wakeResumeLater(){ if(settings.wake && Native && Native.wakeResume) setTimeout(()=>{ if(!off.active && !convo) Native.wakeResume(); renderWake(); }, 900); }
+function wakeResumeLater(){
+  if(Native.wakeChatEnded) setTimeout(()=>{ if(!off.active && !convo) Native.wakeChatEnded(); }, 1200);
+  if(settings.wake && Native && Native.wakeResume) setTimeout(()=>{ if(!off.active && !convo) Native.wakeResume(); renderWake(); }, 900);
+}
 window.zenixWake = () => {
   if(off.active || convo || connecting) return;
   document.querySelector('nav button[data-view="talk"]').click();
