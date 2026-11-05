@@ -61,6 +61,11 @@
         </provider>
 
         <service
+            android:name=".WakeWordService"
+            android:exported="false"
+            android:foregroundServiceType="microphone" />
+
+        <service
             android:name=".VoiceService"
             android:exported="false"
             android:foregroundServiceType="microphone" />

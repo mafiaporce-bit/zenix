@@ -26,6 +26,8 @@ class MainActivity : Activity() {
     lateinit var updater: Updater
     lateinit var ears: DeepgramEars
     private var pendingWebPermission: PermissionRequest? = null
+    private var pageReady = false
+    private var pendingWake = false
 
     companion object {
         const val CHANNEL_ID = "zenix_reminders"
@@ -76,6 +78,10 @@ class MainActivity : Activity() {
         webView.webViewClient = object : WebViewClient() {
             override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? =
                 assetLoader.shouldInterceptRequest(request.url)
+            override fun onPageFinished(view: WebView, url: String) {
+                pageReady = true
+                if (pendingWake) { pendingWake = false; view.postDelayed({ onWake() }, 900) }
+            }
         }
         webView.webChromeClient = object : WebChromeClient() {
             override fun onPermissionRequest(request: PermissionRequest) {
@@ -94,8 +100,24 @@ class MainActivity : Activity() {
             }
         }
 
+        if (intent?.getBooleanExtra("wake", false) == true) pendingWake = true
         webView.loadUrl("https://appassets.androidplatform.net/assets/index.html")
         requestAllPermissions()
+    }
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        if (intent.getBooleanExtra("wake", false)) { if (pageReady) onWake() else pendingWake = true }
+    }
+
+    /** "Hey Maya" was heard: start a voice chat. */
+    fun onWake() { runJs("window.zenixWake && window.zenixWake()") }
+
+    fun wakeCommand(action: String?) {
+        val i = android.content.Intent(this, WakeWordService::class.java)
+        if (action != null) i.action = action
+        try { if (action == null) startForegroundService(i) else startService(i) } catch (_: Exception) { }
     }
 
     fun requestAllPermissions() {

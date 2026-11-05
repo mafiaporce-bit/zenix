@@ -58,6 +58,16 @@ class ZenixBridge(private val activity: MainActivity) {
     @JavascriptInterface fun stopListening(): String { activity.brain.stopListening(); return ok("stopped") }
     @JavascriptInterface fun speak(text: String, lang: String): String { activity.brain.speak(text, lang); return ok("speaking") }
     @JavascriptInterface fun stopSpeaking(): String { activity.brain.stopSpeaking(); return ok("stopped") }
+    // ---------- "Hey Maya" wake word ----------
+    @JavascriptInterface fun wakeStatus(): String = WakeWordService.status(activity)
+    @JavascriptInterface fun wakeDownload(): String { WakeWordService.download(activity); return WakeWordService.status(activity) }
+    @JavascriptInterface fun wakeEnable(on: String): String {
+        if (on == "true") activity.wakeCommand(null) else activity.wakeCommand(WakeWordService.ACTION_OFF)
+        return ok("ok")
+    }
+    @JavascriptInterface fun wakePause(): String { if (WakeWordService.current != null) activity.wakeCommand(WakeWordService.ACTION_PAUSE); return ok("ok") }
+    @JavascriptInterface fun wakeResume(): String { if (WakeWordService.current != null) activity.wakeCommand(WakeWordService.ACTION_RESUME); return ok("ok") }
+
     // ---------- Deepgram ears (native) ----------
     @JavascriptInterface fun dgOpen(key: String, lang: String): String { activity.ears.open(key, lang); return ok("opening") }
     @JavascriptInterface fun dgOpenFlux(key: String): String { activity.ears.open(key, "en", true); return ok("opening") }

@@ -46,4 +46,6 @@ dependencies {
     implementation("com.google.mediapipe:tasks-genai:0.10.24")
     implementation("androidx.core:core:1.13.1")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("net.java.dev.jna:jna:5.13.0@aar")
+    implementation("com.alphacephei:vosk-android:0.3.47@aar")
 }
