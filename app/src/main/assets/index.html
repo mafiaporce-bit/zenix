@@ -170,7 +170,7 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
     <div class="card">
       <h3>Maya brain</h3>
       <div class="seg"><button data-engine="own">Own brain</button><button data-engine="eleven">ElevenLabs</button></div>
-      <p class="muted" style="margin:8px 0">Own brain uses your own key (Claude or the Open brain): much cheaper and no ElevenLabs credits. ElevenLabs gives the premium Jessica voice.</p>
+      <p class="muted" style="margin:8px 0">Own brain uses your own keys (Claude or the Open brain, plus any voice below): much cheaper. ElevenLabs mode is the all-in-one premium agent.</p>
       <div id="ownBox">
         <p class="muted" style="margin:6px 0">Which brain</p>
         <div class="seg small" style="margin:6px 0"><button data-provider="claude">Claude</button><button data-provider="openrouter">Open brain · Grok</button></div>
@@ -912,7 +912,7 @@ let orWebOn = true;                            // retried every time the app ope
 
 function orToolList(){
   const t = TOOL_DEFS.map(d => ({type:'function', function:{name:d.name, description:d.description, parameters:d.input_schema}}));
-  if(orWebOn) t.push({type:'openrouter:web_search', parameters:{max_results:3}});
+  if(orWebOn) t.push({type:'openrouter:web_search', parameters:{max_results:3, max_uses:1}});   // one quick search at most
   return t;
 }
 
@@ -952,9 +952,10 @@ async function orStream(system, messages, onText, signal){
         const data = line.slice(5).trim(); if(data==='[DONE]') continue;
         let ev; try{ ev = JSON.parse(data); }catch(e){ continue; }
         if(ev.error) throw new Error(ev.error.message || 'Open brain error');
-        if(ev.usage){ u.inTok = ev.usage.prompt_tokens||0; u.outTok = ev.usage.completion_tokens||0; if(typeof ev.usage.cost==='number') cost = ev.usage.cost; }
+        if(ev.usage){ const st = ev.usage.server_tool_use || ev.usage.server_tool_use_details || {}; if((st.web_search_requests||0) > 0) turnSearched = true; u.inTok = ev.usage.prompt_tokens||0; u.outTok = ev.usage.completion_tokens||0; if(typeof ev.usage.cost==='number') cost = ev.usage.cost; }
         const ch = ev.choices && ev.choices[0]; if(!ch) continue;
         const d = ch.delta || {};
+        if(d.annotations && d.annotations.length) turnSearched = true;
         if(d.content){ text += d.content; onText && onText(d.content); }
         if(d.tool_calls) d.tool_calls.forEach((tc, k) => {
           const i = typeof tc.index==='number' ? tc.index : k;
@@ -1054,7 +1055,13 @@ async function pumpSpeech(){
   if(!item){ if(!speech.streamOpen && speech.onIdle){ const f=speech.onIdle; speech.onIdle=null; f(); } return; }
   if(typeof dg!=='undefined' && dg.active && !dg.paused) dgPause();
   if(turnStart){ const d=(performance.now()-turnStart)/1000; const b = turnTok ? (turnTok-turnStart)/1000 : 0; turnStart=0; turnTok=0;
-    if(off.kind==='talk') $('actionLine').textContent = `⚡ replied in ${d.toFixed(1)}s` + (b ? ` · brain ${b.toFixed(1)}s · voice ${Math.max(0,d-b).toFixed(1)}s` : '') + speedNote(); }
+    const parts = [];
+    if(turnEars) parts.push(`ears ${turnEars.toFixed(1)}s`);
+    if(turnHead) parts.push('head start ✓'); else if(b) parts.push(`brain ${b.toFixed(1)}s`);
+    if(b || turnHead) parts.push(`voice ${Math.max(0, turnHead ? d : d-b).toFixed(1)}s`);
+    if(turnSearched) parts.push('searched web');
+    if(off.kind==='talk') $('actionLine').textContent = `⚡ ${(d+turnEars).toFixed(1)}s` + (parts.length ? ' · '+parts.join(' · ') : '') + speedNote();
+    turnEars = 0; turnHead = false; turnSearched = false; }
   speech.playing = true; setOrb('speaking'); $('modeLabel').textContent='Maya is speaking'; if(Native && Native.setOrbMode) Native.setOrbMode('speaking');
   try{
     const audio = item.wav ? await item.wav : null;
@@ -1073,14 +1080,14 @@ async function pumpSpeech(){
 }
 function stopSpeech(){ speech.hold=false; speech.q=[]; speech.streamOpen=false; speech.onIdle=null; try{ speech.audio.pause(); }catch(e){} try{ Native.stopSpeaking(); }catch(e){} if(nativeSpeakResolve){ const r=nativeSpeakResolve; nativeSpeakResolve=null; r(); } speech.playing=false; }
 
-let turnStart = 0, turnTok = 0;
+let turnStart = 0, turnTok = 0, turnEars = 0, turnHead = false, turnSearched = false;
 function speedNote(){
   if(settings.engine!=='own') return '';
   if(settings.provider==='openrouter'){ const m = settings.orModel||''; if(/:free$/.test(m)) return ' (free model, can queue)'; if((orNoReason[m]||0) >= 3) return ' (thinking on)'; }
   return '';
 }
 async function ownRespond(text, speakIt, after, opts={}){
-  if(!opts.quiet){ turnStart = performance.now(); turnTok = 0; $('modeLabel').textContent = 'Thinking…'; setOrb('thinking'); }
+  if(!opts.quiet){ turnStart = performance.now(); turnTok = 0; turnSearched = false; $('modeLabel').textContent = 'Thinking…'; setOrb('thinking'); }
   speech.streamOpen = true; speech.onIdle = after || null;
   let full = '';
   try{ full = await ownTurn(text, speakIt, opts); }
@@ -1230,7 +1237,7 @@ window.zenixDGMsg = (txt) => {
   if(m.type==='TurnInfo'){
     if(dg.paused) return;
     const t = (m.transcript||'').trim();
-    if(m.event==='Update' || m.event==='StartOfTurn'){ if(t && off.kind==='talk') $('liveLine').textContent = 'You: '+t; }
+    if(m.event==='Update' || m.event==='StartOfTurn'){ if(t && t!==dg.lastT){ dg.lastT=t; dg.lastHeard=performance.now(); } if(t && off.kind==='talk') $('liveLine').textContent = 'You: '+t; }
     else if(m.event==='EagerEndOfTurn'){ if(t) dgEager(t); }
     else if(m.event==='TurnResumed'){ dgCancelEager(); }
     else if(m.event==='EndOfTurn'){ if(t) dgFinal(t); }
@@ -1272,7 +1279,7 @@ function startSpeculative(t){
   return {
     text: t,
     cancel(){ cancelled = true; try{ ctl.abort(); }catch(e){} stopSpeech(); ownMsgs.length = snapLen; if(snapLast) ownMsgs[snapLen-1] = JSON.parse(snapLast); go(false); },
-    confirm(){ turnStart = performance.now(); $('modeLabel').textContent='Thinking…'; setOrb('thinking'); speech.hold = false; go(true); pumpSpeech(); }
+    confirm(){ turnHead = true; turnStart = performance.now(); $('modeLabel').textContent='Thinking…'; setOrb('thinking'); speech.hold = false; go(true); pumpSpeech(); }
   };
 }
 function dgEager(t){
@@ -1282,6 +1289,7 @@ function dgEager(t){
 }
 function dgCancelEager(){ if(specTurn){ const s=specTurn; specTurn=null; s.cancel(); } }
 function dgFinal(t){
+  turnEars = dg.lastHeard ? (performance.now()-dg.lastHeard)/1000 : 0; dg.lastHeard=0; dg.lastT='';
   dgPause();
   if(specTurn && normT(specTurn.text)===normT(t)){ const s=specTurn; specTurn=null; addMsg('user', t); $('liveLine').textContent='You: '+t; s.confirm(); return; }
   dgCancelEager();
@@ -1289,7 +1297,7 @@ function dgFinal(t){
 }
 function dgTrackTime(){ if(dg.t0){ usage.cost += (Date.now()-dg.t0)/60000 * 0.0048; store.set('usage', usage); dg.t0=0; } }
 function dgPause(){ if(Native && Native.dgSending) Native.dgSending('false'); dg.paused=true; dgTrackTime(); }
-function dgResume(){ dg.buf=''; if(Native && Native.dgSending) Native.dgSending('true'); dg.paused=false; dg.t0=Date.now(); }
+function dgResume(){ dg.buf=''; dg.lastT=''; dg.lastHeard=0; if(Native && Native.dgSending) Native.dgSending('true'); dg.paused=false; dg.t0=Date.now(); }
 function dgFinish(){ const t=dg.buf.trim(); dg.buf=''; dgPause(); if(t && window.zenixOnSpeech) window.zenixOnSpeech(t); }
 function dgClose(){ if(typeof specTurn!=='undefined' && specTurn) dgCancelEager(); dgTrackTime(); const was=dg.active; dg.active=false; dg.paused=true; if(was && Native && Native.dgClose) Native.dgClose(); }
 /* Called by offListen for Own brain when Deepgram ears are on */
