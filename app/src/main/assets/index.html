@@ -104,6 +104,10 @@ input[type=text]{width:100%;height:46px;border-radius:12px;border:1px solid var(
 .mem span{flex:1}
 .mem button{width:36px;height:36px;border-radius:10px;color:var(--danger)}
 .muted{color:var(--muted);font-size:13px;margin:0}
+.seg{display:flex;gap:6px;background:var(--surface2);padding:4px;border-radius:12px}
+.seg button{flex:1;min-height:40px;border-radius:9px;font-size:14px;font-weight:500;color:var(--muted)}
+.seg button.sel{background:var(--surface);color:var(--accent);box-shadow:var(--shadow)}
+.seg.small button{min-height:36px;padding:0 10px;font-size:13px}
 
 nav{display:flex;justify-content:space-around;background:var(--surface);border-top:1px solid var(--line);padding:6px 8px calc(env(safe-area-inset-bottom) + 6px)}
 nav button{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:11px;color:var(--muted);min-height:50px;justify-content:center;border-radius:12px}
@@ -181,6 +185,17 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
       <h3>Phone permissions</h3>
       <p class="muted" id="permText">Allow calls, contacts, calendar and notifications so ZeniX can help.</p>
       <div class="row"><span></span><button class="btn-line" id="permBtn">Allow permissions</button></div>
+    </div>
+    <div class="card">
+      <h3>Offline mode</h3>
+      <div class="seg">
+        <button data-mode="auto">Auto</button><button data-mode="cloud">Cloud</button><button data-mode="offline">Offline</button>
+      </div>
+      <p class="muted" style="margin:10px 0 6px">Auto uses the cloud when you have internet and the on-phone brain when you don't.</p>
+      <p class="muted" id="brainText">Checking…</p>
+      <div id="brainBar" style="display:none;height:8px;border-radius:99px;background:var(--surface2);margin:10px 0;overflow:hidden"><div id="brainFill" style="height:100%;width:0;background:linear-gradient(90deg,var(--accent),var(--accent2))"></div></div>
+      <div class="row"><span class="muted">Offline language</span><div class="seg small"><button data-lang="en-US">English</button><button data-lang="fil-PH">Tagalog</button></div></div>
+      <div class="row"><span></span><button class="btn-line" id="brainBtn">Download</button></div>
     </div>
     <div class="card">
       <h3>Floating orb</h3>
@@ -408,7 +423,10 @@ async function startSession(kind){
     if(pendingText){ convo.sendUserMessage(pendingText); pendingText=null; }
   }catch(e){
     console.error(e); convo=null; session=null; setStatus('off'); resetTalkUI();
-    toast('Could not reach ZeniX. Check your internet.');
+    if(settings.mode==='auto' && offlineReady()){
+      toast('Cloud unreachable — switching to offline ZeniX');
+      if(kind==='talk') startOffline('talk'); else if(pendingText){ const t=pendingText; pendingText=null; offlineChat(t); }
+    } else toast('Could not reach ZeniX. Check your internet.');
   }finally{ connecting=false; }
 }
 async function endSession(){
@@ -425,9 +443,11 @@ function resetTalkUI(){
   setOrb('idle'); $('modeLabel').textContent='Ready when you are'; $('liveLine').textContent=''; $('actionLine').textContent='';
 }
 
-window.zenixEnd = () => endSession(); // called from the phone notification
+window.zenixEnd = () => { if(off.active) endOffline(); else endSession(); }; // called from the phone notification
 $('talkBtn').onclick = async () => {
+  if(off.active) return endOffline();
   if(convo && session==='talk') return endSession();
+  if(wantOffline()){ if(convo) await endSession(); startOffline('talk'); return; }
   if(convo && session==='chat') await endSession();
   if(Native && Native.hasOverlay && Native.hasOverlay()!=='true' && !store.get('askedOverlay', false)){
     store.set('askedOverlay', true);
@@ -440,10 +460,159 @@ $('talkBtn').onclick = async () => {
 $('muteBtn').onclick = () => { if(!convo) return; micMuted=!micMuted; convo.setMicMuted(micMuted); $('muteBtn').classList.toggle('off',micMuted); $('modeLabel').textContent = micMuted?'Mic muted':'Listening…'; };
 $('volBtn').onclick = () => { if(!convo) return; voiceMuted=!voiceMuted; convo.setVolume({volume:voiceMuted?0:1}); $('volBtn').classList.toggle('off',voiceMuted); };
 
+/* ---------- Offline mode (on-phone brain) ---------- */
+if(!settings.mode) settings.mode='auto';
+if(!settings.offlineLang) settings.offlineLang='en-US';
+const off = { active:false, kind:null, waiting:{}, seq:0, thinking:false };
+function offlineReady(){ if(!Native || !Native.offlineStatus) return false; try{ return JSON.parse(Native.offlineStatus()).state==='ready'; }catch(e){ return false; } }
+function wantOffline(){ return settings.mode==='offline' || (settings.mode==='auto' && !navigator.onLine); }
+
+function parseTime(t){
+  const m = t.match(/(\d{1,2})(?:[:.\s](\d{2}))?\s*(a\.?m\.?|p\.?m\.?|ng umaga|ng gabi|ng hapon)?/i);
+  if(!m) return null;
+  let h=parseInt(m[1],10), mi=m[2]?parseInt(m[2],10):0; const ap=(m[3]||'').toLowerCase();
+  if(/p|gabi|hapon/.test(ap) && h<12) h+=12;
+  if(/a|umaga/.test(ap) && h===12) h=0;
+  if(h>23||mi>59) return null;
+  return {h, mi};
+}
+function quickAction(text){
+  const t=text.trim(); const low=t.toLowerCase();
+  let m;
+  if(/alarm|gising/.test(low)){
+    const tm=parseTime(low); if(tm){ const r=callNative('setAlarm', tm.h, tm.mi, 'ZeniX alarm'); showAction(`⏰ Alarm ${String(tm.h).padStart(2,'0')}:${String(tm.mi).padStart(2,'0')}`); return r?r.message:'Alarms need the Android app.'; }
+  }
+  if((m=low.match(/remind me (?:in )?(\d+)\s*(minutes|minute|mins|min|hours|hour|hrs|hr)\s*(?:to|that|about)?\s*(.*)/))){
+    const mins=parseInt(m[1],10)*(/h/.test(m[2])?60:1); const what=(m[3]||'your reminder').trim()||'your reminder';
+    showAction(`🔔 Reminder in ${mins} min`); const r=callNative('setReminder', what, mins); return r?r.message:'Reminders need the Android app.';
+  }
+  if(/call history|recent calls|missed calls/.test(low)){ const r=callNative('openCallHistory'); return r?r.message:'Call history needs the Android app.'; }
+  if((m=t.match(/^(?:hey zenix,?\s*)?(?:please\s+)?(?:can you\s+)?(?:open|launch|buksan mo(?: ang)?|buksan)\s+(?:the\s+|my\s+)?(.+?)(?:\s+app)?(?:\s+please)?[.!?]*$/i))){
+    showAction(`📱 Opening ${m[1]}`); const r=callNative('openApp', m[1]); return r?r.message:'Opening apps needs the Android app.';
+  }
+  if((m=t.match(/^(?:hey zenix,?\s*)?(?:please\s+)?(?:can you\s+)?(?:call|tawagan mo(?: si)?|tawagan)\s+(.+?)(?:\s+please)?[.!?]*$/i))){
+    showAction(`📞 Calling ${m[1]}`); const r=callNative('makeCall', m[1]); return r?r.message:'Calling needs the Android app.';
+  }
+  if(/(calendar|schedule|agenda)/.test(low) || /what.*(on|plan).*(today|tomorrow)/.test(low)){
+    const days = /tomorrow|bukas/.test(low)?1:0, n=/week/.test(low)?7:1;
+    showAction('📅 Checking calendar'); const r=callNative('checkCalendar', days, n); return r?r.message:'Calendar needs the Android app.';
+  }
+  return null;
+}
+function buildPrompt(userText){
+  const mem = memories.slice(-10).map(x=>'- '+x).join('\n') || 'Nothing saved yet.';
+  const sys = `You are ZeniX, ${settings.name||'Jim'}'s funny, witty female AI assistant and best buddy. ${settings.name||'Jim'} is a Filipino EMS medic in the UAE who builds apps. You are running offline on his phone right now. Reply in 1 to 3 short spoken sentences, no lists, no emojis. If he speaks Tagalog or Taglish, reply in Taglish. Be honest; if you don't know, say so. Offline you can set alarms, reminders, open apps, make calls and check his calendar; you cannot search the web or send messages.\nThings you remember about him:\n${mem}`;
+  const turns = history.filter(x=>x.who!=='sys').slice(-7, -1);
+  let p = `<|im_start|>system\n${sys}<|im_end|>\n`;
+  turns.forEach(x=>{ p += `<|im_start|>${x.who==='user'?'user':'assistant'}\n${x.text.slice(0,240)}<|im_end|>\n`; });
+  p += `<|im_start|>user\n${userText}<|im_end|>\n<|im_start|>assistant\n`;
+  return p;
+}
+window.zenixOfflineLoading = () => { $('modeLabel').textContent='Waking up offline brain…'; toast('Loading the offline brain (first time takes a few seconds)'); };
+window.zenixOfflineReply = (id, text, isErr) => { const w=off.waiting[id]; if(!w) return; delete off.waiting[id]; isErr ? w.reject(new Error(text)) : w.resolve(text); };
+function askOffline(text){
+  return new Promise((resolve,reject)=>{ const id='q'+(++off.seq); off.waiting[id]={resolve,reject}; Native.offlineAsk(id, buildPrompt(text)); });
+}
+async function offlineHandle(text){
+  const quick = quickAction(text);
+  if(quick) return quick;
+  off.thinking=true; $('modeLabel').textContent='Thinking…';
+  try{
+    let out = await askOffline(text);
+    out = out.replace(/<\|im_end\|>[\s\S]*/,'').replace(/<\|im_start\|>[\s\S]*/,'').trim();
+    return out || "Sorry bro, my offline brain blanked on that one.";
+  }catch(e){ return 'Offline brain problem: '+e.message; }
+  finally{ off.thinking=false; }
+}
+function offlineSay(text, speakIt){
+  addMsg('ai', text);
+  if(off.kind==='talk') $('liveLine').textContent='ZeniX: '+text;
+  if(speakIt){ setOrb('speaking'); $('modeLabel').textContent='ZeniX is speaking'; if(Native.setOrbMode) Native.setOrbMode('speaking'); Native.speak(text, settings.offlineLang); }
+  else if(off.kind==='talk') offListen();
+}
+function offListen(){
+  if(!off.active || off.kind!=='talk') return;
+  setOrb('listening'); $('modeLabel').textContent='Listening… (offline)';
+  if(Native.setOrbMode) Native.setOrbMode('listening');
+  Native.startListening(settings.offlineLang);
+}
+window.zenixOnListening = () => { if(off.active && off.kind==='talk') $('modeLabel').textContent='Listening… (offline)'; };
+window.zenixOnPartial = (t) => { if(off.active && off.kind==='talk') $('liveLine').textContent='You: '+t; };
+window.zenixOnSpeech = async (t) => {
+  if(!off.active || off.kind!=='talk') return;
+  if(!t){ offListen(); return; }
+  addMsg('user', t); $('liveLine').textContent='You: '+t;
+  if(/^(stop|bye|goodbye|end chat|that's all|tapos na)\b/i.test(t.trim())){ offlineSay('Okay bro, talk later!', true); off.endAfterSpeak=true; return; }
+  const reply = await offlineHandle(t);
+  if(off.active) offlineSay(reply, true);
+};
+window.zenixOnSpeechError = (code) => {
+  if(!off.active || off.kind!=='talk') return;
+  if(code===6 || code===7 || code===8 || code===5){ setTimeout(offListen, 350); return; }
+  toast(code===-1 ? 'Offline listening is not available on this phone' : 'Mic problem ('+code+'). Tap Talk again.');
+  endOffline();
+};
+window.zenixOnSpeakDone = () => {
+  if(!off.active) return;
+  if(Native.setOrbMode) Native.setOrbMode('listening');
+  if(off.endAfterSpeak){ off.endAfterSpeak=false; endOffline(); return; }
+  if(off.kind==='talk') offListen(); else { setOrb('idle'); }
+};
+function startOffline(kind){
+  if(!Native || !Native.offlineAsk){ toast('Offline mode needs the Android app'); return false; }
+  if(!offlineReady()){ toast('Download the offline brain first (Me tab)'); document.querySelector('nav button[data-view="settings"]').click(); return false; }
+  off.active=true; off.kind=kind; off.endAfterSpeak=false;
+  $('dot').className='dot busy'; $('statusText').textContent='Offline';
+  addMsg('sys', kind==='talk'?'Offline voice chat started':'Offline chat');
+  if(kind==='talk'){
+    $('talkBtn').classList.add('end'); $('talkLabel').textContent='End chat';
+    if(Native.keepAwake) Native.keepAwake('true');
+    offlineSay(`Hey ${settings.name||'Jim'}, offline ZeniX here. What's up?`, true);
+  }
+  return true;
+}
+function endOffline(){
+  if(!off.active) return;
+  off.active=false; off.kind=null;
+  try{ Native.stopListening(); Native.stopSpeaking(); }catch(e){}
+  if(Native.keepAwake) Native.keepAwake('false');
+  setStatus('off'); resetTalkUI(); addMsg('sys','Offline chat ended');
+}
+async function offlineChat(text){
+  if(!off.active && !startOffline('chat')) return;
+  const reply = await offlineHandle(text);
+  offlineSay(reply, settings.chatVoice);
+}
+
+/* offline UI in the Me tab */
+function renderOffline(){
+  document.querySelectorAll('[data-mode]').forEach(b=>b.classList.toggle('sel', b.dataset.mode===settings.mode));
+  document.querySelectorAll('[data-lang]').forEach(b=>b.classList.toggle('sel', b.dataset.lang===settings.offlineLang));
+  if(!Native || !Native.offlineStatus){ $('brainText').textContent='Offline mode works in the Android app.'; $('brainBtn').style.display='none'; return; }
+  let st={}; try{ st=JSON.parse(Native.offlineStatus()); }catch(e){}
+  const bar=$('brainBar');
+  if(st.state==='ready'){ $('brainText').textContent='Offline brain is installed ✓ (about '+(st.sizeMB/1000).toFixed(1)+' GB)'; $('brainBtn').textContent='Remove'; bar.style.display='none'; }
+  else if(st.state==='downloading' || st.state==='paused'){ $('brainText').textContent=(st.state==='paused'?'Paused (waiting for internet) ':'Downloading… ')+st.percent+'%'; $('brainBtn').textContent='Downloading'; bar.style.display='block'; $('brainFill').style.width=st.percent+'%'; setTimeout(renderOffline, 2000); }
+  else { $('brainText').textContent=(st.state==='failed'?'Download failed. Try again on Wi-Fi. ':'')+'Download the on-phone brain once (about 1.6 GB, use Wi-Fi). Then ZeniX works with no internet and no credits.'; $('brainBtn').textContent='Download'; bar.style.display='none'; }
+}
+$('brainBtn').onclick = () => {
+  if(!Native || !Native.offlineStatus) return;
+  let st={}; try{ st=JSON.parse(Native.offlineStatus()); }catch(e){}
+  if(st.state==='ready'){ if(confirm('Remove the offline brain from this phone?')){ Native.offlineDelete(); renderOffline(); } return; }
+  if(st.state==='downloading') return;
+  Native.offlineDownload(); toast('Download started — you can keep using ZeniX'); setTimeout(renderOffline, 800);
+};
+document.querySelectorAll('[data-mode]').forEach(b=>b.onclick=()=>{ settings.mode=b.dataset.mode; store.set('settings',settings); renderOffline(); toast(b.dataset.mode==='auto'?'Auto: cloud when online, offline when not':b.dataset.mode==='offline'?'ZeniX will stay offline':'ZeniX will always use the cloud'); });
+document.querySelectorAll('[data-lang]').forEach(b=>b.onclick=()=>{ settings.offlineLang=b.dataset.lang; store.set('settings',settings); renderOffline(); });
+window.addEventListener('online', ()=>{ if(settings.mode==='auto') toast('Back online'); });
+window.addEventListener('offline', ()=>{ if(settings.mode==='auto') toast('No internet — ZeniX will use offline mode'); });
+renderOffline();
+
 /* ---------- Chat ---------- */
 function sendText(text){
   text=text.trim(); if(!text) return;
   addMsg('user', text); $('input').value=''; autoGrow();
+  if(off.active || (!convo && wantOffline())){ offlineChat(text); return; }
   if(convo){ convo.sendUserMessage(text); return; }
   pendingText=text; startSession('chat');
 }
