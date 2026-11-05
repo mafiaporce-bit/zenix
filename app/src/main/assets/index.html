@@ -119,6 +119,57 @@ input[type=text]{width:100%;height:46px;border-radius:12px;border:1px solid var(
 .btn-line{height:44px;padding:0 16px;border-radius:12px;border:1px solid var(--line);background:var(--surface2);font-weight:500;font-size:14px}
 .btn-line.red{color:var(--danger)}
 .settings{overflow-y:auto;padding:4px 0 16px}
+/* ---- map inside Maya ---- */
+.map-panel{display:none;flex-direction:column;flex:0 0 52%;min-height:0;margin:2px 0 10px;border-radius:20px;overflow:hidden;border:1px solid var(--line);background:var(--surface);position:relative;box-shadow:var(--shadow)}
+body.map-open:not([data-view=settings]) .map-panel{display:flex}
+.map-head{display:flex;align-items:center;gap:10px;padding:10px 10px 10px 14px;border-bottom:1px solid var(--line)}
+.map-ttl{flex:1;min-width:0}
+.map-ttl b{display:block;font:600 15px 'Space Grotesk',sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.map-ttl span{display:block;font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.map-x{width:34px;height:34px;border-radius:10px;background:var(--surface2);display:grid;place-items:center;flex-shrink:0}
+.map-x svg,.rc-nav svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+#mapBox{flex:1;min-height:0;background:#0b0a14}
+.route-card{display:none;align-items:center;gap:12px;position:absolute;left:10px;right:10px;bottom:10px;z-index:500;padding:12px 12px 12px 16px;border-radius:16px;background:rgba(18,16,34,.94);border:1px solid var(--line);backdrop-filter:blur(8px);box-shadow:0 10px 30px rgba(0,0,0,.5)}
+.route-card.on{display:flex}
+.rc-main{flex:1;min-width:0}
+.rc-time{font:700 20px 'Space Grotesk',sans-serif;color:#fff}
+.rc-meta{font-size:12.5px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rc-nav{display:flex;align-items:center;gap:6px;height:42px;padding:0 14px;border-radius:12px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;font-weight:600;font-size:14px;flex-shrink:0}
+.leaflet-container{background:#0b0a14!important;font-family:Inter,sans-serif}
+.leaflet-control-attribution{background:rgba(6,5,12,.7)!important;color:#8a83ad!important;font-size:9px!important}
+.leaflet-control-attribution a{color:#a99fe0!important}
+.leaflet-bar a{background:#1B1733!important;color:#F3F0FF!important;border-color:#272144!important}
+.maya-pin{width:16px;height:16px;border-radius:50%;background:#FF3FD2;border:3px solid #fff;box-shadow:0 0 0 6px rgba(255,63,210,.25)}
+.maya-pin.start{background:#4F6BFF;box-shadow:0 0 0 6px rgba(79,107,255,.25)}
+body.map-open #view-talk .greet,body.map-open #view-talk .sub{display:none}
+body.map-open #view-talk .orb-wrap{width:150px;height:150px}
+body.map-open #view-talk .hero{gap:8px;padding:0}
+body.map-open .welcome .w-orb,body.map-open .welcome p{display:none}
+body.map-open .welcome h2{font-size:18px;margin-bottom:12px}
+/* ---- PC / tablet layout ---- */
+@media (min-width:900px){
+  body{display:grid;grid-template-columns:232px minmax(0,1fr);grid-template-rows:auto auto minmax(0,1fr) auto;grid-template-areas:"nav header" "nav upd" "nav main" "nav footer";height:100vh;min-height:0}
+  body>header{grid-area:header;padding:22px 32px 10px}
+  body>header h1{font-size:28px}
+  #updBar{grid-area:upd;margin:0 32px 10px!important}
+  main{grid-area:main;flex-direction:row;gap:22px;padding:0 32px 14px;min-height:0}
+  main>.view{min-width:0}
+  main>.view.active{flex:1 1 0}
+  .map-panel{flex:0 0 46%;order:2;margin:0}
+  body>nav{grid-area:nav;flex-direction:column;justify-content:flex-start;gap:6px;border-top:0;border-right:1px solid var(--line);padding:28px 14px}
+  body>nav::before{content:'Maya';font:700 22px 'Space Grotesk',sans-serif;padding:0 14px 20px;background:linear-gradient(135deg,#C48BFF,#FF6BDF);-webkit-background-clip:text;background-clip:text;color:transparent}
+  body>nav button{flex:0 0 auto;flex-direction:row;justify-content:flex-start;gap:12px;padding:0 14px;min-height:46px;font-size:15px}
+  body>nav button.active{background:rgba(178,102,255,.13)}
+  body>footer{grid-area:footer;background:transparent;text-align:left;padding:6px 32px 14px}
+  #view-settings{max-width:760px}
+  #view-settings.active{margin:0 auto}
+  body.map-open #view-talk .orb-wrap{width:240px;height:240px}
+  body.map-open #view-talk .greet,body.map-open #view-talk .sub{display:block}
+  .msg{max-width:72%}
+  .sugg{grid-template-columns:repeat(4,1fr)}
+  .welcome{max-width:820px;margin:auto}
+  body .toast{bottom:32px}
+}
 .settings>*{flex-shrink:0}
 /* ---- Me page ---- */
 .set-head{display:flex;align-items:center;gap:14px;padding:16px;margin:4px 0 6px;background:linear-gradient(135deg,rgba(178,102,255,.18),rgba(255,63,210,.07));border:1px solid var(--line);border-radius:20px}
@@ -194,6 +245,17 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
 
 <div id="updBar" style="display:none;margin:0 16px 8px;padding:10px 12px;border-radius:14px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;font-size:14px;align-items:center;gap:10px"><span style="flex:1" id="updText">New Maya update available</span><button id="updBtn" style="background:#fff;color:#6D28D9;font-weight:600;border-radius:10px;padding:8px 14px;min-height:40px">Update now</button></div>
 <main>
+  <div id="mapPanel" class="map-panel">
+    <div class="map-head">
+      <div class="map-ttl"><b id="mapTitle">Map</b><span id="mapSub"></span></div>
+      <button class="map-x" id="mapClose" aria-label="Close map"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+    <div id="mapBox"></div>
+    <div class="route-card" id="routeCard">
+      <div class="rc-main"><div class="rc-time" id="rcTime"></div><div class="rc-meta" id="rcMeta"></div></div>
+      <button class="rc-nav" id="rcNav"><svg viewBox="0 0 24 24"><path d="M3 11l18-8-8 18-2-8-8-2z"/></svg>Navigate</button>
+    </div>
+  </div>
   <section class="view active" id="view-talk">
     <div class="hero">
       <p class="greet" id="greet">Hi Jim</p>
@@ -435,7 +497,7 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
 <nav>
   <button class="active" data-view="talk"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/></svg>Talk</button>
   <button data-view="chat"><svg class="i" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Chat</button>
-  <button data-view="settings"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>Me</button>
+  <button data-view="settings"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>Settings</button>
 </nav>
 <footer>Copyright © 2026 Zenix_dev@company. All rights reserved. Developed by JPSums</footer>
 <div class="toast" id="toast"></div>
@@ -445,7 +507,92 @@ import { Conversation } from "https://cdn.jsdelivr.net/npm/@elevenlabs/client/+e
 
 const AGENT_ID = "agent_2501m6nhkeb2enqvv0avjabxbz52";
 const $ = id => document.getElementById(id);
-const Native = window.ZenixNative || null; // Android bridge
+const IS_APP = !!window.ZenixNative;
+const Native = window.ZenixNative || makeWebNative(); // Android bridge, or the browser stand-in on PC
+/* On a PC/browser: the same calls, done with the browser's voice, mic and fetch */
+function makeWebNative(){
+  const W = { isWeb:true };
+  const call = (fn, ...a) => { try{ const f = window[fn]; if(typeof f === 'function') f(...a); }catch(e){} };
+  const OK = '{"ok":true}';
+  const b64buf = buf => { let s = ''; const a = new Uint8Array(buf); for(let i=0; i<a.length; i+=0x8000) s += String.fromCharCode.apply(null, a.subarray(i, i+0x8000)); return btoa(s); };
+  // speaking (computer voices)
+  let picked = '', rate = 1.05, cur = 0;
+  W.setPhoneVoice = (name, r) => { picked = name || ''; rate = parseFloat(r) || 1.05; return OK; };
+  W.listVoices = () => { try{ return JSON.stringify(speechSynthesis.getVoices().filter(v => /^en/i.test(v.lang)).slice(0, 16)
+      .map(v => ({name:v.name, locale:v.lang, quality: /natural|online|neural|google/i.test(v.name) ? 400 : 300}))); }catch(e){ return '[]'; } };
+  W.speak = (text, lang) => {
+    const my = ++cur;
+    try{
+      speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text); u.lang = lang || 'en-US'; u.rate = rate;
+      const vs = speechSynthesis.getVoices();
+      const v = vs.find(x => x.name === picked) || (/^fil/.test(lang||'') ? vs.find(x => /^(fil|tl)/i.test(x.lang)) : null);
+      if(v) u.voice = v;
+      u.onend = u.onerror = () => { if(my === cur) call('zenixOnSpeakDone'); };
+      speechSynthesis.speak(u);
+    }catch(e){ setTimeout(() => call('zenixOnSpeakDone'), 50); }
+    return OK;
+  };
+  W.stopSpeaking = () => { cur++; try{ speechSynthesis.cancel(); }catch(e){} return OK; };
+  // listening (Chrome / Edge speech recognition)
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  let rec = null, said = '', done = false;
+  W.startListening = W.startListeningOnline = (lang) => {
+    if(!SR){ setTimeout(() => call('zenixOnSpeechError', -3), 10); return OK; }
+    try{ if(rec){ rec.onend = null; rec.abort(); } }catch(e){}
+    const r = rec = new SR(); r.lang = lang || 'en-US'; r.interimResults = true; r.continuous = true; said = ''; done = false;
+    r.onstart = () => call('zenixOnListening');
+    r.onresult = (e) => { let interim = ''; for(let i = e.resultIndex; i < e.results.length; i++){ const x = e.results[i]; if(x.isFinal) said += x[0].transcript + ' '; else interim += x[0].transcript; } call('zenixOnPartial', (said + interim).trim()); };
+    r.onerror = (e) => { if(e.error === 'no-speech' || e.error === 'aborted') return; done = true; call('zenixOnSpeechError', e.error === 'not-allowed' || e.error === 'service-not-allowed' ? 9 : 5); };
+    r.onend = () => { if(rec === r) rec = null; if(done) return; done = true; call('zenixOnSpeech', said.trim()); };
+    try{ r.start(); }catch(e){ setTimeout(() => call('zenixOnSpeechError', 5), 300); }
+    return OK;
+  };
+  W.finishListening = () => { try{ rec && rec.stop(); }catch(e){} return OK; };
+  W.stopListening = () => { try{ if(rec){ done = true; rec.abort(); } }catch(e){} return OK; };
+  W.keepAwake = () => OK; W.setOrbMode = () => OK;
+  // cloud voices straight from the browser
+  W.elSpeak = (id, text, voiceId, key, model) => {
+    const expressive = /^eleven_v[34]/.test(model);
+    fetch('https://api.elevenlabs.io/v1/text-to-speech/' + encodeURIComponent(voiceId) + '?output_format=mp3_44100_64', {method:'POST',
+      headers:{'xi-api-key':key, 'content-type':'application/json', 'accept':'audio/mpeg'},
+      body: JSON.stringify({text, model_id:model, voice_settings: expressive ? {stability:0.5} : {stability:0.45, similarity_boost:0.75, speed:1.05}})})
+      .then(async r => { if(!r.ok) throw new Error(r.status + ' ' + (await r.text()).slice(0, 200)); return r.arrayBuffer(); })
+      .then(buf => call('zenixEL', id, b64buf(buf), ''))
+      .catch(e => call('zenixEL', id, '', e.message || 'network error'));
+    return OK;
+  };
+  W.elVoices = (key) => {
+    const h = {headers:{'xi-api-key':key}};
+    Promise.all([fetch('https://api.elevenlabs.io/v1/voices', h), fetch('https://api.elevenlabs.io/v1/user/subscription', h).catch(() => null)])
+      .then(async ([v, sub]) => {
+        let list = [], err = '', left = -1;
+        if(v.ok){ list = ((await v.json()).voices || []).map(x => ({id:x.voice_id, name:x.name, gender:(x.labels||{}).gender||'', lang:(x.labels||{}).language||'', cat:x.category})); }
+        else err = v.status + ' ' + (await v.text()).slice(0, 200);
+        if(sub && sub.ok){ const j = await sub.json(); left = (j.character_limit||0) - (j.character_count||0); }
+        call('zenixELVoices', JSON.stringify(list), err, left);
+      }).catch(e => call('zenixELVoices', '[]', e.message || 'network error', -1));
+    return OK;
+  };
+  W.dgSpeak = (id, text, model, key) => {
+    fetch('https://api.deepgram.com/v1/speak?model=' + encodeURIComponent(model) + '&encoding=mp3', {method:'POST', headers:{'authorization':'Token ' + key, 'content-type':'application/json'}, body: JSON.stringify({text})})
+      .then(async r => { if(!r.ok) throw new Error(r.status + ''); return r.arrayBuffer(); })
+      .then(buf => call('zenixDG', id, b64buf(buf), ''))
+      .catch(e => call('zenixDG', id, '', e.message || 'network error'));
+    return OK;
+  };
+  W.dgTest = (key) => { fetch('https://api.deepgram.com/v1/projects', {headers:{'authorization':'Token ' + key}})
+      .then(r => call('zenixDGTest', r.ok, r.ok ? '' : (r.status===401||r.status===403 ? 'Deepgram key not accepted' : 'Deepgram answered ' + r.status)))
+      .catch(() => call('zenixDGTest', true, '')); return OK; };
+  // files: backups download to the PC and load from a file
+  const download = (name, text) => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], {type:'application/json'})); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500); };
+  W.saveBackup = (name, text) => { download(name, text); return JSON.stringify({ok:true, message:'saved'}); };
+  W.shareText = (title, text) => { download((title||'maya').replace(/\W+/g,'-').toLowerCase() + '.json', text); return OK; };
+  W.pickBackup = () => { const i = document.createElement('input'); i.type = 'file'; i.accept = '.json,application/json,text/plain';
+    i.onchange = () => { const f = i.files && i.files[0]; if(!f) return; f.text().then(t => call('zenixBackupPicked', t)); }; i.click(); return OK; };
+  W.openUrl = (url) => { window.open(url, '_blank', 'noopener'); return JSON.stringify({ok:true, message:'Opened it in a new tab.'}); };
+  return W;
+}
 
 /* ---------- Storage ---------- */
 const store = {
@@ -729,6 +876,118 @@ $('talkBtn').onclick = async () => {
 $('muteBtn').onclick = () => { if(!convo) return; micMuted=!micMuted; convo.setMicMuted(micMuted); $('muteBtn').classList.toggle('off',micMuted); $('modeLabel').textContent = micMuted?'Mic muted':'Listening…'; };
 $('volBtn').onclick = () => { if(!convo) return; voiceMuted=!voiceMuted; convo.setVolume({volume:voiceMuted?0:1}); $('volBtn').classList.toggle('off',voiceMuted); };
 
+/* ---------- Maps inside Maya (OpenStreetMap: free, no key needed) ---------- */
+const MapView = (() => {
+  let map = null, loading = null, layer = null;
+  function loadLeaflet(){
+    if(window.L) return Promise.resolve();
+    if(loading) return loading;
+    loading = new Promise((res, rej) => {
+      const css = document.createElement('link'); css.rel = 'stylesheet'; css.href = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css'; document.head.appendChild(css);
+      const js = document.createElement('script'); js.src = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js';
+      js.onload = () => res(); js.onerror = () => { loading = null; rej(new Error('the map could not load (check internet)')); };
+      document.head.appendChild(js);
+    });
+    return loading;
+  }
+  const relayout = () => setTimeout(() => { if(map) map.invalidateSize(); window.dispatchEvent(new Event('resize')); }, 80);
+  async function open(){
+    document.body.classList.add('map-open'); relayout();
+    await loadLeaflet();
+    if(!map){
+      map = L.map('mapBox', {zoomControl:true}).setView([24.45, 54.6], 8);
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {maxZoom:19, subdomains:'abcd', attribution:'© OpenStreetMap © CARTO'}).addTo(map);
+    }
+    relayout(); return map;
+  }
+  function close(){ document.body.classList.remove('map-open'); relayout(); }
+  function clear(){ if(layer){ layer.remove(); layer = null; } $('routeCard').classList.remove('on'); }
+  function set(l){ clear(); layer = l.addTo(map); }
+  const pin = (cls) => L.divIcon({className:'', html:`<div class="maya-pin ${cls||''}"></div>`, iconSize:[16,16], iconAnchor:[8,8]});
+  return { open, close, clear, set, pin, get map(){ return map; } };
+})();
+$('mapClose').onclick = () => MapView.close();
+
+const UAE_BBOX = '51.4,22.5,56.5,26.2';
+async function geocode(q){
+  q = String(q||'').trim(); if(!q) throw new Error('no place was given');
+  const photon = async (extra) => {
+    const r = await fetch('https://photon.komoot.io/api/?limit=1&q=' + encodeURIComponent(q) + extra); if(!r.ok) throw new Error('search ' + r.status);
+    const f = ((await r.json()).features || [])[0]; if(!f) return null; const p = f.properties || {};
+    const area = [p.city || p.county || p.state, p.country].filter(Boolean).filter((v,i,a) => a.indexOf(v)===i && v!==p.name).join(', ');
+    return {lat:f.geometry.coordinates[1], lon:f.geometry.coordinates[0], name:p.name || q, area, extent:p.extent};
+  };
+  let g = null;
+  try{ g = await photon('&bbox=' + UAE_BBOX) || await photon('&lat=24.8&lon=55.0'); }catch(e){}
+  if(!g){
+    try{ const r = await fetch('https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=' + encodeURIComponent(q)); const j = await r.json();
+      if(j[0]) g = {lat:+j[0].lat, lon:+j[0].lon, name:j[0].name || q, area:(j[0].display_name||'').split(',').slice(-2).join(',').trim()}; }catch(e){}
+  }
+  if(!g) throw new Error(`I couldn't find "${q}" on the map`);
+  return g;
+}
+const HERE_RE = /^(here|my location|current location|where i am|me|my place|this place|dito)$/i;
+function myLocation(){
+  return new Promise((res, rej) => {
+    if(!navigator.geolocation) return rej(new Error('no GPS'));
+    navigator.geolocation.getCurrentPosition(p => res({lat:p.coords.latitude, lon:p.coords.longitude, name:'Your location', area:''}), e => rej(e), {enableHighAccuracy:true, timeout:8000, maximumAge:60000});
+  });
+}
+async function findPlace(q){
+  if(HERE_RE.test(String(q||'').trim())){
+    try{ return await myLocation(); }catch(e){ throw new Error("I can't see his location yet, so ask Jim where he's starting from"); }
+  }
+  return geocode(q);
+}
+async function driveRoute(a, b){
+  const path = `/route/v1/driving/${a.lon},${a.lat};${b.lon},${b.lat}?overview=full&geometries=geojson`;
+  let j = null;
+  for(const base of ['https://router.project-osrm.org', 'https://routing.openstreetmap.de/routed-car']){
+    try{ const r = await fetch(base + path); j = await r.json(); if(j && j.code==='Ok' && j.routes && j.routes[0]) break; }catch(e){ j = null; }
+  }
+  if(!j || j.code!=='Ok') throw new Error('no driving route was found');
+  const rt = j.routes[0];
+  return {sec:rt.duration, m:rt.distance, coords:rt.geometry.coordinates.map(c => [c[1], c[0]]), via:(rt.legs && rt.legs[0] && rt.legs[0].summary) || ''};
+}
+const fmtDur = sec => { const m = Math.max(1, Math.round(sec/60)); return m < 60 ? `${m} min` : `${Math.floor(m/60)} h ${m%60 ? (m%60)+' min' : ''}`.trim(); };
+const sayDur = sec => { const m = Math.max(1, Math.round(sec/60)); if(m < 60) return `${m} minutes`; const h = Math.floor(m/60), r = m%60; return `${h} hour${h>1?'s':''}${r ? ' ' + r + ' minutes' : ''}`; };
+let routeNav = '';
+$('rcNav').onclick = () => { if(!routeNav) return; const r = callNative('openUrl', routeNav); if(!r) window.open(routeNav, '_blank'); };
+
+clientTools.show_map = async ({place}) => {
+  showAction('🗺️ ' + place);
+  try{
+    const [g] = await Promise.all([findPlace(place), MapView.open()]);
+    const m = MapView.map;
+    MapView.set(L.layerGroup([L.marker([g.lat, g.lon], {icon:MapView.pin()})]));
+    if(g.extent) m.fitBounds([[g.extent[3], g.extent[0]], [g.extent[1], g.extent[2]]], {padding:[24,24]}); else m.setView([g.lat, g.lon], 14);
+    $('mapTitle').textContent = g.name; $('mapSub').textContent = g.area || 'Map';
+    return `The map inside the app now shows ${g.name}${g.area ? ', ' + g.area : ''}. Tell Jim in a few words.`;
+  }catch(e){ return 'Map problem: ' + e.message + '.'; }
+};
+clientTools.show_route = async ({from, to}) => {
+  showAction(`🗺️ ${from} → ${to}`);
+  try{
+    const [a, b] = await Promise.all([findPlace(from), findPlace(to), MapView.open()]);
+    const r = await driveRoute(a, b);
+    const m = MapView.map;
+    const glow = L.polyline(r.coords, {color:'#FF3FD2', weight:11, opacity:.22});
+    const line = L.polyline(r.coords, {color:'#B266FF', weight:5, opacity:.95});
+    MapView.set(L.layerGroup([glow, line, L.marker([a.lat, a.lon], {icon:MapView.pin('start')}), L.marker([b.lat, b.lon], {icon:MapView.pin()})]));
+    m.fitBounds(line.getBounds(), {paddingTopLeft:[28,28], paddingBottomRight:[28,110]});
+    const km = r.m >= 10000 ? Math.round(r.m/1000) : (r.m/1000).toFixed(1);
+    $('mapTitle').textContent = `${a.name} → ${b.name}`;
+    $('mapSub').textContent = 'Driving route';
+    $('rcTime').textContent = fmtDur(r.sec);
+    $('rcMeta').textContent = `${km} km${r.via ? ' · via ' + r.via : ''} · usual traffic`;
+    $('routeCard').classList.add('on');
+    routeNav = `https://www.google.com/maps/dir/?api=1&origin=${a.lat},${a.lon}&destination=${b.lat},${b.lon}&travelmode=driving`;
+    return `Route shown on the map inside the app: ${a.name} to ${b.name}, ${km} km, about ${sayDur(r.sec)} by car in usual traffic (no live traffic data)${r.via ? ', mostly via ' + r.via : ''}. Tell Jim the time and distance in one short sentence; if it's rush hour, say it may take longer. A Navigate button on the card opens Google Maps if he wants directions.`;
+  }catch(e){ return 'Route problem: ' + e.message + '.'; }
+};
+clientTools.close_map = async () => { MapView.close(); return 'Map closed.'; };
+window.MayaTools = clientTools;
+
 /* ---------- Offline mode (on-phone brain) ---------- */
 if(!settings.mode) settings.mode='auto';
 if(!settings.offlineLang || (settings.offlineLang==='en-US' && !settings.langMigrated)){ settings.offlineLang='en-PH'; settings.langMigrated=true; }
@@ -839,7 +1098,7 @@ window.zenixOnSpeech = async (t) => {
 window.zenixOnSpeechError = (code) => {
   if(!off.active || off.kind!=='talk') return;
   if(code===6 || code===7 || code===8 || code===5){ setTimeout(offListen, 350); return; }
-  toast(code===-1 ? 'Offline listening is not available on this phone' : 'Mic problem ('+code+'). Tap Talk again.');
+  toast(code===-3 ? 'Voice chat on a computer needs Chrome or Edge' : code===9 ? 'Allow the microphone for Maya, then tap Talk again' : code===-1 ? 'Offline listening is not available on this phone' : 'Mic problem ('+code+'). Tap Talk again.');
   endOffline();
 };
 window.zenixOnSpeakDone = () => {
@@ -850,7 +1109,7 @@ window.zenixOnSpeakDone = () => {
   if(off.kind==='talk') offListen(); else { setOrb('idle'); }
 };
 function startOffline(kind, brain='offline'){
-  if(!Native || !Native.offlineAsk){ toast('This mode needs the Android app'); return false; }
+  if(brain!=='own' && !Native.offlineAsk){ toast('The offline brain needs the Android app'); return false; }
   const goMe = () => document.querySelector('nav button[data-view="settings"]').click();
   if(brain==='offline' && !offlineReady()){ toast('Download the offline brain first (Me tab)'); goMe(); return false; }
   if(brain==='own' && !brainKey()){ toast(settings.provider==='openrouter' ? 'Add your OpenRouter key in the Me tab first' : 'Add your Claude API key in the Me tab first'); goMe(); return false; }
@@ -938,7 +1197,10 @@ const TOOL_DEFS = [
   {name:'add_calendar_event', description:'Add an event to the calendar. start_iso like 2026-11-06T09:00:00+04:00.', input_schema:{type:'object', properties:{title:{type:'string'}, start_iso:{type:'string'}, duration_minutes:{type:'integer'}, location:{type:'string'}}, required:['title','start_iso']}},
   {name:'open_website', description:'Open a website or a Google results page on his screen, when he wants to SEE it (not for answering questions — use web_search for that).', input_schema:{type:'object', properties:{query:{type:'string'}}, required:['query']}},
   {name:'remember', description:"Quietly save one short fact about Jim worth knowing later (people, nicknames, shifts, plans, likes, corrections). Don't announce it.", input_schema:{type:'object', properties:{fact:{type:'string'}}, required:['fact']}},
-  {name:'recall', description:"Search everything you've saved about Jim and past chats. Use before saying you don't know something about him.", input_schema:{type:'object', properties:{query:{type:'string'}}, required:['query']}}
+  {name:'recall', description:"Search everything you've saved about Jim and past chats. Use before saying you don't know something about him.", input_schema:{type:'object', properties:{query:{type:'string'}}, required:['query']}},
+  {name:'show_map', description:"Show a place on the map INSIDE this app (city, area, landmark, address). Use for 'open/show the map of X', 'where is X'.", input_schema:{type:'object', properties:{place:{type:'string', description:"e.g. 'Abu Dhabi', 'Dubai Mall', 'Al Wahda Mall Abu Dhabi'"}}, required:['place']}},
+  {name:'show_route', description:"Draw the driving route on the map INSIDE this app and get distance and travel time. Use for 'how long/how far from A to B', 'route to X'. Use 'here' as from when he means his current location.", input_schema:{type:'object', properties:{from:{type:'string'}, to:{type:'string'}}, required:['from','to']}},
+  {name:'close_map', description:'Close the map.', input_schema:{type:'object', properties:{}}}
 ];
 const WEB_SEARCH = {type:'web_search_20250305', name:'web_search', max_uses:3,
   user_location:{type:'approximate', city:'Abu Dhabi', country:'AE', timezone:'Asia/Dubai'}};
@@ -958,7 +1220,7 @@ Be open: he's an adult and can ask anything. Answer directly and fully on any to
 
 Your words are spoken aloud: everyday replies are short and snappy, usually one or two sentences, no markdown, lists or emojis. Go longer when he asks or the question needs it (recipes, instructions, explanations). Say numbers and times naturally. Be honest; never make up facts.
 
-Use your phone tools instead of just talking about them. Confirm before sending messages. If a tool reports an error, tell him simply what to allow.
+Use your phone tools instead of just talking about them. Maps: show_map and show_route open a map right inside this app (never send him to another app for that); after show_route, say the time and distance in one short sentence. Confirm before sending messages. If a tool reports an error, tell him simply what to allow.
 
 Answer everything yourself: you know a huge amount — recipes (adobo, sinigang, kare-kare...), cooking steps, how-tos, explanations, history, science, health, tech, advice, maths. Answer from your own knowledge, fully and directly. Never say "I can't tell you here" or "let me search Google", and never open Google to answer a question. For recipes and step-by-step things, give the real answer: main ingredients with amounts, then the steps in order, spoken naturally.
 For anything that changes or that you're not sure of (news, weather, prices, scores, opening hours, exchange rates, events), quietly use web_search yourself and tell him the answer in a sentence or two, like a friend would. Never read out links or say "according to source X" unless he asks. Only use open_website when he clearly asks to see or open something on his screen.
@@ -1414,7 +1676,7 @@ if(settings.engine==='own' && settings.voice!=='phone' && !/^(dg|el):/.test(sett
 /* ---------- Deepgram: fast cloud ears + Aura voices (middle option) ---------- */
 if(!settings.ears) settings.ears='phone';
 const dgKey = () => (store.get('dgkey','')||'').trim();
-const useDGEars = () => settings.ears==='deepgram' && !!dgKey() && settings.offlineLang!=='fil-PH' && !(typeof dg!=='undefined' && dg.failed);
+const useDGEars = () => IS_APP && settings.ears==='deepgram' && !!dgKey() && settings.offlineLang!=='fil-PH' && !(typeof dg!=='undefined' && dg.failed);
 const DG_VOICES = [['dg:aura-2-thalia-en','Thalia'],['dg:aura-2-andromeda-en','Andromeda'],['dg:aura-2-helena-en','Helena'],['dg:aura-2-luna-en','Luna'],['dg:aura-2-asteria-en','Asteria']];
 const dgWait = {}; let dgSeq = 0;
 function dgTTS(text){
@@ -1642,7 +1904,7 @@ document.querySelectorAll('nav button').forEach(b => b.onclick = () => {
   setTitle(b.dataset.view);
   if(b.dataset.view==='chat') renderChat();
 });
-function setTitle(v){ $('pageTitle').textContent = {talk:'Maya', chat:'Chat', settings:'Settings'}[v] || 'Maya'; $('newChatBtn').style.display = v==='chat' ? 'flex' : 'none'; }
+function setTitle(v){ document.body.dataset.view = v; $('pageTitle').textContent = {talk:'Maya', chat:'Chat', settings:'Settings'}[v] || 'Maya'; $('newChatBtn').style.display = v==='chat' ? 'flex' : 'none'; }
 $('newChatBtn').onclick = () => {
   store.set('chatfrom', Date.now()); if(typeof ownMsgs!=='undefined') ownMsgs.length = 0;
   chatTyping = false; renderChat(); toast('New chat started. Your old chats are still saved.');
@@ -1674,7 +1936,7 @@ $('orbBtn').onclick = () => { if(Native && Native.requestOverlay){ Native.reques
 document.addEventListener('visibilitychange', () => { if(!document.hidden) refreshOrbBtn(); });
 refreshOrbBtn();
 $('permBtn').onclick = () => { if(Native && Native.requestPermissions){ Native.requestPermissions(); } else toast('Permissions are for the Android app'); };
-if(!Native){ $('permText').textContent='You are using the web version. Install the Android app for alarms, calls, messages and calendar.'; }
+if(!IS_APP){ $('permText').textContent='You are using Maya on a computer. Alarms, calls, messages and calendar work in the Android app.'; $('permBtn').style.display='none'; }
 $('nameInput').value = settings.name || '';
 $('nameInput').addEventListener('input', e => { settings.name=e.target.value.trim()||'Jim'; store.set('settings',settings); greet(); });
 const vt=$('chatVoiceToggle'); vt.classList.toggle('on', settings.chatVoice);
@@ -1917,7 +2179,8 @@ if(Native && Native.checkUpdate){
   setInterval(()=>{ const gap = document.hidden ? 10*60*1000 : 60*1000; if(Date.now()-lastUpd >= gap){ lastUpd = Date.now(); Native.checkUpdate(); } }, 30*1000);
 }
 const myVersion = (Native && Native.appVersion) ? Native.appVersion() : '';
-$('verText').textContent = myVersion ? 'You have v'+myVersion : 'Version: Android app only';
+$('verText').textContent = myVersion ? 'You have v'+myVersion : 'Web version · always up to date';
+if(!IS_APP){ $('updCheck').style.display='none'; }
 window.zenixStartUpdate = () => { $('updBar').style.display='flex'; $('updBtn').click(); };
 window.zenixUpToDate = (name) => { $('verText').textContent = 'You have v'+(myVersion||name)+' · the newest ✓'; toast('Maya is up to date (v'+(myVersion||name)+')'); };
 window.zenixUpdateCheckFailed = () => { $('verText').textContent = 'You have v'+myVersion+' · could not check (internet?)'; };
