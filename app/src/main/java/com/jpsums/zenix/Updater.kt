@@ -34,20 +34,26 @@ class Updater(private val activity: MainActivity) {
     fun currentName(): String = activity.packageManager.getPackageInfo(activity.packageName, 0).versionName ?: ""
 
     /** Runs in the background; tells the screen via window.zenixUpdateAvailable(name). */
-    fun check() {
+    fun check(manual: Boolean = false) {
         thread {
             try {
                 val conn = URL(BASE + "version.json?t=" + System.currentTimeMillis()).openConnection() as HttpURLConnection
                 conn.instanceFollowRedirects = true
+                conn.useCaches = false
+                conn.setRequestProperty("Cache-Control", "no-cache")
                 conn.connectTimeout = 8000; conn.readTimeout = 8000
                 val txt = conn.inputStream.bufferedReader().use { it.readText() }
                 val j = JSONObject(txt)
                 latestCode = j.optLong("versionCode", 0)
                 latestName = j.optString("versionName", "")
                 if (latestCode > currentCode()) {
-                    activity.runJs("window.zenixUpdateAvailable && window.zenixUpdateAvailable(${JSONObject.quote(latestName)})")
+                    activity.runJs("window.zenixUpdateAvailable && window.zenixUpdateAvailable(${JSONObject.quote(latestName)}, $manual)")
+                } else if (manual) {
+                    activity.runJs("window.zenixUpToDate && window.zenixUpToDate(${JSONObject.quote(latestName)})")
                 }
-            } catch (_: Exception) { /* offline or no release yet */ }
+            } catch (_: Exception) {
+                if (manual) activity.runJs("window.zenixUpdateCheckFailed && window.zenixUpdateCheckFailed()")
+            }
         }
     }
 

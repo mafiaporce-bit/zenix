@@ -45,6 +45,7 @@ class ZenixBridge(private val activity: MainActivity) {
 
     // ---------- app updates ----------
     @JavascriptInterface fun checkUpdate(): String { activity.updater.check(); return ok("checking") }
+    @JavascriptInterface fun checkUpdateNow(): String { activity.updater.check(true); return ok("checking") }
     @JavascriptInterface fun startUpdate(): String = activity.updater.start()
     @JavascriptInterface fun appVersion(): String = activity.updater.currentName()
 

@@ -277,7 +277,8 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
     </div>
     <div class="card">
       <h3>About</h3>
-      <p class="muted">Maya runs on the brain you pick: Claude, the Open brain (Grok) or ElevenLabs. Needs internet (or the offline brain). Version 2.0 · Android</p>
+      <p class="muted" id="aboutText">Maya runs on the brain you pick: Claude, the Open brain (Grok) or ElevenLabs. Needs internet (or the offline brain).</p>
+      <div class="row" style="margin-top:8px"><p class="muted" id="verText">Version …</p><button class="btn-line" id="updCheck">Check for updates</button></div>
     </div>
   </section>
 </main>
@@ -1676,7 +1677,7 @@ document.addEventListener('visibilitychange', () => { if(!document.hidden) rende
 if(settings.wake && Native && Native.wakeStatus) setTimeout(waitWakeReady, 1200); else renderWake();
 
 /* ---------- app updates ---------- */
-window.zenixUpdateAvailable = (name) => { $('updText').textContent = 'New Maya '+(name?('v'+name+' '):'')+'is ready'; $('updBar').style.display='flex'; };
+window.zenixUpdateAvailable = (name, manual) => { $('updText').textContent = 'New Maya '+(name?('v'+name+' '):'')+'is ready'; $('updBar').style.display='flex'; $('updBtn').textContent='Update now'; if(manual){ $('verText').textContent = 'v'+name+' is ready, tap Update now at the top'; window.scrollTo({top:0, behavior:'smooth'}); } };
 window.zenixUpdateFailed = () => { toast('Update download failed. Try again on Wi-Fi.'); $('updBtn').textContent='Retry'; };
 $('updBtn').onclick = () => {
   const r = Native && Native.startUpdate ? Native.startUpdate() : '';
@@ -1684,8 +1685,19 @@ $('updBtn').onclick = () => {
   else if(r==='downloading'){ $('updBtn').textContent='Downloading…'; toast('Downloading the update, the install screen will pop up'); }
   else toast('Could not start the update');
 };
-if(Native && Native.checkUpdate){ Native.checkUpdate(); document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) Native.checkUpdate(); }); }
-if(Native && Native.appVersion){ try{ document.querySelector('#view-settings .card:last-child .muted').textContent = 'Maya runs on ElevenLabs voice with a Claude brain, plus an optional on-phone brain. Version '+Native.appVersion(); }catch(e){} }
+if(Native && Native.checkUpdate){
+  Native.checkUpdate();
+  document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) Native.checkUpdate(); });
+  setInterval(()=>{ if(!document.hidden) Native.checkUpdate(); }, 3*60*1000);   // also while Maya stays open
+}
+const myVersion = (Native && Native.appVersion) ? Native.appVersion() : '';
+$('verText').textContent = myVersion ? 'You have v'+myVersion : 'Version: Android app only';
+window.zenixUpToDate = (name) => { $('verText').textContent = 'You have v'+(myVersion||name)+' · the newest ✓'; toast('Maya is up to date (v'+(myVersion||name)+')'); };
+window.zenixUpdateCheckFailed = () => { $('verText').textContent = 'You have v'+myVersion+' · could not check (internet?)'; };
+$('updCheck').onclick = () => {
+  if(!(Native && Native.checkUpdateNow)){ toast('Updates work in the Android app'); return; }
+  $('verText').textContent = 'Checking…'; Native.checkUpdateNow();
+};
 
 greet(); renderChat(); renderMem(); setInterval(greet, 60000);
 </script>
