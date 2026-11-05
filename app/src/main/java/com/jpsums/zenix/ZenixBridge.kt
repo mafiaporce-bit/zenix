@@ -54,6 +54,7 @@ class ZenixBridge(private val activity: MainActivity) {
     @JavascriptInterface fun offlineDelete(): String = activity.brain.deleteModel()
     @JavascriptInterface fun offlineAsk(id: String, prompt: String): String { activity.brain.ask(id, prompt); return ok("thinking") }
     @JavascriptInterface fun startListening(lang: String): String { activity.brain.startListening(lang); return ok("listening") }
+    @JavascriptInterface fun startListeningOnline(lang: String): String { activity.brain.startListening(lang, false); return ok("listening") }
     @JavascriptInterface fun stopListening(): String { activity.brain.stopListening(); return ok("stopped") }
     @JavascriptInterface fun speak(text: String, lang: String): String { activity.brain.speak(text, lang); return ok("speaking") }
     @JavascriptInterface fun stopSpeaking(): String { activity.brain.stopSpeaking(); return ok("stopped") }

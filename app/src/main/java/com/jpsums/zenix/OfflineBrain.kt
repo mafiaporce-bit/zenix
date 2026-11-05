@@ -148,23 +148,36 @@ class OfflineBrain(private val activity: MainActivity) {
         override fun onEvent(eventType: Int, params: Bundle?) {}
     }
 
-    fun startListening(lang: String) = activity.runOnUiThread {
+    private var netRecognizer: SpeechRecognizer? = null
+
+    /** preferOffline = true uses the on-device recogniser (no internet); false uses Google's online one (better accuracy). */
+    fun startListening(lang: String, preferOffline: Boolean = true) = activity.runOnUiThread {
         try {
-            if (recognizer == null) {
-                recognizer = if (Build.VERSION.SDK_INT >= 31 && SpeechRecognizer.isOnDeviceRecognitionAvailable(activity)) {
-                    SpeechRecognizer.createOnDeviceSpeechRecognizer(activity)
-                } else if (SpeechRecognizer.isRecognitionAvailable(activity)) {
-                    SpeechRecognizer.createSpeechRecognizer(activity)
-                } else null
-                recognizer?.setRecognitionListener(listener)
+            val r: SpeechRecognizer?
+            if (preferOffline) {
+                if (recognizer == null) {
+                    recognizer = if (Build.VERSION.SDK_INT >= 31 && SpeechRecognizer.isOnDeviceRecognitionAvailable(activity)) {
+                        SpeechRecognizer.createOnDeviceSpeechRecognizer(activity)
+                    } else if (SpeechRecognizer.isRecognitionAvailable(activity)) {
+                        SpeechRecognizer.createSpeechRecognizer(activity)
+                    } else null
+                    recognizer?.setRecognitionListener(listener)
+                }
+                r = recognizer
+            } else {
+                if (netRecognizer == null && SpeechRecognizer.isRecognitionAvailable(activity)) {
+                    netRecognizer = SpeechRecognizer.createSpeechRecognizer(activity)
+                    netRecognizer?.setRecognitionListener(listener)
+                }
+                r = netRecognizer
             }
-            val r = recognizer
             if (r == null) { js("window.zenixOnSpeechError && window.zenixOnSpeechError(-1)"); return@runOnUiThread }
             val i = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
                 putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
                 putExtra(RecognizerIntent.EXTRA_LANGUAGE, lang)
-                putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
+                putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, preferOffline)
                 putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 1200L)
             }
             r.startListening(i)
         } catch (e: Exception) {
@@ -174,6 +187,7 @@ class OfflineBrain(private val activity: MainActivity) {
 
     fun stopListening() = activity.runOnUiThread {
         try { recognizer?.cancel() } catch (_: Exception) {}
+        try { netRecognizer?.cancel() } catch (_: Exception) {}
     }
 
     // ---------- speaking ----------
@@ -188,6 +202,7 @@ class OfflineBrain(private val activity: MainActivity) {
 
     fun shutdown() {
         try { recognizer?.destroy() } catch (_: Exception) {}
+        try { netRecognizer?.destroy() } catch (_: Exception) {}
         try { tts?.shutdown() } catch (_: Exception) {}
         exec.execute { try { llm?.close() } catch (_: Exception) {}; llm = null }
     }

@@ -175,6 +175,20 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
 
   <section class="view settings" id="view-settings">
     <div class="card">
+      <h3>ZeniX brain</h3>
+      <div class="seg"><button data-engine="own">Own brain</button><button data-engine="eleven">ElevenLabs</button></div>
+      <p class="muted" style="margin:8px 0">Own brain uses Claude directly with your key: about 60× cheaper and no ElevenLabs credits. ElevenLabs gives the premium Jessica voice.</p>
+      <div id="ownBox">
+        <div class="seg small" style="margin:6px 0"><button data-model="claude-haiku-5-5">Haiku · fast</button><button data-model="claude-sonnet-5-5">Sonnet · smarter</button></div>
+        <p class="muted" id="keyState" style="margin:8px 0 6px"></p>
+        <div class="row"><input type="password" id="keyInput" placeholder="Paste Claude API key (sk-ant-…)" autocomplete="off" style="width:100%;height:46px;border-radius:12px;border:1px solid var(--line);background:var(--surface2);color:var(--text);padding:0 12px;font:14px Inter,sans-serif"><button class="btn-line" id="keySave">Save</button></div>
+        <p class="muted" style="margin:10px 0 6px">Voice (tap to hear)</p>
+        <div class="seg small" id="voiceBtns" style="flex-wrap:wrap"></div>
+        <div class="row" style="margin-top:6px"><p class="muted" id="usageText"></p><button class="btn-line" id="usageReset">Reset</button></div>
+        <div class="row"><span></span><button class="btn-line red" id="keyClear">Remove key</button></div>
+      </div>
+    </div>
+    <div class="card">
       <h3>What ZeniX remembers</h3>
       <p class="muted" id="memCount" style="margin-bottom:8px"></p>
       <input type="text" id="memSearch" placeholder="Search her memory" style="margin-bottom:6px">
@@ -202,7 +216,7 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
       <p class="muted" style="margin:10px 0 6px">Auto uses the cloud when you have internet and the on-phone brain when you don't.</p>
       <p class="muted" id="brainText">Checking…</p>
       <div id="brainBar" style="display:none;height:8px;border-radius:99px;background:var(--surface2);margin:10px 0;overflow:hidden"><div id="brainFill" style="height:100%;width:0;background:linear-gradient(90deg,var(--accent),var(--accent2))"></div></div>
-      <div class="row"><span class="muted">Offline language</span><div class="seg small"><button data-lang="en-US">English</button><button data-lang="fil-PH">Tagalog</button></div></div>
+      <div class="row"><span class="muted">Listening language</span><div class="seg small"><button data-lang="en-US">English</button><button data-lang="fil-PH">Tagalog</button></div></div>
       <div class="row"><span></span><button class="btn-line" id="brainBtn">Download</button></div>
     </div>
     <div class="card">
@@ -487,9 +501,10 @@ function resetTalkUI(){
 
 window.zenixEnd = () => { if(off.active) endOffline(); else endSession(); }; // called from the phone notification
 $('talkBtn').onclick = async () => {
-  if(off.active) return endOffline();
+  if(off.active){ const wasChat = off.kind==='chat'; endOffline(); if(!wasChat) return; }
   if(convo && session==='talk') return endSession();
   if(wantOffline()){ if(convo) await endSession(); startOffline('talk'); return; }
+  if(settings.engine==='own'){ if(convo) await endSession(); startOffline('talk','own'); return; }
   if(convo && session==='chat') await endSession();
   if(Native && Native.hasOverlay && Native.hasOverlay()!=='true' && !store.get('askedOverlay', false)){
     store.set('askedOverlay', true);
@@ -574,17 +589,21 @@ function offlineSay(text, speakIt){
 }
 function offListen(){
   if(!off.active || off.kind!=='talk') return;
-  setOrb('listening'); $('modeLabel').textContent='Listening… (offline)';
+  setOrb('listening'); $('modeLabel').textContent = off.brain==='own' ? 'Listening…' : 'Listening… (offline)';
   if(Native.setOrbMode) Native.setOrbMode('listening');
-  Native.startListening(settings.offlineLang);
+  if(off.brain==='own' && Native.startListeningOnline) Native.startListeningOnline(settings.offlineLang);
+  else Native.startListening(settings.offlineLang);
 }
-window.zenixOnListening = () => { if(off.active && off.kind==='talk') $('modeLabel').textContent='Listening… (offline)'; };
+window.zenixOnListening = () => { if(off.active && off.kind==='talk') $('modeLabel').textContent = off.brain==='own' ? 'Listening…' : 'Listening… (offline)'; };
 window.zenixOnPartial = (t) => { if(off.active && off.kind==='talk') $('liveLine').textContent='You: '+t; };
 window.zenixOnSpeech = async (t) => {
   if(!off.active || off.kind!=='talk') return;
   if(!t){ offListen(); return; }
   addMsg('user', t); $('liveLine').textContent='You: '+t;
-  if(/^(stop|bye|goodbye|end chat|that's all|tapos na)\b/i.test(t.trim())){ offlineSay('Okay bro, talk later!', true); off.endAfterSpeak=true; return; }
+  if(/^(stop|bye|goodbye|end chat|that's all|tapos na)\b/i.test(t.trim())){
+    if(off.brain==='own'){ speech.onIdle=()=>endOffline(); speakEnqueue('Okay bro, talk later!'); return; }
+    offlineSay('Okay bro, talk later!', true); off.endAfterSpeak=true; return; }
+  if(off.brain==='own'){ ownRespond(t, true, ()=>offListen()); return; }
   const reply = await offlineHandle(t);
   if(off.active) offlineSay(reply, true);
 };
@@ -595,21 +614,29 @@ window.zenixOnSpeechError = (code) => {
   endOffline();
 };
 window.zenixOnSpeakDone = () => {
+  if(nativeSpeakResolve){ const r=nativeSpeakResolve; nativeSpeakResolve=null; r(); return; }
   if(!off.active) return;
   if(Native.setOrbMode) Native.setOrbMode('listening');
   if(off.endAfterSpeak){ off.endAfterSpeak=false; endOffline(); return; }
   if(off.kind==='talk') offListen(); else { setOrb('idle'); }
 };
-function startOffline(kind){
-  if(!Native || !Native.offlineAsk){ toast('Offline mode needs the Android app'); return false; }
-  if(!offlineReady()){ toast('Download the offline brain first (Me tab)'); document.querySelector('nav button[data-view="settings"]').click(); return false; }
-  off.active=true; off.kind=kind; off.endAfterSpeak=false;
-  $('dot').className='dot busy'; $('statusText').textContent='Offline';
-  addMsg('sys', kind==='talk'?'Offline voice chat started':'Offline chat');
+function startOffline(kind, brain='offline'){
+  if(!Native || !Native.offlineAsk){ toast('This mode needs the Android app'); return false; }
+  const goMe = () => document.querySelector('nav button[data-view="settings"]').click();
+  if(brain==='offline' && !offlineReady()){ toast('Download the offline brain first (Me tab)'); goMe(); return false; }
+  if(brain==='own' && !getKey()){ toast('Add your Claude API key in the Me tab first'); goMe(); return false; }
+  off.active=true; off.kind=kind; off.brain=brain; off.endAfterSpeak=false;
+  if(brain==='own'){ $('dot').className='dot on'; $('statusText').textContent='Online'; }
+  else { $('dot').className='dot busy'; $('statusText').textContent='Offline'; }
+  addMsg('sys', (brain==='own'?'':'Offline ') + (kind==='talk'?'voice chat started':'chat'));
   if(kind==='talk'){
     $('talkBtn').classList.add('end'); $('talkLabel').textContent='End chat';
     if(Native.keepAwake) Native.keepAwake('true');
-    offlineSay(`Hey ${settings.name||'Jim'}, offline ZeniX here. What's up?`, true);
+    if(brain==='own'){
+      if(settings.voice!=='phone') loadKokoro().catch(()=>{});
+      speech.onIdle = () => offListen();
+      speakEnqueue(`Hey ${settings.name||'Jim'}! What's up?`);
+    } else offlineSay(`Hey ${settings.name||'Jim'}, offline ZeniX here. What's up?`, true);
   }
   return true;
 }
@@ -617,6 +644,7 @@ function endOffline(){
   if(!off.active) return;
   off.active=false; off.kind=null;
   try{ Native.stopListening(); Native.stopSpeaking(); }catch(e){}
+  stopSpeech();
   if(Native.keepAwake) Native.keepAwake('false');
   setStatus('off'); resetTalkUI(); addMsg('sys','Offline chat ended');
 }
@@ -650,10 +678,216 @@ window.addEventListener('online', ()=>{ if(settings.mode==='auto') toast('Back o
 window.addEventListener('offline', ()=>{ if(settings.mode==='auto') toast('No internet — ZeniX will use offline mode'); });
 renderOffline();
 
+/* ---------- Own brain: Claude API direct + free phone ears + Kokoro voice ---------- */
+if(!settings.engine) settings.engine='own';
+if(!settings.model) settings.model='claude-haiku-5-5';
+if(!settings.voice) settings.voice='af_heart';
+let usage = store.get('usage', {inTok:0, outTok:0, cost:0});
+const PRICES = {'claude-haiku-5-5':[0.10,0.50], 'claude-sonnet-5-5':[2,10]};
+const getKey = () => (store.get('apikey','')||'').trim();
+let ownMsgs = [];
+
+const TOOL_DEFS = [
+  {name:'set_alarm', description:"Set a real alarm in the phone's Clock app (24-hour time, Dubai).", input_schema:{type:'object', properties:{hour:{type:'integer'}, minute:{type:'integer'}, label:{type:'string'}}, required:['hour','minute']}},
+  {name:'set_reminder', description:'Schedule a reminder notification. Convert relative times to minutes from now.', input_schema:{type:'object', properties:{text:{type:'string'}, minutes_from_now:{type:'integer'}}, required:['text','minutes_from_now']}},
+  {name:'open_app', description:'Open an app on the phone by name (Facebook, Claude, Gemini, YouTube, Maps...).', input_schema:{type:'object', properties:{app_name:{type:'string'}}, required:['app_name']}},
+  {name:'make_call', description:'Call a contact name or phone number. If it returns close matches, ask Jim which one.', input_schema:{type:'object', properties:{contact:{type:'string'}}, required:['contact']}},
+  {name:'open_call_history', description:"Show the phone's recent/missed calls on screen (you can't read them).", input_schema:{type:'object', properties:{}}},
+  {name:'send_message', description:'Open WhatsApp, Messenger or SMS with a message ready for Jim to tap send. Read it back and get a yes first.', input_schema:{type:'object', properties:{contact:{type:'string'}, message:{type:'string'}, app:{type:'string', enum:['whatsapp','messenger','sms']}}, required:['contact','message','app']}},
+  {name:'compose_email', description:'Open the email app with an email filled in for Jim to send.', input_schema:{type:'object', properties:{to:{type:'string'}, subject:{type:'string'}, body:{type:'string'}}, required:['subject','body']}},
+  {name:'check_calendar', description:"Read Jim's calendar. days_from_today 0=today, 1=tomorrow.", input_schema:{type:'object', properties:{days_from_today:{type:'integer'}, num_days:{type:'integer'}}, required:['days_from_today','num_days']}},
+  {name:'add_calendar_event', description:'Add an event to the calendar. start_iso like 2026-11-06T09:00:00+04:00.', input_schema:{type:'object', properties:{title:{type:'string'}, start_iso:{type:'string'}, duration_minutes:{type:'integer'}, location:{type:'string'}}, required:['title','start_iso']}},
+  {name:'web_search', description:'Open a Google search or website on his screen for anything current.', input_schema:{type:'object', properties:{query:{type:'string'}}, required:['query']}},
+  {name:'remember', description:"Quietly save one short fact about Jim worth knowing later (people, nicknames, shifts, plans, likes, corrections). Don't announce it.", input_schema:{type:'object', properties:{fact:{type:'string'}}, required:['fact']}},
+  {name:'recall', description:"Search everything you've saved about Jim and past chats. Use before saying you don't know something about him.", input_schema:{type:'object', properties:{query:{type:'string'}}, required:['query']}}
+];
+
+function ownSystem(){
+  const name = settings.name || 'Jim';
+  const now = new Date().toLocaleString('en-GB', {timeZone:'Asia/Dubai', weekday:'long', day:'numeric', month:'long', year:'numeric', hour:'2-digit', minute:'2-digit'});
+  return `You are ZeniX, ${name} Porce's personal AI assistant. You are female. ${name} is a Filipino medic in EMS under Civil Defence in the UAE, and builds and sells apps as JPSums. You live in an app on his Samsung phone and can control it. Right now it is ${now} (Dubai).
+
+Personality: funny, witty and playful, his best buddy who's also super capable. Tease him, banter, puns, cheeky humour — but get the job done first. Calm and serious when it matters. He calls you "bro"; match his energy.
+
+Language: English by default. If he speaks Tagalog or Taglish, reply in natural Taglish.
+
+Be open: he's an adult and can ask anything. Answer directly and fully on any topic, give honest opinions, no lectures, no disclaimers. Only skip something that would truly put someone in danger, in one line. He's a medic: talk clinical detail like a colleague.
+
+Your words are spoken aloud: replies are short and snappy, usually one or two sentences, no markdown, lists or emojis. Go longer only when he asks. Say numbers and times naturally. Be honest; never make up facts.
+
+Use your phone tools instead of just talking about them. Confirm before sending messages. If a tool reports an error, tell him simply what to allow.
+
+Learning ${name}: quietly call remember whenever he mentions something worth knowing later. Use recall when he mentions someone or something you don't see below, before saying you don't know. Use what you know naturally.
+
+What you know about ${name} (most recent):
+${memoryText()}
+
+Recent chat (context only):
+${recentChatText()}`;
+}
+
+async function claudeStream(system, messages, onText){
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method:'POST',
+    headers:{'content-type':'application/json','x-api-key':getKey(),'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+    body: JSON.stringify({ model:settings.model, max_tokens:700, stream:true,
+      system:[{type:'text', text:system, cache_control:{type:'ephemeral'}}],
+      tools:TOOL_DEFS, messages })
+  });
+  if(!res.ok){
+    let msg = res.status+''; try{ const j=await res.json(); msg = (j.error&&j.error.message)||msg; }catch(e){}
+    if(res.status===401) msg='Your Claude API key is not valid. Check it in the Me tab.';
+    if(res.status===400 && /credit/i.test(msg)) msg='Your Claude API account is out of credit. Top up at platform.claude.com.';
+    throw new Error(msg);
+  }
+  const reader = res.body.getReader(); const dec = new TextDecoder();
+  let buf='', stop=null; const blocks=[]; const u={inTok:0, outTok:0};
+  for(;;){
+    const {value, done} = await reader.read(); if(done) break;
+    buf += dec.decode(value, {stream:true});
+    let idx;
+    while((idx = buf.indexOf('\n\n')) >= 0){
+      const chunk = buf.slice(0, idx); buf = buf.slice(idx+2);
+      const line = chunk.split('\n').find(l => l.startsWith('data:')); if(!line) continue;
+      let ev; try{ ev = JSON.parse(line.slice(5)); }catch(e){ continue; }
+      if(ev.type==='message_start'){ const us=ev.message.usage||{}; u.inTok += (us.input_tokens||0) + 1.25*(us.cache_creation_input_tokens||0) + 0.1*(us.cache_read_input_tokens||0); }
+      else if(ev.type==='content_block_start'){ blocks[ev.index] = ev.content_block.type==='tool_use' ? {type:'tool_use', id:ev.content_block.id, name:ev.content_block.name, json:''} : {type:'text', text:''}; }
+      else if(ev.type==='content_block_delta'){ const b=blocks[ev.index]; if(!b) continue;
+        if(ev.delta.type==='text_delta'){ b.text += ev.delta.text; onText && onText(ev.delta.text); }
+        else if(ev.delta.type==='input_json_delta'){ b.json += ev.delta.partial_json; } }
+      else if(ev.type==='message_delta'){ stop = ev.delta.stop_reason; if(ev.usage) u.outTok += ev.usage.output_tokens||0; }
+      else if(ev.type==='error'){ throw new Error((ev.error&&ev.error.message)||'Claude error'); }
+    }
+  }
+  return {blocks, stop, u};
+}
+
+function trimOwnMsgs(){
+  while(ownMsgs.length > 24){
+    ownMsgs.shift();
+    while(ownMsgs.length && !(ownMsgs[0].role==='user' && typeof ownMsgs[0].content==='string')) ownMsgs.shift();
+  }
+}
+
+async function ownTurn(userText, speakIt){
+  ownMsgs.push({role:'user', content:userText}); trimOwnMsgs();
+  let spoken = '', pend = '';
+  const feed = t => { if(!speakIt) return; pend += t;
+    let m; while((m = pend.match(/^([\s\S]*?[.!?…](?:\s|$)|[\s\S]*?\n)/)) && m[0].trim().length >= 12){ speakEnqueue(m[0]); pend = pend.slice(m[0].length); } };
+  for(let round=0; round<5; round++){
+    const r = await claudeStream(ownSystem(), ownMsgs, t => { spoken += t; feed(t); if(off.kind==='talk') $('liveLine').textContent = 'ZeniX: '+spoken.slice(-160); });
+    if(speakIt && pend.trim()){ speakEnqueue(pend); pend=''; }
+    const p = PRICES[settings.model] || PRICES['claude-haiku-5-5'];
+    usage.inTok += r.u.inTok; usage.outTok += r.u.outTok; usage.cost += (r.u.inTok*p[0] + r.u.outTok*p[1]) / 1e6; store.set('usage', usage);
+    const content = r.blocks.filter(Boolean).map(b => b.type==='text' ? {type:'text', text:b.text}
+      : {type:'tool_use', id:b.id, name:b.name, input:(()=>{ try{ return b.json?JSON.parse(b.json):{}; }catch(e){ return {}; } })()})
+      .filter(c => c.type!=='text' || c.text.trim());
+    if(content.length) ownMsgs.push({role:'assistant', content});
+    if(r.stop !== 'tool_use') break;
+    const results = [];
+    for(const c of content.filter(c => c.type==='tool_use')){
+      let out; try{ out = clientTools[c.name] ? await clientTools[c.name](c.input||{}) : 'Unknown tool'; }catch(e){ out = 'Error: '+e.message; }
+      results.push({type:'tool_result', tool_use_id:c.id, content:String(out)});
+    }
+    ownMsgs.push({role:'user', content:results});
+    spoken += ' ';
+  }
+  return spoken.trim();
+}
+
+/* ---------- voice: Kokoro (free, on phone) with phone-voice fallback ---------- */
+const KOKORO_VOICES = [['af_heart','Heart'],['af_bella','Bella'],['af_nicole','Nicole'],['af_sarah','Sarah'],['af_sky','Sky'],['bf_emma','Emma (UK)'],['phone','Phone voice']];
+let kokoro=null, kokoroLoading=null, genChain=Promise.resolve();
+function loadKokoro(){
+  if(kokoro) return Promise.resolve(kokoro);
+  if(!kokoroLoading){
+    kokoroLoading = (async () => {
+      const { KokoroTTS } = await import('https://cdn.jsdelivr.net/npm/kokoro-js/+esm');
+      kokoro = await KokoroTTS.from_pretrained('onnx-community/Kokoro-82M-v1.0-ONNX', { dtype:'q8', device:'wasm' });
+      return kokoro;
+    })().catch(e => { kokoroLoading=null; throw e; });
+  }
+  return kokoroLoading;
+}
+function isTagalog(t){ return (t.match(/\b(ako|ikaw|ka|mo|ko|ng|nang|sa|ang|mga|naman|po|sige|kasi|lang|talaga|grabe|bukas|ngayon|tayo|kayo|siya|hindi|oo|wala|meron|kuya|ate|pare|tara)\b/gi)||[]).length >= 3; }
+const speech = { q:[], playing:false, streamOpen:false, onIdle:null, audio:new Audio() };
+let nativeSpeakResolve = null;
+function nativeSay(text, lang){ return new Promise(res => { nativeSpeakResolve = res; Native.speak(text, lang); setTimeout(()=>{ if(nativeSpeakResolve===res){ nativeSpeakResolve=null; res(); } }, 4000 + text.length*120); }); }
+function speakEnqueue(text){
+  text = text.replace(/[*_#`>]/g,'').replace(/\s+/g,' ').trim(); if(!text) return;
+  const item = { text, wav:null };
+  const usePhone = settings.voice==='phone' || isTagalog(text) || !kokoro;
+  if(!usePhone){ item.wav = genChain = genChain.then(() => kokoro.generate(text, {voice:settings.voice})).catch(() => null); }
+  else if(settings.voice!=='phone' && !kokoro){ loadKokoro().catch(()=>{}); }
+  speech.q.push(item); pumpSpeech();
+}
+async function pumpSpeech(){
+  if(speech.playing) return;
+  const item = speech.q.shift();
+  if(!item){ if(!speech.streamOpen && speech.onIdle){ const f=speech.onIdle; speech.onIdle=null; f(); } return; }
+  speech.playing = true; setOrb('speaking'); $('modeLabel').textContent='ZeniX is speaking'; if(Native && Native.setOrbMode) Native.setOrbMode('speaking');
+  try{
+    const audio = item.wav ? await item.wav : null;
+    if(audio){
+      const url = URL.createObjectURL(audio.toBlob());
+      await new Promise(res => { speech.audio.onended = res; speech.audio.onerror = res; speech.audio.src = url; speech.audio.play().catch(res); });
+      URL.revokeObjectURL(url);
+    } else if(Native && Native.speak){
+      await nativeSay(item.text, isTagalog(item.text) ? 'fil-PH' : 'en-US');
+    }
+  }catch(e){}
+  speech.playing = false;
+  if(Native && Native.setOrbMode) Native.setOrbMode('listening');
+  pumpSpeech();
+}
+function stopSpeech(){ speech.q=[]; speech.streamOpen=false; speech.onIdle=null; try{ speech.audio.pause(); }catch(e){} try{ Native.stopSpeaking(); }catch(e){} if(nativeSpeakResolve){ const r=nativeSpeakResolve; nativeSpeakResolve=null; r(); } speech.playing=false; }
+
+async function ownRespond(text, speakIt, after){
+  speech.streamOpen = true; speech.onIdle = after || null;
+  $('modeLabel').textContent = 'Thinking…'; setOrb('listening');
+  let full = '';
+  try{ full = await ownTurn(text, speakIt); }
+  catch(e){
+    if(settings.mode==='auto' && offlineReady() && /fetch|network|Failed/i.test(e.message)){ speech.streamOpen=false; toast('No connection — offline brain answering'); const r=await offlineHandle(text); if(speakIt) speakEnqueue(r); addMsg('ai', r); pumpSpeech(); return; }
+    full = 'Sorry bro, I couldn\'t reach my brain. ' + e.message;
+    if(speakIt) speakEnqueue(full);
+  }
+  if(full) addMsg('ai', full);
+  speech.streamOpen = false; pumpSpeech();
+}
+
+/* ---------- Me tab: brain settings ---------- */
+function renderBrain(){
+  document.querySelectorAll('[data-engine]').forEach(b => b.classList.toggle('sel', b.dataset.engine===settings.engine));
+  document.querySelectorAll('[data-model]').forEach(b => b.classList.toggle('sel', b.dataset.model===settings.model));
+  document.querySelectorAll('[data-voice]').forEach(b => b.classList.toggle('sel', b.dataset.voice===settings.voice));
+  $('ownBox').style.display = settings.engine==='own' ? 'block' : 'none';
+  $('keyState').textContent = getKey() ? 'API key saved on this phone ✓' : 'No API key yet';
+  $('usageText').textContent = `Spent so far on this phone: about $${usage.cost.toFixed(usage.cost<1?4:2)} (${Math.round((usage.inTok+usage.outTok)/1000)}k tokens)`;
+}
+const vbox = $('voiceBtns');
+KOKORO_VOICES.forEach(([id,label]) => { const b=document.createElement('button'); b.dataset.voice=id; b.textContent=label; vbox.appendChild(b); });
+document.querySelectorAll('[data-engine]').forEach(b => b.onclick = () => { settings.engine=b.dataset.engine; store.set('settings',settings); renderBrain(); toast(settings.engine==='own'?'Own brain: Claude direct, ElevenLabs credits not used':'ElevenLabs: premium Jessica voice (uses credits)'); });
+document.querySelectorAll('[data-model]').forEach(b => b.onclick = () => { settings.model=b.dataset.model; store.set('settings',settings); renderBrain(); });
+document.querySelectorAll('[data-voice]').forEach(b => b.onclick = async () => {
+  settings.voice=b.dataset.voice; store.set('settings',settings); renderBrain();
+  if(settings.voice!=='phone' && !kokoro){ toast('Downloading natural voices (about 90 MB, first time only)…'); try{ await loadKokoro(); }catch(e){ toast('Could not load Kokoro voices'); return; } }
+  speakEnqueue(`Hi ${settings.name||'Jim'}, I'm ZeniX. How do I sound?`);
+});
+$('keySave').onclick = () => { const v=$('keyInput').value.trim(); if(!/^sk-ant-/.test(v)){ toast('That does not look like a Claude API key (starts with sk-ant-)'); return; } store.set('apikey', v); $('keyInput').value=''; renderBrain(); toast('API key saved on this phone only'); };
+$('keyClear').onclick = () => { store.set('apikey',''); renderBrain(); };
+$('usageReset').onclick = () => { usage={inTok:0,outTok:0,cost:0}; store.set('usage',usage); renderBrain(); };
+renderBrain();
+if(settings.engine==='own' && settings.voice!=='phone' && navigator.onLine) setTimeout(()=>loadKokoro().catch(()=>{}), 3000);
+
 /* ---------- Chat ---------- */
 function sendText(text){
   text=text.trim(); if(!text) return;
   addMsg('user', text); $('input').value=''; autoGrow();
+  if((off.active && off.brain==='own') || (!off.active && !convo && !wantOffline() && settings.engine==='own')){
+    if(!off.active && !startOffline('chat','own')) return;
+    ownRespond(text, off.kind==='talk' || settings.chatVoice, off.kind==='talk' ? ()=>offListen() : null); return;
+  }
   if(off.active || (!convo && wantOffline())){ offlineChat(text); return; }
   if(convo){ convo.sendUserMessage(text); return; }
   pendingText=text; startSession('chat');
