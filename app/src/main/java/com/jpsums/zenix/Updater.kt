@@ -48,6 +48,7 @@ class Updater(private val activity: MainActivity) {
                 latestName = j.optString("versionName", "")
                 if (latestCode > currentCode()) {
                     activity.runJs("window.zenixUpdateAvailable && window.zenixUpdateAvailable(${JSONObject.quote(latestName)}, $manual)")
+                    notifyOnce(latestCode, latestName)
                 } else if (manual) {
                     activity.runJs("window.zenixUpToDate && window.zenixUpToDate(${JSONObject.quote(latestName)})")
                 }
@@ -55,6 +56,25 @@ class Updater(private val activity: MainActivity) {
                 if (manual) activity.runJs("window.zenixUpdateCheckFailed && window.zenixUpdateCheckFailed()")
             }
         }
+    }
+
+    /** A phone notification (once per version) so the update can't be missed. */
+    private fun notifyOnce(code: Long, name: String) {
+        val prefs = activity.getSharedPreferences("zenix", Context.MODE_PRIVATE)
+        if (prefs.getLong("notified_update", 0L) >= code) return
+        if (MainActivity.inForeground) return   // the banner in the app is enough
+        prefs.edit().putLong("notified_update", code).apply()
+        try {
+            val open = android.app.PendingIntent.getActivity(activity, 21,
+                Intent(activity, MainActivity::class.java).putExtra("update", true).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
+                android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE)
+            val n = android.app.Notification.Builder(activity, MainActivity.UPDATE_CHANNEL_ID)
+                .setSmallIcon(R.drawable.ic_notify)
+                .setContentTitle("New Maya v$name is ready")
+                .setContentText("Tap to update")
+                .setContentIntent(open).setAutoCancel(true).build()
+            activity.getSystemService(android.app.NotificationManager::class.java).notify(31, n)
+        } catch (_: Exception) { }
     }
 
     fun start(): String {

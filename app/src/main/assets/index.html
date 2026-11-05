@@ -93,7 +93,53 @@ input[type=text]{width:100%;height:46px;border-radius:12px;border:1px solid var(
 .toggle.on::after{left:23px}
 .btn-line{height:44px;padding:0 16px;border-radius:12px;border:1px solid var(--line);background:var(--surface2);font-weight:500;font-size:14px}
 .btn-line.red{color:var(--danger)}
-.settings{overflow-y:auto;padding-bottom:12px}
+.settings{overflow-y:auto;padding:4px 0 16px}
+.settings>*{flex-shrink:0}
+/* ---- Me page ---- */
+.set-head{display:flex;align-items:center;gap:14px;padding:16px;margin:4px 0 6px;background:linear-gradient(135deg,rgba(178,102,255,.18),rgba(255,63,210,.07));border:1px solid var(--line);border-radius:20px}
+.set-avatar{width:52px;height:52px;border-radius:16px;display:grid;place-items:center;background:linear-gradient(135deg,var(--accent),var(--accent2));font:700 22px 'Space Grotesk',sans-serif;color:#fff;flex-shrink:0;box-shadow:0 8px 24px rgba(178,102,255,.35)}
+.set-head h2{margin:0;font:600 18px 'Space Grotesk',sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.set-head p{margin:3px 0 0;color:var(--muted);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.set-label{margin:20px 6px 8px;font-size:11.5px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted)}
+.set-list{background:var(--surface);border:1px solid var(--line);border-radius:18px;overflow:hidden}
+.set-item{border-top:1px solid var(--line)}
+.set-item:first-child{border-top:0}
+.set-item>summary{list-style:none;display:flex;align-items:center;gap:12px;padding:11px 14px;min-height:62px;cursor:pointer}
+.set-item>summary::-webkit-details-marker{display:none}
+.set-item>summary:active{background:rgba(255,255,255,.03)}
+.set-item[open]>summary{background:rgba(178,102,255,.06)}
+.ico{width:36px;height:36px;border-radius:11px;display:grid;place-items:center;flex-shrink:0;background:rgba(178,102,255,.15);color:#C48BFF}
+.ico svg,.chev{width:19px;height:19px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.ico.pink{background:rgba(255,63,210,.13);color:#FF74E0}
+.ico.blue{background:rgba(96,128,255,.15);color:#8FA6FF}
+.ico.green{background:rgba(34,197,94,.13);color:#4ADE80}
+.ico.amber{background:rgba(245,165,36,.14);color:#F7B84B}
+.set-t{flex:1;min-width:0}
+.set-t>b{display:block;font-weight:600;font-size:15px}
+.set-t>span{display:block;color:var(--muted);font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.chev{color:var(--muted);flex-shrink:0;transition:transform .2s}
+.set-item[open] .chev{transform:rotate(90deg)}
+.set-body{padding:6px 14px 16px;animation:fadeIn .18s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+.hint{color:var(--muted);font-size:12.5px;line-height:1.5;margin:0 0 10px}
+.sub-label{font-size:12px;font-weight:600;color:var(--muted);margin:16px 0 7px;letter-spacing:.3px}
+.field{width:100%;height:46px;border-radius:12px;border:1px solid var(--line);background:var(--surface2);color:var(--text);padding:0 12px;font:14px Inter,sans-serif;outline:none}
+.field:focus{border-color:var(--accent)}
+.inline{display:flex;gap:8px;align-items:center;margin-top:10px}
+.inline .field{flex:1;min-width:0}
+.status-line{font-size:12.5px;color:var(--muted);margin:10px 0 0;line-height:1.45}
+.toggle-row{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:48px;margin-top:8px}
+.toggle-row b{display:block;font-size:14px;font-weight:600}
+.toggle-row small{display:block;color:var(--muted);font-size:12px;margin-top:2px}
+.pill{font-size:11.5px;font-weight:600;padding:4px 9px;border-radius:999px;background:var(--surface2);color:var(--muted);flex-shrink:0}
+.pill.ok{background:rgba(34,197,94,.14);color:#4ADE80}
+.voices{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin-top:12px}
+.voices button{min-height:42px;padding:6px 8px;border-radius:11px;border:1px solid var(--line);background:var(--surface2);font-size:13px;color:var(--text);line-height:1.2;overflow:hidden;text-overflow:ellipsis}
+.voices button.sel{border-color:var(--accent);color:var(--accent);background:rgba(178,102,255,.12);font-weight:600}
+.voices p{grid-column:1/-1}
+.vsrc{display:none}
+.vsrc.on{display:block}
+.set-body .seg.small button{padding:0 6px}
 .mem{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--line);font-size:14px}
 .mem:first-of-type{border-top:0}
 .mem span{flex:1}
@@ -167,121 +213,203 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
   </section>
 
   <section class="view settings" id="view-settings">
-    <div class="card">
-      <h3>Maya brain</h3>
-      <div class="seg"><button data-engine="own">Own brain</button><button data-engine="eleven">ElevenLabs</button></div>
-      <p class="muted" style="margin:8px 0">Own brain uses your own keys (Claude or the Open brain, plus any voice below): much cheaper. ElevenLabs mode is the all-in-one premium agent.</p>
-      <div id="ownBox">
-        <p class="muted" style="margin:6px 0">Which brain</p>
-        <div class="seg small" style="margin:6px 0"><button data-provider="claude">Claude</button><button data-provider="openrouter">Open brain · Grok</button></div>
-        <div id="claudeBox">
-          <div class="seg small" style="margin:6px 0"><button data-model="claude-haiku-5-5">Haiku · fast</button><button data-model="claude-sonnet-5-5">Sonnet · smarter</button></div>
-          <p class="muted" id="keyState" style="margin:8px 0 6px"></p>
-          <div class="row"><input type="password" id="keyInput" placeholder="Paste Claude API key (sk-ant-…)" autocomplete="off" style="width:100%;height:46px;border-radius:12px;border:1px solid var(--line);background:var(--surface2);color:var(--text);padding:0 12px;font:14px Inter,sans-serif"><button class="btn-line" id="keySave">Save</button></div>
-        </div>
-        <div id="orBox" style="display:none">
-          <p class="muted" style="margin:6px 0 8px">The Open brain runs through OpenRouter: Grok and other more open AIs with one key. Get a key at openrouter.ai → Keys and add a few dollars of credit.</p>
-          <div class="seg small" id="orModels" style="flex-wrap:wrap;margin:6px 0"></div>
-          <div class="row"><input id="orCustom" placeholder="Or type any OpenRouter model id" autocomplete="off" style="width:100%;height:42px;border-radius:12px;border:1px solid var(--line);background:var(--surface2);color:var(--text);padding:0 12px;font:13px Inter,sans-serif"><button class="btn-line" id="orCustomSave">Use</button></div>
-          <p class="muted" id="orState" style="margin:8px 0 6px"></p>
-          <div class="row"><input type="password" id="orInput" placeholder="Paste OpenRouter key (sk-or-…)" autocomplete="off" style="width:100%;height:46px;border-radius:12px;border:1px solid var(--line);background:var(--surface2);color:var(--text);padding:0 12px;font:14px Inter,sans-serif"><button class="btn-line" id="orSave">Save</button></div>
-          <div class="row" style="margin-top:6px"><span></span><button class="btn-line" id="orTest">Test key</button></div>
-        </div>
-        <p class="muted" style="margin:10px 0 6px">Voice (tap to hear)</p>
-        <div class="seg small" id="voiceBtns" style="flex-wrap:wrap"></div>
-        <p class="muted" id="voiceProg" style="display:none;margin-top:6px"></p>
-        <p class="muted" style="margin:10px 0 6px">Google HD voices (instant, recommended for speed)</p>
-        <div class="seg small" id="hdVoices" style="flex-wrap:wrap"></div>
-        <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line)">
-          <h3 style="font-size:15px">Fast cloud voice · Deepgram</h3>
-          <p class="muted" style="margin:4px 0 8px">Faster ears and natural voices, about $1/hour. New Deepgram accounts get $200 free.</p>
-          <p class="muted" style="margin:0 0 6px">Ears</p>
-          <div class="seg small"><button data-ears="phone">Phone</button><button data-ears="deepgram">Deepgram</button></div>
-          <p class="muted" style="margin:10px 0 6px">Deepgram voices (tap to hear)</p>
-          <div class="seg small" style="flex-wrap:wrap">
-            <button data-voice="dg:aura-2-thalia-en">Thalia</button><button data-voice="dg:aura-2-andromeda-en">Andromeda</button><button data-voice="dg:aura-2-helena-en">Helena</button><button data-voice="dg:aura-2-luna-en">Luna</button><button data-voice="dg:aura-2-asteria-en">Asteria</button>
+    <div class="set-head">
+      <div class="set-avatar" id="setAvatar">J</div>
+      <div style="flex:1;min-width:0"><h2 id="setName">Jim</h2><p id="setSub">Maya settings</p></div>
+    </div>
+
+    <p class="set-label">Assistant</p>
+    <div class="set-list">
+      <details class="set-item" data-sec="brain">
+        <summary><span class="ico"><svg viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="3"/><path d="M9 1v4M15 1v4M9 19v4M15 19v4M1 9h4M1 15h4M19 9h4M19 15h4"/></svg></span><span class="set-t"><b>Brain</b><span id="sumBrain"></span></span><svg class="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></summary>
+        <div class="set-body">
+          <div class="seg"><button data-brain="claude">Claude</button><button data-brain="openrouter">Open · Grok</button><button data-brain="eleven">ElevenLabs</button></div>
+          <p class="hint" id="brainHint" style="margin-top:10px"></p>
+          <div id="ownBox">
+            <div id="claudeBox">
+              <p class="sub-label">Model</p>
+              <div class="seg small"><button data-model="claude-haiku-5-5">Haiku · fast</button><button data-model="claude-sonnet-5-5">Sonnet · smarter</button></div>
+            </div>
+            <div id="orBox" style="display:none">
+              <p class="sub-label">Model</p>
+              <div class="voices" id="orModels"></div>
+              <div class="inline"><input class="field" id="orCustom" placeholder="Or any OpenRouter model id" autocomplete="off"><button class="btn-line" id="orCustomSave">Use</button></div>
+            </div>
           </div>
-          <p class="muted" id="dgState" style="margin:10px 0 6px"></p>
-          <div class="row"><input type="password" id="dgInput" placeholder="Paste Deepgram API key" autocomplete="off" style="width:100%;height:46px;border-radius:12px;border:1px solid var(--line);background:var(--surface2);color:var(--text);padding:0 12px;font:14px Inter,sans-serif"><button class="btn-line" id="dgSave">Save</button></div>
         </div>
-        <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line)">
-          <h3 style="font-size:15px">ElevenLabs voices</h3>
-          <p class="muted" style="margin:4px 0 8px">The best-sounding voices, including your own from ElevenLabs, with any brain above. Uses your ElevenLabs credits (about half a credit per letter spoken). Speaks Tagalog too.</p>
-          <p class="muted" style="margin:0 0 6px">Emotions &amp; breathing (laughs, sighs, whispers, breaths)</p>
-          <div class="seg small" style="margin-bottom:10px"><button data-expr="on">On · more human</button><button data-expr="off">Off · fastest</button></div>
-          <div class="seg small" id="elVoiceBtns" style="flex-wrap:wrap"></div>
-          <p class="muted" id="elState" style="margin:10px 0 6px"></p>
-          <div class="row"><input type="password" id="elInput" placeholder="Paste ElevenLabs API key" autocomplete="off" style="width:100%;height:46px;border-radius:12px;border:1px solid var(--line);background:var(--surface2);color:var(--text);padding:0 12px;font:14px Inter,sans-serif"><button class="btn-line" id="elSave">Save</button></div>
-          <div class="row" style="margin-top:6px"><button class="btn-line red" id="elClear">Remove key</button><button class="btn-line" id="elRefresh">Refresh voices</button></div>
+      </details>
+
+      <details class="set-item" data-sec="voice">
+        <summary><span class="ico pink"><svg viewBox="0 0 24 24"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 010 7M19 5a10 10 0 010 14"/></svg></span><span class="set-t"><b>Voice</b><span id="sumVoice"></span></span><svg class="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></summary>
+        <div class="set-body">
+          <p class="hint" id="voiceAgentNote" style="display:none">In ElevenLabs mode Maya speaks with the agent's own voice (Natasha). Pick a brain above to choose voices here.</p>
+          <div id="voicePicker">
+            <div class="seg small"><button data-vsrc="el">ElevenLabs</button><button data-vsrc="dg">Deepgram</button><button data-vsrc="hd">Google</button><button data-vsrc="kk">Free</button></div>
+            <div class="vsrc" id="vsrc-el">
+              <p class="hint" style="margin-top:12px">The most human voices, including the ones in your ElevenLabs account. Uses ElevenLabs credits.</p>
+              <div class="toggle-row"><div><b>Emotions &amp; breathing</b><small>Laughs, sighs, whispers · a little slower</small></div><div class="seg small" style="flex:0 0 auto"><button data-expr="on">On</button><button data-expr="off">Off</button></div></div>
+              <div class="voices" id="elVoiceBtns"></div>
+              <div class="inline"><span class="status-line" style="flex:1;margin:0" id="elVoiceNote">Added a voice on ElevenLabs?</span><button class="btn-line" id="elRefresh">Refresh voices</button></div>
+            </div>
+            <div class="vsrc" id="vsrc-dg">
+              <p class="hint" style="margin-top:12px">Fast, clear cloud voices. Needs a Deepgram key (see Keys).</p>
+              <div class="voices">
+                <button data-voice="dg:aura-2-thalia-en">Thalia</button><button data-voice="dg:aura-2-andromeda-en">Andromeda</button><button data-voice="dg:aura-2-helena-en">Helena</button><button data-voice="dg:aura-2-luna-en">Luna</button><button data-voice="dg:aura-2-asteria-en">Asteria</button>
+              </div>
+            </div>
+            <div class="vsrc" id="vsrc-hd">
+              <p class="hint" style="margin-top:12px">Your phone's Google voices. Instant and free, the fastest option.</p>
+              <div class="voices" id="hdVoices"></div>
+            </div>
+            <div class="vsrc" id="vsrc-kk">
+              <p class="hint" style="margin-top:12px">Natural voices that run on the phone. Free.</p>
+              <div class="voices" id="voiceBtns"></div>
+              <p class="status-line" id="voiceProg" style="display:none"></p>
+            </div>
+          </div>
         </div>
-        <div class="row" style="margin-top:6px"><p class="muted" id="usageText"></p><button class="btn-line" id="usageReset">Reset</button></div>
-        <div class="row"><span></span><button class="btn-line red" id="keyClear">Remove key</button></div>
-      </div>
+      </details>
+
+      <details class="set-item" data-sec="ears">
+        <summary><span class="ico blue"><svg viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0014 0M12 17v5"/></svg></span><span class="set-t"><b>Listening</b><span id="sumEars"></span></span><svg class="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></summary>
+        <div class="set-body">
+          <p class="sub-label" style="margin-top:4px">Ears</p>
+          <div class="seg small"><button data-ears="phone">Phone · free</button><button data-ears="deepgram">Deepgram · faster</button></div>
+          <p class="hint" style="margin-top:8px">Deepgram hears you better and lets Maya start thinking before you finish talking.</p>
+          <p class="sub-label">Language</p>
+          <div class="seg small"><button data-lang="en-PH">English (PH)</button><button data-lang="en-US">English (US)</button><button data-lang="fil-PH">Tagalog</button></div>
+        </div>
+      </details>
+
+      <details class="set-item" data-sec="chat">
+        <summary><span class="ico green"><svg viewBox="0 0 24 24"><path d="M21 12a8 8 0 01-11.6 7.1L4 20l1-4.6A8 8 0 1121 12z"/></svg></span><span class="set-t"><b>Chat</b><span id="sumChat"></span></span><svg class="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></summary>
+        <div class="set-body">
+          <div class="toggle-row"><div><b>Speak chat replies</b><small>Turn off for silent text replies</small></div><button class="toggle on" id="chatVoiceToggle" aria-label="Toggle voice in chat"></button></div>
+          <p class="sub-label">Your name</p>
+          <input type="text" class="field" id="nameInput" placeholder="Jim" maxlength="30">
+        </div>
+      </details>
     </div>
-    <div class="card">
-      <h3>What Maya remembers</h3>
-      <p class="muted" id="memCount" style="margin-bottom:8px"></p>
-      <input type="text" id="memSearch" placeholder="Search her memory" style="margin-bottom:6px">
-      <div id="memList"></div>
-      <button class="btn-line" id="memMore" style="display:none;width:100%;margin-top:6px">Show more</button>
-      <div class="row" style="margin-top:8px">
-        <input type="text" id="memInput" placeholder="Add something for her to remember" maxlength="200">
-        <button class="btn-line" id="memAdd">Add</button>
-      </div>
-      <div class="row" style="margin-top:4px">
-        <button class="btn-line" id="memExport" style="flex:1">Back up memory</button>
-        <button class="btn-line" id="memImport" style="flex:1">Restore</button>
-      </div>
+
+    <p class="set-label">Features</p>
+    <div class="set-list">
+      <details class="set-item" data-sec="wake">
+        <summary><span class="ico amber"><svg viewBox="0 0 24 24"><path d="M12 3l1.8 4.7L18.5 9l-4.7 1.8L12 15.5l-1.8-4.7L5.5 9l4.7-1.3L12 3zM19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9L19 15z"/></svg></span><span class="set-t"><b>"Hey Maya"</b><span id="sumWake"></span></span><svg class="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></summary>
+        <div class="set-body">
+          <p class="hint">Say "Hey Maya" to start talking, even in another app. It listens on your phone only; nothing is sent until you say it.</p>
+          <div class="toggle-row"><span class="status-line" style="margin:0" id="wakeState">Off</span><button class="btn-line" id="wakeBtn">Turn on</button></div>
+        </div>
+      </details>
+      <details class="set-item" data-sec="orb">
+        <summary><span class="ico"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/></svg></span><span class="set-t"><b>Floating orb</b><span id="sumOrb"></span></span><svg class="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></summary>
+        <div class="set-body">
+          <p class="hint" id="orbText">Shows Maya's orb over other apps while you talk. Drag it anywhere, tap it to come back.</p>
+          <div class="toggle-row"><span></span><button class="btn-line" id="orbBtn">Turn on orb</button></div>
+        </div>
+      </details>
+      <details class="set-item" data-sec="offline">
+        <summary><span class="ico blue"><svg viewBox="0 0 24 24"><path d="M2 2l20 20M17.5 18H7a5 5 0 01-1.6-9.7M9.4 5.4A6 6 0 0118 10h.5a3.5 3.5 0 012 6.4"/></svg></span><span class="set-t"><b>Offline mode</b><span id="sumOffline"></span></span><svg class="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></summary>
+        <div class="set-body">
+          <div class="seg small"><button data-mode="auto">Auto</button><button data-mode="cloud">Cloud</button><button data-mode="offline">Offline</button></div>
+          <p class="hint" style="margin-top:10px">Auto uses the cloud when you have internet and the on-phone brain when you don't.</p>
+          <p class="status-line" id="brainText">Checking…</p>
+          <div id="brainBar" style="display:none;height:8px;border-radius:99px;background:var(--surface2);margin:10px 0;overflow:hidden"><div id="brainFill" style="height:100%;width:0;background:linear-gradient(90deg,var(--accent),var(--accent2))"></div></div>
+          <div class="toggle-row"><span></span><button class="btn-line" id="brainBtn">Download</button></div>
+        </div>
+      </details>
     </div>
-    <div class="card">
-      <h3>Phone permissions</h3>
-      <p class="muted" id="permText">Allow calls, contacts, calendar and notifications so Maya can help.</p>
-      <div class="row"><span></span><button class="btn-line" id="permBtn">Allow permissions</button></div>
+
+    <p class="set-label">Memory &amp; data</p>
+    <div class="set-list">
+      <details class="set-item" data-sec="mem">
+        <summary><span class="ico pink"><svg viewBox="0 0 24 24"><path d="M12 21s-7-4.4-9.3-9A5 5 0 0112 6.6 5 5 0 0121.3 12C19 16.6 12 21 12 21z"/></svg></span><span class="set-t"><b>What Maya remembers</b><span id="sumMem"></span></span><svg class="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></summary>
+        <div class="set-body">
+          <p class="hint" id="memCount"></p>
+          <input type="text" class="field" id="memSearch" placeholder="Search her memory">
+          <div id="memList" style="margin-top:6px"></div>
+          <button class="btn-line" id="memMore" style="display:none;width:100%;margin-top:6px">Show more</button>
+          <div class="inline"><input type="text" class="field" id="memInput" placeholder="Add something for her to remember" maxlength="200"><button class="btn-line" id="memAdd">Add</button></div>
+          <div class="inline"><button class="btn-line" id="memExport" style="flex:1">Back up</button><button class="btn-line" id="memImport" style="flex:1">Restore</button></div>
+        </div>
+      </details>
+      <details class="set-item" data-sec="hist">
+        <summary><span class="ico green"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span><span class="set-t"><b>Conversation history</b><span id="sumHist"></span></span><svg class="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></summary>
+        <div class="set-body">
+          <div class="toggle-row"><div><b id="histCount">0 messages saved</b><small>Stored only on this phone</small></div><button class="btn-line red" id="clearBtn">Clear</button></div>
+        </div>
+      </details>
+      <details class="set-item" data-sec="usage">
+        <summary><span class="ico amber"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></span><span class="set-t"><b>Usage &amp; cost</b><span id="sumUsage"></span></span><svg class="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></summary>
+        <div class="set-body">
+          <p class="status-line" style="margin-top:0" id="usageText"></p>
+          <div class="toggle-row"><span class="hint" style="margin:0">Estimate on this phone</span><button class="btn-line" id="usageReset">Reset</button></div>
+        </div>
+      </details>
     </div>
-    <div class="card">
-      <h3>"Hey Maya"</h3>
-      <p class="muted" style="margin-bottom:6px">Say "Hey Maya" to start talking, even while you're in another app. It listens on your phone only (nothing is sent until you say it).</p>
-      <div class="row"><span class="muted" id="wakeState">Off</span><button class="btn-line" id="wakeBtn">Turn on</button></div>
+
+    <p class="set-label">Keys &amp; accounts</p>
+    <div class="set-list">
+      <details class="set-item" data-sec="kclaude">
+        <summary><span class="ico"><svg viewBox="0 0 24 24"><circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M16 7l3 3M14 9l2 2"/></svg></span><span class="set-t"><b>Claude</b><span>Brain · platform.claude.com</span></span><span class="pill" id="pillClaude">Not set</span></summary>
+        <div class="set-body">
+          <p class="status-line" style="margin-top:0" id="keyState"></p>
+          <div class="inline"><input type="password" class="field" id="keyInput" placeholder="Paste Claude key (sk-ant-…)" autocomplete="off"><button class="btn-line" id="keySave">Save</button></div>
+          <div class="toggle-row"><span></span><button class="btn-line red" id="keyClear">Remove key</button></div>
+        </div>
+      </details>
+      <details class="set-item" data-sec="kor">
+        <summary><span class="ico"><svg viewBox="0 0 24 24"><circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M16 7l3 3M14 9l2 2"/></svg></span><span class="set-t"><b>OpenRouter</b><span>Open brain (Grok, Venice) · openrouter.ai</span></span><span class="pill" id="pillOR">Not set</span></summary>
+        <div class="set-body">
+          <p class="status-line" style="margin-top:0" id="orState"></p>
+          <div class="inline"><input type="password" class="field" id="orInput" placeholder="Paste OpenRouter key (sk-or-…)" autocomplete="off"><button class="btn-line" id="orSave">Save</button></div>
+          <div class="toggle-row"><button class="btn-line red" id="orClear">Remove key</button><button class="btn-line" id="orTest">Test key</button></div>
+        </div>
+      </details>
+      <details class="set-item" data-sec="kdg">
+        <summary><span class="ico"><svg viewBox="0 0 24 24"><circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M16 7l3 3M14 9l2 2"/></svg></span><span class="set-t"><b>Deepgram</b><span>Ears and fast voices · deepgram.com</span></span><span class="pill" id="pillDG">Not set</span></summary>
+        <div class="set-body">
+          <p class="status-line" style="margin-top:0" id="dgState"></p>
+          <div class="inline"><input type="password" class="field" id="dgInput" placeholder="Paste Deepgram key" autocomplete="off"><button class="btn-line" id="dgSave">Save</button></div>
+        </div>
+      </details>
+      <details class="set-item" data-sec="kel">
+        <summary><span class="ico"><svg viewBox="0 0 24 24"><circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M16 7l3 3M14 9l2 2"/></svg></span><span class="set-t"><b>ElevenLabs</b><span>Human voices · elevenlabs.io</span></span><span class="pill" id="pillEL">Not set</span></summary>
+        <div class="set-body">
+          <p class="status-line" style="margin-top:0" id="elState"></p>
+          <div class="inline"><input type="password" class="field" id="elInput" placeholder="Paste ElevenLabs key" autocomplete="off"><button class="btn-line" id="elSave">Save</button></div>
+          <div class="toggle-row"><span></span><button class="btn-line red" id="elClear">Remove key</button></div>
+        </div>
+      </details>
     </div>
-    <div class="card">
-      <h3>Offline mode</h3>
-      <div class="seg">
-        <button data-mode="auto">Auto</button><button data-mode="cloud">Cloud</button><button data-mode="offline">Offline</button>
-      </div>
-      <p class="muted" style="margin:10px 0 6px">Auto uses the cloud when you have internet and the on-phone brain when you don't.</p>
-      <p class="muted" id="brainText">Checking…</p>
-      <div id="brainBar" style="display:none;height:8px;border-radius:99px;background:var(--surface2);margin:10px 0;overflow:hidden"><div id="brainFill" style="height:100%;width:0;background:linear-gradient(90deg,var(--accent),var(--accent2))"></div></div>
-      <div class="row"><span class="muted">Listening language</span><div class="seg small"><button data-lang="en-PH">English (PH)</button><button data-lang="en-US">English (US)</button><button data-lang="fil-PH">Tagalog</button></div></div>
-      <div class="row"><span></span><button class="btn-line" id="brainBtn">Download</button></div>
+    <p class="hint" style="margin:8px 6px 0">Keys are kept on this phone only.</p>
+
+    <p class="set-label">App</p>
+    <div class="set-list">
+      <details class="set-item" data-sec="perm">
+        <summary><span class="ico green"><svg viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6l8-3z"/><path d="M9 12l2 2 4-4"/></svg></span><span class="set-t"><b>Phone permissions</b><span>Calls, contacts, calendar, notifications</span></span><svg class="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></summary>
+        <div class="set-body">
+          <p class="hint" id="permText">Allow calls, contacts, calendar and notifications so Maya can help.</p>
+          <div class="toggle-row"><span></span><button class="btn-line" id="permBtn">Allow permissions</button></div>
+        </div>
+      </details>
+      <details class="set-item" data-sec="backup">
+        <summary><span class="ico amber"><svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M5 21h14"/></svg></span><span class="set-t"><b>Back up &amp; restore</b><span>Keys, settings, memory and chats</span></span><svg class="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></summary>
+        <div class="set-body">
+          <p class="hint">Saves everything, including your keys, into a file in Downloads/Maya, locked with your PIN. If you clear Maya's data or change phones, restore it in one tap. Keep the PIN safe; nobody can recover it.</p>
+          <input type="password" inputmode="numeric" class="field" id="bkPin" placeholder="Backup PIN (4+ digits)" autocomplete="off">
+          <div class="inline"><button class="btn-line" id="bkSave" style="flex:1">Back up everything</button><button class="btn-line" id="bkLoad" style="flex:1">Restore</button></div>
+          <p class="status-line" id="bkState"></p>
+        </div>
+      </details>
+      <details class="set-item" data-sec="about">
+        <summary><span class="ico blue"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg></span><span class="set-t"><b>About &amp; updates</b><span id="sumAbout"></span></span><svg class="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></summary>
+        <div class="set-body">
+          <p class="hint" id="aboutText">Maya runs on the brain you pick: Claude, the Open brain (Grok) or ElevenLabs. Needs internet, or the offline brain.</p>
+          <div class="toggle-row"><span class="status-line" style="margin:0" id="verText">Version …</span><button class="btn-line" id="updCheck">Check for updates</button></div>
+        </div>
+      </details>
     </div>
-    <div class="card">
-      <h3>Floating orb</h3>
-      <p class="muted" id="orbText">Shows Maya's orb over other apps while you talk. Drag it anywhere, tap it to come back.</p>
-      <div class="row"><span></span><button class="btn-line" id="orbBtn">Turn on orb</button></div>
-    </div>
-    <div class="card">
-      <h3>Voice in chat</h3>
-      <div class="row">
-        <div><p>Maya speaks chat replies</p><small>Turn off for silent text replies</small></div>
-        <button class="toggle on" id="chatVoiceToggle" aria-label="Toggle voice in chat"></button>
-      </div>
-    </div>
-    <div class="card">
-      <h3>Your name</h3>
-      <input type="text" id="nameInput" placeholder="Jim" maxlength="30">
-    </div>
-    <div class="card">
-      <h3>Conversation history</h3>
-      <div class="row">
-        <div><p id="histCount">0 messages saved</p><small>Stored only on this phone</small></div>
-        <button class="btn-line red" id="clearBtn">Clear</button>
-      </div>
-    </div>
-    <div class="card">
-      <h3>About</h3>
-      <p class="muted" id="aboutText">Maya runs on the brain you pick: Claude, the Open brain (Grok) or ElevenLabs. Needs internet (or the offline brain).</p>
-      <div class="row" style="margin-top:8px"><p class="muted" id="verText">Version …</p><button class="btn-line" id="updCheck">Check for updates</button></div>
-    </div>
+    <div style="height:12px"></div>
   </section>
 </main>
 
@@ -1154,7 +1282,8 @@ async function pickVoice(b){
 }
 document.querySelectorAll('[data-voice]').forEach(b => b.onclick = () => pickVoice(b));
 $('keySave').onclick = () => { const v=$('keyInput').value.trim(); if(!/^sk-ant-/.test(v)){ toast('That does not look like a Claude API key (starts with sk-ant-)'); return; } store.set('apikey', v); $('keyInput').value=''; renderBrain(); toast('API key saved on this phone only'); };
-$('keyClear').onclick = () => { if(settings.provider==='openrouter') store.set('orkey',''); else store.set('apikey',''); renderBrain(); };
+$('keyClear').onclick = () => { store.set('apikey',''); renderBrain(); toast('Claude key removed'); };
+$('orClear').onclick = () => { store.set('orkey',''); renderBrain(); toast('OpenRouter key removed'); };
 
 /* Open brain settings */
 const orBoxEl = $('orModels');
@@ -1714,15 +1843,111 @@ $('updBtn').onclick = () => {
 if(Native && Native.checkUpdate){
   Native.checkUpdate();
   document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) Native.checkUpdate(); });
-  setInterval(()=>{ if(!document.hidden) Native.checkUpdate(); }, 3*60*1000);   // also while Maya stays open
+  let lastUpd = Date.now();
+  setInterval(()=>{ const gap = document.hidden ? 10*60*1000 : 60*1000; if(Date.now()-lastUpd >= gap){ lastUpd = Date.now(); Native.checkUpdate(); } }, 30*1000);
 }
 const myVersion = (Native && Native.appVersion) ? Native.appVersion() : '';
 $('verText').textContent = myVersion ? 'You have v'+myVersion : 'Version: Android app only';
+window.zenixStartUpdate = () => { $('updBar').style.display='flex'; $('updBtn').click(); };
 window.zenixUpToDate = (name) => { $('verText').textContent = 'You have v'+(myVersion||name)+' · the newest ✓'; toast('Maya is up to date (v'+(myVersion||name)+')'); };
 window.zenixUpdateCheckFailed = () => { $('verText').textContent = 'You have v'+myVersion+' · could not check (internet?)'; };
 $('updCheck').onclick = () => {
   if(!(Native && Native.checkUpdateNow)){ toast('Updates work in the Android app'); return; }
   $('verText').textContent = 'Checking…'; Native.checkUpdateNow();
+};
+
+/* ---------- Me page: brain picker, voice tabs, summaries ---------- */
+function brainId(){ return settings.engine==='eleven' ? 'eleven' : (settings.provider==='openrouter' ? 'openrouter' : 'claude'); }
+document.querySelectorAll('[data-brain]').forEach(b => b.onclick = () => {
+  const v = b.dataset.brain;
+  if(v==='eleven'){ settings.engine='eleven'; store.set('settings', settings); renderBrain(); toast('ElevenLabs agent: all-in-one, uses ElevenLabs credits'); }
+  else { settings.engine='own'; setBrain(v); toast(v==='openrouter' ? (orKey() ? 'Open brain on' : 'Open brain: add your OpenRouter key under Keys') : (getKey() ? 'Claude brain on' : 'Claude: add your Claude key under Keys')); }
+  renderMe();
+});
+function voiceSrc(){ const v = settings.voice||''; if(v.startsWith('el:')) return 'el'; if(v.startsWith('dg:')) return 'dg'; if(v==='phone' && settings.phoneVoice) return 'hd'; return 'kk'; }
+let vsrcShown = null;
+function showVsrc(k){ vsrcShown = k; document.querySelectorAll('[data-vsrc]').forEach(b => b.classList.toggle('sel', b.dataset.vsrc===k)); document.querySelectorAll('.vsrc').forEach(d => d.classList.toggle('on', d.id==='vsrc-'+k)); }
+document.querySelectorAll('[data-vsrc]').forEach(b => b.onclick = () => showVsrc(b.dataset.vsrc));
+function voiceName(){
+  const v = settings.voice||'';
+  if(v.startsWith('el:')){ const l = store.get('elvoices', null) || EL_DEFAULT; const f = l.find(x => 'el:'+x.id===v); return ((f && f.name) || 'ElevenLabs voice').split(/\s+[-|–]\s+|\s*\|\s*/)[0] + ' · ElevenLabs' + (expressiveOn() ? ' · emotions' : ''); }
+  if(v.startsWith('dg:')){ const f = DG_VOICES.find(x => x[0]===v); return (f ? f[1] : 'Deepgram') + ' · Deepgram'; }
+  if(v==='phone') return settings.phoneVoice ? 'Google voice · instant' : 'Phone voice';
+  const k = KOKORO_VOICES.find(x => x[0]===v); return (k ? k[1] : 'Heart') + ' · free';
+}
+function setPill(id, on){ const p=$(id); if(!p) return; p.textContent = on ? 'Saved ✓' : 'Not set'; p.classList.toggle('ok', !!on); }
+function renderMe(){
+  const nm = settings.name || 'Jim';
+  $('setAvatar').textContent = nm.trim().charAt(0).toUpperCase() || 'M';
+  $('setName').textContent = nm;
+  const id = brainId();
+  document.querySelectorAll('[data-brain]').forEach(b => b.classList.toggle('sel', b.dataset.brain===id));
+  const orLabel = (OR_MODELS.find(m => m[0]===settings.orModel) || [0, settings.orModel])[1];
+  const brainTxt = id==='eleven' ? 'ElevenLabs agent' : id==='openrouter' ? orLabel + ' · OpenRouter' : (settings.model==='claude-sonnet-5-5' ? 'Claude Sonnet' : 'Claude Haiku');
+  $('sumBrain').textContent = brainTxt + ((id==='openrouter' && !orKey()) || (id==='claude' && !getKey()) ? ' · key missing' : '');
+  $('brainHint').textContent = id==='eleven' ? 'All-in-one ElevenLabs agent with its own voice and ears. Uses ElevenLabs credits.'
+    : id==='openrouter' ? 'Grok and other more open AIs through OpenRouter. Pick any voice below.' : 'Claude straight from Anthropic, the quickest replies. Pick any voice below.';
+  const agent = id==='eleven';
+  $('voiceAgentNote').style.display = agent ? 'block' : 'none';
+  $('voicePicker').style.display = agent ? 'none' : 'block';
+  $('sumVoice').textContent = agent ? 'Agent voice (Natasha)' : voiceName();
+  if(!vsrcShown) showVsrc(voiceSrc());
+  const lang = {'en-PH':'English (PH)','en-US':'English (US)','fil-PH':'Tagalog'}[settings.offlineLang] || 'English (PH)';
+  $('sumEars').textContent = (agent ? 'ElevenLabs' : (settings.ears==='deepgram' && dgKey() ? 'Deepgram' : 'Phone')) + ' · ' + lang;
+  $('sumChat').textContent = (settings.chatVoice===false ? 'Silent replies' : 'Speaks replies') + ' · ' + nm;
+  $('sumWake').textContent = $('wakeState').textContent || 'Off';
+  $('sumOrb').textContent = /✓/.test($('orbBtn').textContent) ? 'On' : 'Off';
+  $('sumOffline').textContent = ({auto:'Auto', cloud:'Cloud only', offline:'Offline only'}[settings.mode] || 'Auto') + (/installed/.test($('brainText').textContent) ? ' · brain installed' : '');
+  $('sumMem').textContent = memories.length ? memories.length + ' things saved' : 'Nothing yet';
+  $('sumHist').textContent = $('histCount').textContent;
+  $('sumUsage').textContent = 'About $' + usage.cost.toFixed(2) + ' so far';
+  $('sumAbout').textContent = myVersion ? 'Version ' + myVersion : 'Version';
+  $('setSub').textContent = brainTxt + ' · ' + (agent ? 'Natasha' : voiceName().split(' · ')[0]);
+  setPill('pillClaude', getKey()); setPill('pillOR', orKey()); setPill('pillDG', dgKey()); setPill('pillEL', elKey());
+}
+// one section open at a time, like a phone's Settings app
+document.querySelectorAll('.set-item').forEach(d => d.addEventListener('toggle', () => {
+  if(d.open){ document.querySelectorAll('.set-item[open]').forEach(o => { if(o!==d) o.open = false; }); if(d.dataset.sec==='voice') showVsrc(voiceSrc()); setTimeout(() => d.scrollIntoView({block:'nearest', behavior:'smooth'}), 60); }
+}));
+$('view-settings').addEventListener('click', () => setTimeout(renderMe, 80));
+$('view-settings').addEventListener('input', () => setTimeout(renderMe, 80));
+setInterval(() => { if(!document.hidden && $('view-settings').classList.contains('active')) renderMe(); }, 2000);
+renderMe();
+
+/* ---------- Back up everything (keys, settings, memory, chats), locked with a PIN ---------- */
+const b64 = buf => btoa(String.fromCharCode(...new Uint8Array(buf)));
+const unb64 = t => Uint8Array.from(atob(t), c => c.charCodeAt(0));
+async function pinKey(pin, salt){
+  const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(pin), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey({name:'PBKDF2', salt, iterations:150000, hash:'SHA-256'}, base, {name:'AES-GCM', length:256}, false, ['encrypt','decrypt']);
+}
+$('bkSave').onclick = async () => {
+  const pin = $('bkPin').value.trim();
+  if(pin.length < 4){ toast('Choose a PIN of at least 4 digits first'); $('bkPin').focus(); return; }
+  try{
+    const all = {}; for(let i=0; i<localStorage.length; i++){ const k = localStorage.key(i); if(k && k.startsWith('zenix_')) all[k] = localStorage.getItem(k); }
+    const salt = crypto.getRandomValues(new Uint8Array(16)), iv = crypto.getRandomValues(new Uint8Array(12));
+    const enc = await crypto.subtle.encrypt({name:'AES-GCM', iv}, await pinKey(pin, salt), new TextEncoder().encode(JSON.stringify(all)));
+    const file = JSON.stringify({app:'Maya', v:1, saved:new Date().toISOString(), salt:b64(salt), iv:b64(iv), data:b64(enc)});
+    const name = 'maya-backup-' + new Date().toISOString().slice(0,10) + '.json';
+    const r = Native && Native.saveBackup ? JSON.parse(Native.saveBackup(name, file)) : {ok:false, message:'Backups work in the Android app'};
+    $('bkState').textContent = r.ok ? '✓ Saved to Downloads/Maya/' + name + '. Remember your PIN.' : r.message;
+    if(r.ok){ $('bkPin').value=''; toast('Backup saved to your Downloads'); }
+  }catch(e){ $('bkState').textContent = 'Backup failed: ' + e.message; }
+};
+$('bkLoad').onclick = () => {
+  if($('bkPin').value.trim().length < 4){ toast('Type the PIN you used for the backup first'); $('bkPin').focus(); return; }
+  if(Native && Native.pickBackup) Native.pickBackup(); else toast('Restore works in the Android app');
+};
+window.zenixBackupPicked = async (text) => {
+  try{
+    const j = JSON.parse(text); if(j.app!=='Maya' || !j.data) throw new Error('not a Maya backup file');
+    const dec = await crypto.subtle.decrypt({name:'AES-GCM', iv:unb64(j.iv)}, await pinKey($('bkPin').value.trim(), unb64(j.salt)), unb64(j.data));
+    const all = JSON.parse(new TextDecoder().decode(dec));
+    Object.keys(all).forEach(k => { if(k.startsWith('zenix_')) localStorage.setItem(k, all[k]); });
+    $('bkState').textContent = '✓ Restored. Reloading Maya…'; toast('Everything restored');
+    setTimeout(() => location.reload(), 900);
+  }catch(e){ $('bkState').textContent = /decrypt|operation/i.test(e.message) || e.name==='OperationError' ? 'Wrong PIN for this backup' : ('Could not restore: ' + e.message); }
 };
 
 greet(); renderChat(); renderMem(); setInterval(greet, 60000);

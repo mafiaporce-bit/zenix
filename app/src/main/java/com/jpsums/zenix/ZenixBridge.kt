@@ -38,6 +38,31 @@ class ZenixBridge(private val activity: MainActivity) {
     @JavascriptInterface fun requestPermissions(): String { activity.runOnUiThread { activity.requestAllPermissions() }; return ok("Asking for permissions.") }
     @JavascriptInterface fun keepAwake(on: String): String { activity.setKeepAwake(on == "true"); return ok("ok") }
 
+    /** Saves the PIN-locked backup into Downloads/Maya (survives clearing Maya's data). */
+    @JavascriptInterface fun saveBackup(name: String, text: String): String {
+        return try {
+            if (android.os.Build.VERSION.SDK_INT >= 29) {
+                val cv = android.content.ContentValues().apply {
+                    put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, name)
+                    put(android.provider.MediaStore.MediaColumns.MIME_TYPE, "application/json")
+                    put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, android.os.Environment.DIRECTORY_DOWNLOADS + "/Maya")
+                }
+                val uri = activity.contentResolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, cv)
+                    ?: return fail("Couldn't create the backup file.")
+                activity.contentResolver.openOutputStream(uri)?.use { it.write(text.toByteArray()) }
+                ok("saved")
+            } else {
+                shareText("Maya backup", text)
+            }
+        } catch (e: Exception) { fail("Couldn't save the backup: ${e.message}") }
+    }
+
+    /** Opens the file picker so Jim can choose a backup; the text goes to window.zenixBackupPicked. */
+    @JavascriptInterface fun pickBackup(): String {
+        activity.runOnUiThread { activity.pickBackupFile() }
+        return ok("picking")
+    }
+
     @JavascriptInterface fun shareText(title: String, text: String): String {
         val i = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_SUBJECT, title).putExtra(Intent.EXTRA_TEXT, text)
         return if (launch(Intent.createChooser(i, title))) ok("Choose where to save it.") else fail("Couldn't share.")

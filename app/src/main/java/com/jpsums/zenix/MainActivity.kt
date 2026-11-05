@@ -28,6 +28,7 @@ class MainActivity : Activity() {
     private var pendingWebPermission: PermissionRequest? = null
     private var pageReady = false
     private var pendingWake = false
+    private var pendingUpdate = false
 
     companion object {
         const val CHANNEL_ID = "zenix_reminders"
@@ -35,6 +36,8 @@ class MainActivity : Activity() {
         @Volatile var instance: java.lang.ref.WeakReference<MainActivity>? = null
         @Volatile var inForeground = false
         private const val PERM_REQUEST = 42
+        private const val PICK_BACKUP = 77
+        const val UPDATE_CHANNEL_ID = "zenix_updates"
         val ALL_PERMISSIONS: Array<String>
             get() {
                 val list = mutableListOf(
@@ -81,6 +84,7 @@ class MainActivity : Activity() {
             override fun onPageFinished(view: WebView, url: String) {
                 pageReady = true
                 if (pendingWake) { pendingWake = false; view.postDelayed({ onWake() }, 900) }
+                if (pendingUpdate) { pendingUpdate = false; view.postDelayed({ runJs("window.zenixStartUpdate && window.zenixStartUpdate()") }, 1200) }
             }
         }
         webView.webChromeClient = object : WebChromeClient() {
@@ -101,6 +105,7 @@ class MainActivity : Activity() {
         }
 
         if (intent?.getBooleanExtra("wake", false) == true) pendingWake = true
+        if (intent?.getBooleanExtra("update", false) == true) pendingUpdate = true
         webView.loadUrl("https://appassets.androidplatform.net/assets/index.html")
         requestAllPermissions()
     }
@@ -109,6 +114,7 @@ class MainActivity : Activity() {
         super.onNewIntent(intent)
         setIntent(intent)
         if (intent.getBooleanExtra("wake", false)) { if (pageReady) onWake() else pendingWake = true }
+        if (intent.getBooleanExtra("update", false)) { if (pageReady) runJs("window.zenixStartUpdate && window.zenixStartUpdate()") else pendingUpdate = true }
     }
 
     /** "Hey Maya" was heard: start a voice chat. */
@@ -118,6 +124,25 @@ class MainActivity : Activity() {
         val i = android.content.Intent(this, WakeWordService::class.java)
         if (action != null) i.action = action
         try { if (action == null) startForegroundService(i) else startService(i) } catch (_: Exception) { }
+    }
+
+    fun pickBackupFile() {
+        val i = android.content.Intent(android.content.Intent.ACTION_OPEN_DOCUMENT)
+            .addCategory(android.content.Intent.CATEGORY_OPENABLE).setType("*/*")
+        try { startActivityForResult(i, PICK_BACKUP) } catch (_: Exception) { runJs("window.toast && toast('No file picker found')") }
+    }
+
+    @Deprecated("Deprecated in Java")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: android.content.Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != PICK_BACKUP || resultCode != RESULT_OK) return
+        val uri = data?.data ?: return
+        kotlin.concurrent.thread {
+            try {
+                val text = contentResolver.openInputStream(uri)?.use { it.readBytes().toString(Charsets.UTF_8) } ?: ""
+                runJs("window.zenixBackupPicked && window.zenixBackupPicked(${org.json.JSONObject.quote(text)})")
+            } catch (e: Exception) { runJs("window.zenixBackupPicked && window.zenixBackupPicked('')") }
+        }
     }
 
     fun requestAllPermissions() {
@@ -183,6 +208,11 @@ class MainActivity : Activity() {
         if (nm.getNotificationChannel(CHANNEL_ID) == null) {
             val ch = NotificationChannel(CHANNEL_ID, "Maya reminders", NotificationManager.IMPORTANCE_HIGH)
             ch.description = "Reminders set by Maya"
+            nm.createNotificationChannel(ch)
+        }
+        if (nm.getNotificationChannel(UPDATE_CHANNEL_ID) == null) {
+            val ch = NotificationChannel(UPDATE_CHANNEL_ID, "Maya updates", NotificationManager.IMPORTANCE_DEFAULT)
+            ch.description = "Tells you when a new Maya is ready"
             nm.createNotificationChannel(ch)
         }
         if (nm.getNotificationChannel(VOICE_CHANNEL_ID) == null) {
