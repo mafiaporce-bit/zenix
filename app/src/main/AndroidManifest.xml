@@ -66,6 +66,19 @@
             android:foregroundServiceType="microphone" />
 
         <service
+            android:name=".SendHelperService"
+            android:exported="true"
+            android:label="Maya auto-send"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/maya_accessibility" />
+        </service>
+
+        <service
             android:name=".VoiceService"
             android:exported="false"
             android:foregroundServiceType="microphone" />

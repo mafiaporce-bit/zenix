@@ -388,6 +388,15 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
           <div class="toggle-row"><span></span><button class="btn-line" id="orbBtn">Turn on orb</button></div>
         </div>
       </details>
+      <details class="set-item" data-sec="autosend">
+        <summary><span class="ico green"><svg viewBox="0 0 24 24"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg></span><span class="set-t"><b>Auto-send messages</b><span id="sumAuto"></span></span><svg class="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></summary>
+        <div class="set-body">
+          <p class="hint">After Maya reads your message back and you say <b>yes</b>, she taps Send for you in WhatsApp, Messenger and Messages. Without it, the chat opens ready and you tap Send.</p>
+          <div class="toggle-row"><span class="status-line" style="margin:0" id="autoState">Off</span><button class="btn-line" id="autoBtn">Turn on</button></div>
+          <p class="hint" style="margin-top:12px">Turn on: tap <b>Turn on</b> → <b>Installed apps</b> → <b>Maya auto-send</b> → switch it on. If it's greyed out, tap <b>Allow restricted settings</b> below first (⋮ menu, top right of Maya's app info), then try again.</p>
+          <div class="toggle-row" style="margin-top:0"><span></span><button class="btn-line" id="autoInfo">Allow restricted settings</button></div>
+        </div>
+      </details>
       <details class="set-item" data-sec="offline">
         <summary><span class="ico blue"><svg viewBox="0 0 24 24"><path d="M2 2l20 20M17.5 18H7a5 5 0 01-1.6-9.7M9.4 5.4A6 6 0 0118 10h.5a3.5 3.5 0 012 6.4"/></svg></span><span class="set-t"><b>Offline mode</b><span id="sumOffline"></span></span><svg class="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></summary>
         <div class="set-body">
@@ -1191,7 +1200,7 @@ const TOOL_DEFS = [
   {name:'open_app', description:'Open an app on the phone by name (Facebook, Claude, Gemini, YouTube, Maps...).', input_schema:{type:'object', properties:{app_name:{type:'string'}}, required:['app_name']}},
   {name:'make_call', description:'Call a contact name or phone number. If it returns close matches, ask Jim which one.', input_schema:{type:'object', properties:{contact:{type:'string'}}, required:['contact']}},
   {name:'open_call_history', description:"Show the phone's recent/missed calls on screen (you can't read them).", input_schema:{type:'object', properties:{}}},
-  {name:'send_message', description:'Open WhatsApp, Messenger or SMS with a message ready for Jim to tap send. Read it back and get a yes first.', input_schema:{type:'object', properties:{contact:{type:'string'}, message:{type:'string'}, app:{type:'string', enum:['whatsapp','messenger','sms']}}, required:['contact','message','app']}},
+  {name:'send_message', description:'Send a WhatsApp, Messenger or SMS message. ALWAYS read the message and the person back to Jim and wait for a clear yes BEFORE calling this. If auto-send is on, Maya taps Send herself; otherwise the chat opens ready and Jim taps Send. The result tells you which.', input_schema:{type:'object', properties:{contact:{type:'string'}, message:{type:'string'}, app:{type:'string', enum:['whatsapp','messenger','sms']}}, required:['contact','message','app']}},
   {name:'compose_email', description:'Open the email app with an email filled in for Jim to send.', input_schema:{type:'object', properties:{to:{type:'string'}, subject:{type:'string'}, body:{type:'string'}}, required:['subject','body']}},
   {name:'check_calendar', description:"Read Jim's calendar. days_from_today 0=today, 1=tomorrow.", input_schema:{type:'object', properties:{days_from_today:{type:'integer'}, num_days:{type:'integer'}}, required:['days_from_today','num_days']}},
   {name:'add_calendar_event', description:'Add an event to the calendar. start_iso like 2026-11-06T09:00:00+04:00.', input_schema:{type:'object', properties:{title:{type:'string'}, start_iso:{type:'string'}, duration_minutes:{type:'integer'}, location:{type:'string'}}, required:['title','start_iso']}},
@@ -1220,7 +1229,7 @@ Be open: he's an adult and can ask anything. Answer directly and fully on any to
 
 Your words are spoken aloud: everyday replies are short and snappy, usually one or two sentences, no markdown, lists or emojis. Go longer when he asks or the question needs it (recipes, instructions, explanations). Say numbers and times naturally. Be honest; never make up facts.
 
-Use your phone tools instead of just talking about them. Maps: show_map and show_route open a map right inside this app (never send him to another app for that); after show_route, say the time and distance in one short sentence. Confirm before sending messages. If a tool reports an error, tell him simply what to allow.
+Use your phone tools instead of just talking about them. Maps: show_map and show_route open a map right inside this app (never send him to another app for that); after show_route, say the time and distance in one short sentence. Before sending any message, always read back who it's going to and the exact words, and only call send_message after he clearly says yes. If a tool reports an error, tell him simply what to allow.
 
 Answer everything yourself: you know a huge amount — recipes (adobo, sinigang, kare-kare...), cooking steps, how-tos, explanations, history, science, health, tech, advice, maths. Answer from your own knowledge, fully and directly. Never say "I can't tell you here" or "let me search Google", and never open Google to answer a question. For recipes and step-by-step things, give the real answer: main ingredients with amounts, then the steps in order, spoken naturally.
 For anything that changes or that you're not sure of (news, weather, prices, scores, opening hours, exchange rates, events), quietly use web_search yourself and tell him the answer in a sentence or two, like a friend would. Never read out links or say "according to source X" unless he asks. Only use open_website when he clearly asks to see or open something on his screen.
@@ -2246,6 +2255,21 @@ $('view-settings').addEventListener('click', () => setTimeout(renderMe, 80));
 $('view-settings').addEventListener('input', () => setTimeout(renderMe, 80));
 setInterval(() => { if(!document.hidden && $('view-settings').classList.contains('active')) renderMe(); }, 2000);
 renderMe();
+
+/* ---------- Auto-send (Maya taps Send after Jim says yes) ---------- */
+const autoOn = () => !!(Native.autoSendOn && Native.autoSendOn()==='true');
+function renderAuto(){
+  if(!Native.autoSendOn){ $('autoState').textContent='Android app only'; $('autoBtn').style.display='none'; $('autoInfo').style.display='none'; $('sumAuto').textContent='Android app only'; return; }
+  const on = autoOn();
+  $('autoState').textContent = on ? 'On ✓ Maya taps Send after your yes' : 'Off: you tap Send yourself';
+  $('autoBtn').textContent = on ? 'Settings' : 'Turn on';
+  $('sumAuto').textContent = on ? 'On · sends after your yes' : 'Off';
+}
+$('autoBtn').onclick = () => { if(Native.openAutoSendSettings){ Native.openAutoSendSettings(); toast('Installed apps → Maya auto-send → On'); } };
+$('autoInfo').onclick = () => { if(Native.openAppInfo){ Native.openAppInfo(); toast('Tap ⋮ (top right) → Allow restricted settings'); } };
+document.addEventListener('visibilitychange', () => { if(!document.hidden) renderAuto(); });
+renderAuto();
+window.zenixSendResult = (ok, msg) => { toast(msg); addMsg('sys', (ok ? '✅ ' : '⚠️ ') + msg); };
 
 /* ---------- Back up everything (keys, settings, memory, chats), locked with a PIN ---------- */
 const b64 = buf => btoa(String.fromCharCode(...new Uint8Array(buf)));

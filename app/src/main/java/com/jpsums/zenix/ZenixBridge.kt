@@ -367,15 +367,17 @@ class ZenixBridge(private val activity: MainActivity) {
         when (app.lowercase(Locale.ROOT)) {
             "messenger" -> {
                 val i = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, message).setPackage("com.facebook.orca")
-                return if (launch(i)) ok("Messenger is open with the message ready. Pick $contact and tap send.")
+                val auto = SendHelperService.arm(activity, "messenger", contact, message)
+                return if (launch(i)) ok(if (auto) "Sending it to $contact on Messenger now." else "Messenger is open with the message ready. Pick $contact and tap send.")
                 else fail("Messenger isn't installed.")
             }
             "whatsapp" -> {
                 val c = findContact(contact) ?: return notFound(contact)
                 val url = "https://api.whatsapp.com/send?phone=${intlDigits(c.number)}&text=${Uri.encode(message)}"
                 val i = Intent(Intent.ACTION_VIEW, Uri.parse(url)).setPackage("com.whatsapp")
-                return if (launch(i) ) ok("WhatsApp chat with ${c.name} is open with the message. Tap send.")
-                else if (launch(Intent(Intent.ACTION_VIEW, Uri.parse(url)))) ok("WhatsApp is open with the message. Tap send.")
+                val auto = SendHelperService.arm(activity, "whatsapp", c.name, message)
+                return if (launch(i) ) ok(if (auto) "Sending it to ${c.name} on WhatsApp now." else "WhatsApp chat with ${c.name} is open with the message. Tap send.")
+                else if (launch(Intent(Intent.ACTION_VIEW, Uri.parse(url)))) ok(if (auto) "Sending it to ${c.name} on WhatsApp now." else "WhatsApp is open with the message. Tap send.")
                 else fail("WhatsApp isn't installed.")
             }
             else -> {
@@ -389,10 +391,18 @@ class ZenixBridge(private val activity: MainActivity) {
                     } catch (e: Exception) { fail("The text didn't go through: ${e.message}") }
                 }
                 val i = Intent(Intent.ACTION_SENDTO, Uri.parse("smsto:" + Uri.encode(c.number))).putExtra("sms_body", message)
-                return if (launch(i)) ok("Messages app is open with the text to ${c.name}. Tap send.") else fail("Couldn't open Messages.")
+                val auto = SendHelperService.arm(activity, "sms", c.name, message)
+                return if (launch(i)) ok(if (auto) "Sending the text to ${c.name} now." else "Messages app is open with the text to ${c.name}. Tap send.") else fail("Couldn't open Messages.")
             }
         }
     }
+
+    /** Auto-send (accessibility) status and setup screens. */
+    @JavascriptInterface fun autoSendOn(): String = if (SendHelperService.isOn(activity)) "true" else "false"
+    @JavascriptInterface fun openAutoSendSettings(): String =
+        if (launch(Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS))) ok("Find Maya auto-send and turn it on.") else fail("Couldn't open Accessibility settings.")
+    @JavascriptInterface fun openAppInfo(): String =
+        if (launch(Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + activity.packageName)))) ok("ok") else fail("Couldn't open app info.")
 
     @JavascriptInterface
     fun readMessages(contact: String, count: String): String {

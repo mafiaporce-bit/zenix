@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Maya auto-send: only watches messaging apps, and only acts right after Jim says yes to a message -->
+<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:accessibilityEventTypes="typeWindowStateChanged|typeWindowContentChanged"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:accessibilityFlags="flagReportViewIds|flagRetrieveInteractiveWindows"
+    android:canRetrieveWindowContent="true"
+    android:canPerformGestures="false"
+    android:notificationTimeout="150"
+    android:packageNames="com.whatsapp,com.whatsapp.w4b,com.facebook.orca,com.facebook.mlite,com.samsung.android.messaging,com.google.android.apps.messaging"
+    android:description="@string/acc_desc" />
