@@ -871,7 +871,7 @@ async function ownTurn(userText, speakIt, opts={}){
     while((m = pend.match(/^([\s\S]*?[.!?…](?:\s|$)|[\s\S]*?\n)/)) && m[0].trim().length >= 12){ speakEnqueue(m[0]); said++; pend = pend.slice(m[0].length); }
     if(!said && (m = pend.match(/^([\s\S]{24,}?[,;:—])\s/))){ speakEnqueue(m[1]); said++; pend = pend.slice(m[0].length); } };
   for(let round=0; round<5; round++){
-    const r = await claudeStream(ownSystem(), ownMsgs, t => { spoken += t; feed(t); if(off.kind==='talk' && !speech.hold) $('liveLine').textContent = 'Maya: '+spoken.slice(-160); }, opts.signal);
+    const r = await claudeStream(ownSystem(), ownMsgs, t => { if(turnStart && !turnTok) turnTok = performance.now(); spoken += t; feed(t); if(off.kind==='talk' && !speech.hold) $('liveLine').textContent = 'Maya: '+spoken.slice(-160); }, opts.signal);
     if(speakIt && pend.trim()){ speakEnqueue(pend); pend=''; }
     const p = PRICES[settings.model] || PRICES['claude-haiku-5-5'];
     usage.inTok += r.u.inTok; usage.outTok += r.u.outTok; usage.cost += (r.u.inTok*p[0] + r.u.outTok*p[1]) / 1e6 + 0.01*(r.u.searches||0); store.set('usage', usage);
@@ -905,7 +905,9 @@ const OR_MODELS = [
 ];
 const OR_PRICES = {'x-ai/grok-4.3':[1.25,2.5], 'x-ai/grok-4.7':[2,6]};
 let orNoTools = store.get('ornotools', {});    // models that can't use phone tools
-let orNoReason = store.get('ornoreason', {});  // models where reasoning can't be switched off
+let orNoReason = store.get('ornoreason', {});  // per model: which "thinking off" setting works (index below)
+Object.keys(orNoReason).forEach(k => { if(orNoReason[k]===true) orNoReason[k]=0; });   // retry models marked by older versions
+const OR_REASON_OFF = [{effort:'none'}, {enabled:false}, {effort:'minimal'}, {effort:'low'}, null];
 let orWebOn = true;                            // retried every time the app opens
 
 function orToolList(){
@@ -916,11 +918,13 @@ function orToolList(){
 
 async function orStream(system, messages, onText, signal){
   const model = settings.orModel || 'x-ai/grok-4.3';
-  for(let attempt=0; attempt<4; attempt++){
+  for(let attempt=0; attempt<8; attempt++){
     const body = { model, stream:true, max_tokens:700, temperature:0.8,
       messages: [{role:'system', content:system[0]}, {role:'system', content:system[1]}].concat(messages) };
     if(!orNoTools[model]) body.tools = orToolList();
-    if(!orNoReason[model]) body.reasoning = {effort:'none'};
+    // switch thinking off for speed; try the different ways providers accept it
+    const rm = OR_REASON_OFF[orNoReason[model]||0];
+    if(rm) body.reasoning = rm;
     const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method:'POST', signal,
       headers:{'content-type':'application/json', 'authorization':'Bearer '+orKey(), 'HTTP-Referer':'https://github.com/mafiaporce-bit/zenix', 'X-Title':'Maya'},
@@ -933,7 +937,7 @@ async function orStream(system, messages, onText, signal){
       if(res.status===429) throw new Error('The open brain is busy right now, try again in a moment.');
       if(orWebOn && /web.?search|server.?tool|openrouter:/i.test(msg)){ orWebOn=false; continue; }
       if(body.tools && /tool|function/i.test(msg)){ orNoTools[model]=true; store.set('ornotools', orNoTools); continue; }
-      if(body.reasoning && /reason|effort|thinking/i.test(msg)){ orNoReason[model]=true; store.set('ornoreason', orNoReason); continue; }
+      if(body.reasoning && /reason|effort|thinking/i.test(msg)){ orNoReason[model]=(orNoReason[model]||0)+1; store.set('ornoreason', orNoReason); continue; }
       throw new Error(msg);
     }
     const reader = res.body.getReader(); const dec = new TextDecoder();
@@ -976,7 +980,7 @@ async function orTurn(userText, speakIt, opts={}){
     while((m = pend.match(/^([\s\S]*?[.!?…](?:\s|$)|[\s\S]*?\n)/)) && m[0].trim().length >= 12){ speakEnqueue(m[0]); said++; pend = pend.slice(m[0].length); }
     if(!said && (m = pend.match(/^([\s\S]{24,}?[,;:—])\s/))){ speakEnqueue(m[1]); said++; pend = pend.slice(m[0].length); } };
   for(let round=0; round<5; round++){
-    const r = await orStream(ownSystem(), ownMsgs, t => { spoken += t; feed(t); if(off.kind==='talk' && !speech.hold) $('liveLine').textContent = 'Maya: '+spoken.slice(-160); }, opts.signal);
+    const r = await orStream(ownSystem(), ownMsgs, t => { if(turnStart && !turnTok) turnTok = performance.now(); spoken += t; feed(t); if(off.kind==='talk' && !speech.hold) $('liveLine').textContent = 'Maya: '+spoken.slice(-160); }, opts.signal);
     if(speakIt && pend.trim()){ speakEnqueue(pend); pend=''; }
     usage.inTok += r.u.inTok; usage.outTok += r.u.outTok; usage.cost += r.cost; store.set('usage', usage);
     const msg = {role:'assistant', content: r.text || (r.calls.length ? null : '')};
@@ -1049,7 +1053,8 @@ async function pumpSpeech(){
   const item = speech.q.shift();
   if(!item){ if(!speech.streamOpen && speech.onIdle){ const f=speech.onIdle; speech.onIdle=null; f(); } return; }
   if(typeof dg!=='undefined' && dg.active && !dg.paused) dgPause();
-  if(turnStart){ const d=(performance.now()-turnStart)/1000; turnStart=0; if(off.kind==='talk') $('actionLine').textContent = `⚡ replied in ${d.toFixed(1)}s`; }
+  if(turnStart){ const d=(performance.now()-turnStart)/1000; const b = turnTok ? (turnTok-turnStart)/1000 : 0; turnStart=0; turnTok=0;
+    if(off.kind==='talk') $('actionLine').textContent = `⚡ replied in ${d.toFixed(1)}s` + (b ? ` · brain ${b.toFixed(1)}s · voice ${Math.max(0,d-b).toFixed(1)}s` : '') + speedNote(); }
   speech.playing = true; setOrb('speaking'); $('modeLabel').textContent='Maya is speaking'; if(Native && Native.setOrbMode) Native.setOrbMode('speaking');
   try{
     const audio = item.wav ? await item.wav : null;
@@ -1068,9 +1073,14 @@ async function pumpSpeech(){
 }
 function stopSpeech(){ speech.hold=false; speech.q=[]; speech.streamOpen=false; speech.onIdle=null; try{ speech.audio.pause(); }catch(e){} try{ Native.stopSpeaking(); }catch(e){} if(nativeSpeakResolve){ const r=nativeSpeakResolve; nativeSpeakResolve=null; r(); } speech.playing=false; }
 
-let turnStart = 0;
+let turnStart = 0, turnTok = 0;
+function speedNote(){
+  if(settings.engine!=='own') return '';
+  if(settings.provider==='openrouter'){ const m = settings.orModel||''; if(/:free$/.test(m)) return ' (free model, can queue)'; if((orNoReason[m]||0) >= 3) return ' (thinking on)'; }
+  return '';
+}
 async function ownRespond(text, speakIt, after, opts={}){
-  if(!opts.quiet){ turnStart = performance.now(); $('modeLabel').textContent = 'Thinking…'; setOrb('thinking'); }
+  if(!opts.quiet){ turnStart = performance.now(); turnTok = 0; $('modeLabel').textContent = 'Thinking…'; setOrb('thinking'); }
   speech.streamOpen = true; speech.onIdle = after || null;
   let full = '';
   try{ full = await ownTurn(text, speakIt, opts); }
