@@ -38,6 +38,11 @@ class ZenixBridge(private val activity: MainActivity) {
     @JavascriptInterface fun requestPermissions(): String { activity.runOnUiThread { activity.requestAllPermissions() }; return ok("Asking for permissions.") }
     @JavascriptInterface fun keepAwake(on: String): String { activity.setKeepAwake(on == "true"); return ok("ok") }
 
+    @JavascriptInterface fun shareText(title: String, text: String): String {
+        val i = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_SUBJECT, title).putExtra(Intent.EXTRA_TEXT, text)
+        return if (launch(Intent.createChooser(i, title))) ok("Choose where to save it.") else fail("Couldn't share.")
+    }
+
     // ---------- app updates ----------
     @JavascriptInterface fun checkUpdate(): String { activity.updater.check(); return ok("checking") }
     @JavascriptInterface fun startUpdate(): String = activity.updater.start()

@@ -176,10 +176,17 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
   <section class="view settings" id="view-settings">
     <div class="card">
       <h3>What ZeniX remembers</h3>
+      <p class="muted" id="memCount" style="margin-bottom:8px"></p>
+      <input type="text" id="memSearch" placeholder="Search her memory" style="margin-bottom:6px">
       <div id="memList"></div>
+      <button class="btn-line" id="memMore" style="display:none;width:100%;margin-top:6px">Show more</button>
       <div class="row" style="margin-top:8px">
         <input type="text" id="memInput" placeholder="Add something for her to remember" maxlength="200">
         <button class="btn-line" id="memAdd">Add</button>
+      </div>
+      <div class="row" style="margin-top:4px">
+        <button class="btn-line" id="memExport" style="flex:1">Back up memory</button>
+        <button class="btn-line" id="memImport" style="flex:1">Restore</button>
       </div>
     </div>
     <div class="card">
@@ -281,23 +288,56 @@ function renderChat(){
 function addMsg(who, text){
   if(!text) return;
   history.push({who, text, ts:Date.now()});
-  if(history.length>300) history = history.slice(-300);
+  if(history.length>3000) history = history.slice(-3000);
   store.set('history', history); renderChat();
 }
+let memShown=40;
 function renderMem(){
   const l=$('memList'); l.innerHTML='';
-  if(!memories.length){ l.innerHTML='<p class="muted">Nothing yet. Tell her "remember that…" in a chat.</p>'; return; }
-  memories.forEach((m,i)=>{
+  $('memCount').textContent = memories.length ? `${memories.length} things saved, no limit. Newest first.` : '';
+  const q=($('memSearch')?$('memSearch').value:'').trim().toLowerCase();
+  const list = memories.map((m,i)=>({m,i})).reverse().filter(x=>!q || x.m.toLowerCase().includes(q));
+  if(!memories.length){ l.innerHTML='<p class="muted">Nothing yet. Just talk to her, she learns as you go.</p>'; $('memMore').style.display='none'; return; }
+  if(!list.length){ l.innerHTML='<p class="muted">No match.</p>'; }
+  list.slice(0, memShown).forEach(({m,i})=>{
     const r=document.createElement('div'); r.className='mem';
     const s=document.createElement('span'); s.textContent=m;
     const b=document.createElement('button'); b.textContent='✕'; b.setAttribute('aria-label','Forget');
     b.onclick=()=>{ memories.splice(i,1); store.set('memories',memories); renderMem(); };
     r.append(s,b); l.appendChild(r);
   });
+  $('memMore').style.display = list.length>memShown ? 'block' : 'none';
+}
+function normFact(f){ return f.toLowerCase().replace(/[^a-z0-9 ]/g,'').replace(/\s+/g,' ').trim(); }
+function saveFact(fact){
+  fact=(fact||'').trim(); if(!fact) return false;
+  const n=normFact(fact);
+  const dup=memories.findIndex(m=>normFact(m)===n);
+  if(dup>=0) memories.splice(dup,1);
+  memories.push(fact);
+  store.set('memories', memories); renderMem(); return true;
+}
+/* Search all memories + past chats for the recall tool */
+function recallSearch(query){
+  const stop=new Set(['the','a','an','my','is','are','of','to','and','in','on','for','what','who','do','you','remember','about','si','ang','ng','sa']);
+  const words=(query||'').toLowerCase().split(/[^a-z0-9]+/).filter(w=>w.length>1 && !stop.has(w));
+  if(!words.length) return 'Give me a key word to search.';
+  const score=t=>{ const low=t.toLowerCase(); return words.reduce((a,w)=>a+(low.includes(w)?1:0),0); };
+  const facts=memories.map(m=>({t:m,s:score(m)})).filter(x=>x.s>0).sort((a,b)=>b.s-a.s).slice(0,10).map(x=>'- '+x.t);
+  const chats=history.filter(h=>h.who!=='sys').map(h=>({t:(h.who==='user'?'Jim said: ':'You said: ')+h.text.slice(0,200), d:new Date(h.ts).toLocaleDateString(), s:score(h.text)}))
+    .filter(x=>x.s>0).sort((a,b)=>b.s-a.s).slice(0,5).map(x=>`- (${x.d}) ${x.t}`);
+  if(!facts.length && !chats.length) return 'Nothing saved about that yet.';
+  return (facts.length?'Saved facts:\n'+facts.join('\n'):'') + (chats.length?'\nFrom past chats:\n'+chats.join('\n'):'');
 }
 
 /* ---------- Memory for each call ---------- */
-function memoryText(){ return memories.length ? memories.map(m=>'- '+m).join('\n') : 'Nothing saved yet.'; }
+function memoryText(){
+  if(!memories.length) return 'Nothing saved yet.';
+  const out=[]; let len=0;
+  for(let i=memories.length-1;i>=0;i--){ const line='- '+memories[i]; if(len+line.length>6000) break; out.unshift(line); len+=line.length+1; }
+  const hidden = memories.length-out.length;
+  return out.join('\n') + (hidden>0 ? `\n(Plus ${hidden} older memories: use recall to search them.)` : '');
+}
 function recentChatText(){
   const recent = history.filter(m=>m.who!=='sys').slice(-14)
     .map(m=>(m.who==='user'?'Jim: ':'ZeniX: ')+m.text).join('\n');
@@ -362,8 +402,9 @@ const clientTools = {
     const url = isUrl ? (query.startsWith('http') ? query : 'https://'+query) : 'https://www.google.com/search?q='+encodeURIComponent(query);
     return reply(callNative('openUrl', url) || webFallback(url));
   },
+  recall: async ({query}) => { showAction('🧠 Remembering…'); return recallSearch(query); },
   remember: async ({fact}) => {
-    if(fact && !memories.includes(fact)){ memories.push(fact); if(memories.length>60) memories.shift(); store.set('memories', memories); renderMem(); }
+    saveFact(fact);
     showAction('🧠 Remembered');
     return 'Saved. I will remember that.';
   }
@@ -632,7 +673,24 @@ document.querySelectorAll('nav button').forEach(b => b.onclick = () => {
 });
 
 /* ---------- Me tab ---------- */
-$('memAdd').onclick = () => { const v=$('memInput').value.trim(); if(!v) return; memories.push(v); store.set('memories',memories); $('memInput').value=''; renderMem(); toast('ZeniX will remember that'); };
+$('memAdd').onclick = () => { const v=$('memInput').value.trim(); if(!v) return; saveFact(v); $('memInput').value=''; toast('ZeniX will remember that'); };
+$('memSearch').addEventListener('input', ()=>{ memShown=40; renderMem(); });
+$('memMore').onclick = () => { memShown+=60; renderMem(); };
+$('memExport').onclick = () => {
+  const data = JSON.stringify({app:'ZeniX', saved:new Date().toISOString(), memories, history});
+  if(Native && Native.shareText){ Native.shareText('ZeniX memory backup', data); }
+  else { try{ navigator.clipboard.writeText(data); toast('Backup copied'); }catch(e){ toast('Could not back up'); } }
+};
+$('memImport').onclick = () => {
+  const t = prompt('Paste your ZeniX memory backup here');
+  if(!t) return;
+  try{
+    const j = JSON.parse(t); let added=0;
+    (j.memories||[]).forEach(m=>{ if(typeof m==='string' && !memories.some(x=>normFact(x)===normFact(m))){ memories.push(m); added++; } });
+    if(Array.isArray(j.history) && !history.length){ history=j.history; store.set('history',history); renderChat(); }
+    store.set('memories',memories); renderMem(); toast(`Restored ${added} memories`);
+  }catch(e){ toast('That backup did not look right'); }
+};
 function refreshOrbBtn(){ if(Native && Native.hasOverlay && Native.hasOverlay()==='true'){ $('orbBtn').textContent='On ✓'; } }
 $('orbBtn').onclick = () => { if(Native && Native.requestOverlay){ Native.requestOverlay(); } else toast('The orb is for the Android app'); };
 document.addEventListener('visibilitychange', () => { if(!document.hidden) refreshOrbBtn(); });
