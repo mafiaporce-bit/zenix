@@ -1306,7 +1306,8 @@ if(dgKey() && Native && Native.dgTest) setTimeout(()=>Native.dgTest(dgKey()), 20
 /* ---------- ElevenLabs voices with any brain (Claude, Grok, Venice…) ---------- */
 const elKey = () => (store.get('elkey','')||'').trim();
 const EL_JESSICA = 'cgSgspJ2msm6clMCkdW9';   // same voice as the ElevenLabs Maya
-const EL_DEFAULT = [{id:EL_JESSICA, name:'Jessica', gender:'female'}, {id:'hpp4J3VqNfWAUOO0d1Us', name:'Bella', gender:'female'}, {id:'EXAVITQu4vr4xnSDxMaL', name:'Sarah', gender:'female'}, {id:'FGY2WhTYpPnrIDTdsKH5', name:'Laura', gender:'female'}];
+const EL_NATASHA = 'j05EIz3iI3JmBTWC3CsA';   // Jim's pick: Natasha, whispery ASMR
+const EL_DEFAULT = [{id:EL_NATASHA, name:'Natasha', gender:'female'}, {id:EL_JESSICA, name:'Jessica', gender:'female'}, {id:'hpp4J3VqNfWAUOO0d1Us', name:'Bella', gender:'female'}, {id:'EXAVITQu4vr4xnSDxMaL', name:'Sarah', gender:'female'}, {id:'FGY2WhTYpPnrIDTdsKH5', name:'Laura', gender:'female'}];
 let elModel = store.get('elmodel', 'eleven_flash_v2_5');   // fastest + half the credits
 const elWait = {}; let elSeq = 0;
 function elTTS(text){
@@ -1325,6 +1326,7 @@ window.zenixEL = (id, b64, err) => {
     if(/^40[0-9]/.test(err) && /model/i.test(err) && elModel!=='eleven_turbo_v2_5'){ elModel='eleven_turbo_v2_5'; store.set('elmodel', elModel); }
     else if(warn && /quota|credit/i.test(err)) toast('ElevenLabs is out of credits, using the phone voice');
     else if(warn && /permission/i.test(err)) toast('Your ElevenLabs key needs the "Text to Speech" permission');
+    else if(warn && /voice_not_found|not found/i.test(err)) toast('That voice isn\'t in your ElevenLabs library yet. Add it on elevenlabs.io first.');
     else if(warn && /^40[13]/.test(err)) toast('ElevenLabs key not accepted. Check it in the Me tab.');
     return w.reject(new Error(err));
   }
@@ -1335,7 +1337,7 @@ window.zenixEL = (id, b64, err) => {
 function renderEL(){
   const box = $('elVoiceBtns'); if(!box) return; box.innerHTML = '';
   const list = store.get('elvoices', null) || EL_DEFAULT;
-  const score = v => (v.gender==='female' ? 0 : 2) + (!v.lang || v.lang==='en' ? 0 : 1);
+  const score = v => v.id===EL_NATASHA ? -1 : (v.gender==='female' ? 0 : 2) + (!v.lang || v.lang==='en' ? 0 : 1);
   const seen = {};
   list.slice().sort((a,b) => score(a)-score(b)).slice(0, 24).forEach(v => {
     let label = (v.name||'Voice').split(/\s+[-|–]\s+|\s*\|\s*/)[0].trim().slice(0, 18);
@@ -1366,8 +1368,8 @@ $('elSave').onclick = () => {
   store.set('elkey', v); $('elInput').value = '';
   $('elState').textContent = 'Checking key with ElevenLabs…';
   if(Native && Native.elVoices) Native.elVoices(v);
-  if(!settings.voice.startsWith('el:')){ settings.voice = 'el:'+EL_JESSICA; store.set('settings', settings); }
-  renderEL(); renderBrain(); renderHD(); toast('ElevenLabs key saved. Maya now speaks with Jessica.');
+  if(!settings.voice.startsWith('el:')){ settings.voice = 'el:'+EL_NATASHA; store.set('settings', settings); }
+  renderEL(); renderBrain(); renderHD(); toast('ElevenLabs key saved. Maya now speaks with Natasha.');
 };
 $('elClear').onclick = () => {
   store.set('elkey', ''); store.set('elvoices', null);
