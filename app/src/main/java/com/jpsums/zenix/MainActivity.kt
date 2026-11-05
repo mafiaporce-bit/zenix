@@ -22,6 +22,7 @@ import androidx.webkit.WebViewAssetLoader
 class MainActivity : Activity() {
 
     private lateinit var webView: WebView
+    lateinit var brain: OfflineBrain
     private var pendingWebPermission: PermissionRequest? = null
 
     companion object {
@@ -65,6 +66,7 @@ class MainActivity : Activity() {
             mediaPlaybackRequiresUserGesture = false
             cacheMode = WebSettings.LOAD_DEFAULT
         }
+        brain = OfflineBrain(this)
         webView.addJavascriptInterface(ZenixBridge(this), "ZenixNative")
 
         webView.webViewClient = object : WebViewClient() {
@@ -127,7 +129,12 @@ class MainActivity : Activity() {
         super.onPause()
     }
 
+    fun runJs(code: String) {
+        runOnUiThread { if (::webView.isInitialized) webView.evaluateJavascript(code, null) }
+    }
+
     override fun onDestroy() {
+        if (::brain.isInitialized) brain.shutdown()
         stopService(android.content.Intent(this, VoiceService::class.java))
         super.onDestroy()
     }

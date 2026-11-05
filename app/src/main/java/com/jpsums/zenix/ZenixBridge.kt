@@ -38,6 +38,16 @@ class ZenixBridge(private val activity: MainActivity) {
     @JavascriptInterface fun requestPermissions(): String { activity.runOnUiThread { activity.requestAllPermissions() }; return ok("Asking for permissions.") }
     @JavascriptInterface fun keepAwake(on: String): String { activity.setKeepAwake(on == "true"); return ok("ok") }
 
+    // ---------- offline brain ----------
+    @JavascriptInterface fun offlineStatus(): String = activity.brain.status()
+    @JavascriptInterface fun offlineDownload(): String = activity.brain.download()
+    @JavascriptInterface fun offlineDelete(): String = activity.brain.deleteModel()
+    @JavascriptInterface fun offlineAsk(id: String, prompt: String): String { activity.brain.ask(id, prompt); return ok("thinking") }
+    @JavascriptInterface fun startListening(lang: String): String { activity.brain.startListening(lang); return ok("listening") }
+    @JavascriptInterface fun stopListening(): String { activity.brain.stopListening(); return ok("stopped") }
+    @JavascriptInterface fun speak(text: String, lang: String): String { activity.brain.speak(text, lang); return ok("speaking") }
+    @JavascriptInterface fun stopSpeaking(): String { activity.brain.stopSpeaking(); return ok("stopped") }
+
     // ---------- floating orb ----------
     @JavascriptInterface fun hasOverlay(): String = android.provider.Settings.canDrawOverlays(activity).toString()
     @JavascriptInterface fun requestOverlay(): String {

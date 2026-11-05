@@ -11,8 +11,8 @@ android {
         applicationId = "com.jpsums.zenix"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "2.0"
+        versionCode = 2
+        versionName = "2.1"
     }
 
     signingConfigs {
@@ -42,4 +42,5 @@ android {
 
 dependencies {
     implementation("androidx.webkit:webkit:1.11.0")
+    implementation("com.google.mediapipe:tasks-genai:0.10.24")
 }
