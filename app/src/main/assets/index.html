@@ -1136,6 +1136,7 @@ document.querySelectorAll('[data-ormodel]').forEach(b => b.onclick = () => {
 });
 $('orCustomSave').onclick = () => {
   const v = $('orCustom').value.trim();
+  if(/^sk-or-/.test(v)){ $('orCustom').value=''; $('orInput').value=v; $('orSave').click(); return; }   // key pasted in the model box
   if(!/^[\w.-]+\/[\w.:-]+$/.test(v)){ toast('Model ids look like x-ai/grok-4.3 (copy it from openrouter.ai/models)'); return; }
   setBrain('openrouter', v); toast('Using '+v);
 };
