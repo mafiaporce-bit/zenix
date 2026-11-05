@@ -29,7 +29,7 @@
     </queries>
 
     <application
-        android:label="ZeniX"
+        android:label="Maya"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher"
         android:theme="@style/ZenixTheme"

@@ -77,6 +77,12 @@ class DeepgramEars(private val activity: MainActivity) {
                     val socket = ws ?: break
                     if (sending && n > 0) {
                         socket.send(buf.toByteString(0, n))
+                        var sum = 0.0
+                        var k = 0
+                        while (k + 1 < n) { val v = ((buf[k + 1].toInt() shl 8) or (buf[k].toInt() and 0xff)).toShort().toDouble(); sum += v * v; k += 2 }
+                        val rms = Math.sqrt(sum / (n / 2).coerceAtLeast(1)) / 32768.0
+                        val lvl = (rms * 9).coerceIn(0.0, 1.0)
+                        js("window.zenixRms && window.zenixRms(${"%.2f".format(java.util.Locale.US, lvl)})")
                     } else if (System.currentTimeMillis() - lastKeepAlive > 4000) {
                         socket.send("{\"type\":\"KeepAlive\"}")
                         lastKeepAlive = System.currentTimeMillis()

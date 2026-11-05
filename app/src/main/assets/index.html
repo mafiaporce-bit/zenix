@@ -4,22 +4,15 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0B0F1A">
-<title>ZeniX</title>
+<title>Maya</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
-  --bg:#F6F4FB; --surface:#FFFFFF; --surface2:#F0ECF8; --text:#151226; --muted:#6A6483;
-  --line:#E2DCF0; --accent:#8B5CF6; --accent2:#EC4899; --danger:#E5484D; --ok:#16A34A;
-  --bubble-user:#8B5CF6; --bubble-user-text:#fff; --bubble-ai:#FFFFFF;
-  --shadow:0 8px 30px rgba(40,20,80,.08);
-}
-@media (prefers-color-scheme: dark){
-  :root{
-    --bg:#0D0B17; --surface:#16132A; --surface2:#1F1A3A; --text:#F1EEFF; --muted:#9A93B8;
-    --line:#2A2448; --accent:#A78BFA; --accent2:#F472B6; --bubble-ai:#1F1A3A;
-    --shadow:0 8px 30px rgba(0,0,0,.35);
-  }
+  --bg:#06050C; --surface:#121022; --surface2:#1B1733; --text:#F3F0FF; --muted:#9C95BC;
+  --line:#272144; --accent:#B266FF; --accent2:#FF3FD2; --danger:#FF4D5E; --ok:#22C55E;
+  --bubble-user:#7C3AED; --bubble-user-text:#fff; --bubble-ai:#1B1733;
+  --shadow:0 8px 30px rgba(0,0,0,.45);
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font-family:Inter,system-ui,sans-serif}
@@ -43,7 +36,9 @@ main{flex:1;display:flex;flex-direction:column;padding:0 16px;min-height:0}
 .hero{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:10px 0 4px;text-align:center}
 .greet{font:600 22px/1.25 'Space Grotesk',sans-serif;margin:0}
 .sub{color:var(--muted);margin:0;font-size:14px}
-.orb-wrap{position:relative;width:220px;height:220px;display:grid;place-items:center}
+.orb-wrap{position:relative;width:300px;height:300px;max-width:86vw;max-height:86vw;display:grid;place-items:center;cursor:pointer}
+#mayaOrb{width:100%;height:100%;display:block}
+body{background:radial-gradient(120% 80% at 50% 35%,#12102A 0%,#06050C 60%)}
 .orb-glow{position:absolute;inset:2px;border-radius:50%;background:radial-gradient(circle,rgba(236,72,153,.35),rgba(139,92,246,.18) 45%,transparent 70%);filter:blur(14px);animation:zg 4s ease-in-out infinite}
 .orb{position:relative;width:184px;height:184px;border-radius:50%;overflow:hidden;background:#1A0F3D;box-shadow:inset 0 0 40px rgba(255,255,255,.08),0 20px 60px rgba(139,92,246,.35)}
 .orb-aur{position:absolute;inset:-30%;background:conic-gradient(from 0deg,#8B5CF6,#EC4899,#F9A8D4,#6366F1,#22D3EE,#8B5CF6);filter:blur(22px);animation:spin 9s linear infinite;opacity:.9}
@@ -122,22 +117,20 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
 
 <header>
   <div class="logo">
-    <svg viewBox="0 0 40 40" width="26" height="26"><defs><radialGradient id="lg" cx="40%" cy="35%" r="70%"><stop offset="0" stop-color="#FFE1F2"/><stop offset=".45" stop-color="#EC4899"/><stop offset="1" stop-color="#6D28D9"/></radialGradient></defs><circle cx="20" cy="20" r="16" fill="url(#lg)"/><path d="M14 14h12L14 26h12" stroke="#fff" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <svg viewBox="0 0 40 40" width="28" height="28"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4F6BFF"/><stop offset=".5" stop-color="#FF3FD2"/><stop offset="1" stop-color="#22D3EE"/></linearGradient></defs><circle cx="20" cy="20" r="13" fill="none" stroke="url(#lg)" stroke-width="4"/><circle cx="20" cy="20" r="9" fill="none" stroke="#fff" stroke-width="1" stroke-dasharray="1 3"/></svg>
   </div>
-  <div class="brand"><h1>ZENI<b>X</b></h1><small>Personal AI Assistant</small></div>
+  <div class="brand"><h1>MAY<b>A</b></h1><small>Personal AI Assistant</small></div>
   <div class="status"><span class="dot" id="dot"></span><span id="statusText">Offline</span></div>
 </header>
 
-<div id="updBar" style="display:none;margin:0 16px 8px;padding:10px 12px;border-radius:14px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;font-size:14px;align-items:center;gap:10px"><span style="flex:1" id="updText">New ZeniX update available</span><button id="updBtn" style="background:#fff;color:#6D28D9;font-weight:600;border-radius:10px;padding:8px 14px;min-height:40px">Update now</button></div>
+<div id="updBar" style="display:none;margin:0 16px 8px;padding:10px 12px;border-radius:14px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;font-size:14px;align-items:center;gap:10px"><span style="flex:1" id="updText">New Maya update available</span><button id="updBtn" style="background:#fff;color:#6D28D9;font-weight:600;border-radius:10px;padding:8px 14px;min-height:40px">Update now</button></div>
 <main>
   <section class="view active" id="view-talk">
     <div class="hero">
       <p class="greet" id="greet">Hi Jim</p>
-      <p class="sub">Tap the button and just talk to ZeniX</p>
+      <p class="sub">Tap the button and just talk to Maya</p>
       <div class="orb-wrap idle" id="orbWrap">
-        <div class="orb-glow"></div>
-        <div class="ring"></div><div class="ring r2"></div>
-        <div class="orb"><div class="orb-aur"></div><div class="orb-aur2"></div><div class="orb-glass"></div></div>
+        <canvas id="mayaOrb" aria-label="Maya"></canvas>
       </div>
       <div class="mode-label" id="modeLabel">Ready when you are</div>
       <div class="live-line" id="liveLine"></div>
@@ -149,9 +142,9 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
       </button>
       <button class="btn-main" id="talkBtn">
         <svg class="i" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
-        <span id="talkLabel">Talk to ZeniX</span>
+        <span id="talkLabel">Talk to Maya</span>
       </button>
-      <button class="btn-round" id="volBtn" disabled aria-label="Mute ZeniX voice">
+      <button class="btn-round" id="volBtn" disabled aria-label="Mute Maya voice">
         <svg class="i" viewBox="0 0 24 24"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/></svg>
       </button>
     </div>
@@ -166,7 +159,7 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
       <button class="chip">Open Gemini</button>
     </div>
     <div class="composer">
-      <textarea id="input" rows="1" placeholder="Message ZeniX…"></textarea>
+      <textarea id="input" rows="1" placeholder="Message Maya…"></textarea>
       <button class="send" id="sendBtn" aria-label="Send">
         <svg class="i" viewBox="0 0 24 24"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
       </button>
@@ -175,7 +168,7 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
 
   <section class="view settings" id="view-settings">
     <div class="card">
-      <h3>ZeniX brain</h3>
+      <h3>Maya brain</h3>
       <div class="seg"><button data-engine="own">Own brain</button><button data-engine="eleven">ElevenLabs</button></div>
       <p class="muted" style="margin:8px 0">Own brain uses Claude directly with your key: about 60× cheaper and no ElevenLabs credits. ElevenLabs gives the premium Jessica voice.</p>
       <div id="ownBox">
@@ -204,7 +197,7 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
       </div>
     </div>
     <div class="card">
-      <h3>What ZeniX remembers</h3>
+      <h3>What Maya remembers</h3>
       <p class="muted" id="memCount" style="margin-bottom:8px"></p>
       <input type="text" id="memSearch" placeholder="Search her memory" style="margin-bottom:6px">
       <div id="memList"></div>
@@ -220,7 +213,7 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
     </div>
     <div class="card">
       <h3>Phone permissions</h3>
-      <p class="muted" id="permText">Allow calls, contacts, calendar and notifications so ZeniX can help.</p>
+      <p class="muted" id="permText">Allow calls, contacts, calendar and notifications so Maya can help.</p>
       <div class="row"><span></span><button class="btn-line" id="permBtn">Allow permissions</button></div>
     </div>
     <div class="card">
@@ -236,13 +229,13 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
     </div>
     <div class="card">
       <h3>Floating orb</h3>
-      <p class="muted" id="orbText">Shows ZeniX's orb over other apps while you talk. Drag it anywhere, tap it to come back.</p>
+      <p class="muted" id="orbText">Shows Maya's orb over other apps while you talk. Drag it anywhere, tap it to come back.</p>
       <div class="row"><span></span><button class="btn-line" id="orbBtn">Turn on orb</button></div>
     </div>
     <div class="card">
       <h3>Voice in chat</h3>
       <div class="row">
-        <div><p>ZeniX speaks chat replies</p><small>Turn off for silent text replies</small></div>
+        <div><p>Maya speaks chat replies</p><small>Turn off for silent text replies</small></div>
         <button class="toggle on" id="chatVoiceToggle" aria-label="Toggle voice in chat"></button>
       </div>
     </div>
@@ -259,7 +252,7 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
     </div>
     <div class="card">
       <h3>About</h3>
-      <p class="muted">ZeniX runs on ElevenLabs voice with a Claude brain. Needs internet. Version 2.0 · Android</p>
+      <p class="muted">Maya runs on ElevenLabs voice with a Claude brain. Needs internet. Version 2.0 · Android</p>
     </div>
   </section>
 </main>
@@ -300,11 +293,11 @@ function setStatus(s){
   $('dot').className='dot'+(s==='on'?' on':s==='busy'?' busy':'');
   $('statusText').textContent = s==='on'?'Online':s==='busy'?'Connecting…':'Offline';
 }
-const setOrb = s => $('orbWrap').className = 'orb-wrap ' + s;
+const setOrb = s => { $('orbWrap').className = 'orb-wrap ' + s; if(window.MayaOrb) window.MayaOrb.setState(s); };
 
 function renderChat(){
   const c=$('chat'); c.innerHTML='';
-  if(!history.length) c.innerHTML='<div class="empty">Say hi to ZeniX 👋<br>Type below or pick a quick prompt.</div>';
+  if(!history.length) c.innerHTML='<div class="empty">Say hi to Maya 👋<br>Type below or pick a quick prompt.</div>';
   history.forEach(m=>{
     const d=document.createElement('div');
     if(m.who==='sys'){ d.className='sys'; d.textContent=m.text; }
@@ -369,7 +362,7 @@ function memoryText(){
 }
 function recentChatText(){
   const recent = history.filter(m=>m.who!=='sys').slice(-14)
-    .map(m=>(m.who==='user'?'Jim: ':'ZeniX: ')+m.text).join('\n');
+    .map(m=>(m.who==='user'?'Jim: ':'Maya: ')+m.text).join('\n');
   return recent ? recent.slice(-1800) : 'No previous conversation.';
 }
 
@@ -386,7 +379,7 @@ const reply = r => (r && r.message) ? r.message : JSON.stringify(r);
 const clientTools = {
   set_alarm: async ({hour, minute, label}) => {
     showAction(`⏰ Alarm ${String(hour).padStart(2,'0')}:${String(minute).padStart(2,'0')}`);
-    return reply(callNative('setAlarm', hour, minute, label||'ZeniX alarm') || {ok:false, message:'Alarms only work in the Android app.'});
+    return reply(callNative('setAlarm', hour, minute, label||'Maya alarm') || {ok:false, message:'Alarms only work in the Android app.'});
   },
   set_reminder: async ({text, minutes_from_now}) => {
     showAction(`🔔 Reminder in ${minutes_from_now} min: ${text}`);
@@ -454,7 +447,7 @@ async function ensureMic(){
 async function startSession(kind){
   if(convo || connecting) return;
   connecting=true; session=kind; setStatus('busy');
-  if(kind==='talk'){ $('modeLabel').textContent='Connecting to ZeniX…'; $('talkLabel').textContent='Connecting…'; }
+  if(kind==='talk'){ $('modeLabel').textContent='Connecting to Maya…'; $('talkLabel').textContent='Connecting…'; }
   if(!(await ensureMic())){
     connecting=false; session=null; setStatus('off'); resetTalkUI();
     toast('Allow the microphone, then tap again'); return;
@@ -471,19 +464,19 @@ async function startSession(kind){
         if(kind==='chat'){ convo.setMicMuted(true); micMuted=true; if(!settings.chatVoice) convo.setVolume({volume:0}); }
         if(Native && Native.keepAwake) Native.keepAwake('true');
       },
-      onDisconnect: () => { convo=null; session=null; setStatus('off'); resetTalkUI(); addMsg('sys','ZeniX disconnected'); if(Native && Native.keepAwake) Native.keepAwake('false'); },
-      onError: (err) => { console.error(err); toast('ZeniX had a connection problem'); },
+      onDisconnect: () => { convo=null; session=null; setStatus('off'); resetTalkUI(); addMsg('sys','Maya disconnected'); if(Native && Native.keepAwake) Native.keepAwake('false'); },
+      onError: (err) => { console.error(err); toast('Maya had a connection problem'); },
       onMessage: (m) => {
         const who = (m.source || m.role) === 'user' ? 'user' : 'ai';
         const text = m.message || m.text || '';
         if(who==='user' && session==='chat') return;
         addMsg(who, text);
-        if(session==='talk') $('liveLine').textContent = (who==='ai'?'ZeniX: ':'You: ') + text;
+        if(session==='talk') $('liveLine').textContent = (who==='ai'?'Maya: ':'You: ') + text;
       },
       onModeChange: ({mode}) => {
         if(Native && Native.setOrbMode) Native.setOrbMode(mode);
         if(session!=='talk') return;
-        if(mode==='speaking'){ setOrb('speaking'); $('modeLabel').textContent='ZeniX is speaking'; }
+        if(mode==='speaking'){ setOrb('speaking'); $('modeLabel').textContent='Maya is speaking'; }
         else { setOrb('listening'); $('modeLabel').textContent = micMuted ? 'Mic muted' : 'Listening…'; }
       }
     });
@@ -496,9 +489,9 @@ async function startSession(kind){
   }catch(e){
     console.error(e); convo=null; session=null; setStatus('off'); resetTalkUI();
     if(settings.mode==='auto' && offlineReady()){
-      toast('Cloud unreachable — switching to offline ZeniX');
+      toast('Cloud unreachable — switching to offline Maya');
       if(kind==='talk') startOffline('talk'); else if(pendingText){ const t=pendingText; pendingText=null; offlineChat(t); }
-    } else toast('Could not reach ZeniX. Check your internet.');
+    } else toast('Could not reach Maya. Check your internet.');
   }finally{ connecting=false; }
 }
 async function endSession(){
@@ -508,7 +501,7 @@ async function endSession(){
   if(Native && Native.keepAwake) Native.keepAwake('false');
 }
 function resetTalkUI(){
-  $('talkBtn').classList.remove('end'); $('talkLabel').textContent='Talk to ZeniX';
+  $('talkBtn').classList.remove('end'); $('talkLabel').textContent='Talk to Maya';
   $('muteBtn').disabled=true; $('volBtn').disabled=true;
   $('muteBtn').classList.remove('off'); $('volBtn').classList.remove('off');
   micMuted=false; voiceMuted=false;
@@ -524,7 +517,7 @@ $('talkBtn').onclick = async () => {
   if(convo && session==='chat') await endSession();
   if(Native && Native.hasOverlay && Native.hasOverlay()!=='true' && !store.get('askedOverlay', false)){
     store.set('askedOverlay', true);
-    toast('Turn on "Display over other apps" for ZeniX, then come back and tap Talk');
+    toast('Turn on "Display over other apps" for Maya, then come back and tap Talk');
     setTimeout(()=>Native.requestOverlay(), 1200);
     return;
   }
@@ -553,20 +546,20 @@ function quickAction(text){
   const t=text.trim(); const low=t.toLowerCase();
   let m;
   if(/alarm|gising/.test(low)){
-    const tm=parseTime(low); if(tm){ const r=callNative('setAlarm', tm.h, tm.mi, 'ZeniX alarm'); showAction(`⏰ Alarm ${String(tm.h).padStart(2,'0')}:${String(tm.mi).padStart(2,'0')}`); return r?r.message:'Alarms need the Android app.'; }
+    const tm=parseTime(low); if(tm){ const r=callNative('setAlarm', tm.h, tm.mi, 'Maya alarm'); showAction(`⏰ Alarm ${String(tm.h).padStart(2,'0')}:${String(tm.mi).padStart(2,'0')}`); return r?r.message:'Alarms need the Android app.'; }
   }
   if((m=low.match(/remind me (?:in )?(\d+)\s*(minutes|minute|mins|min|hours|hour|hrs|hr)\s*(?:to|that|about)?\s*(.*)/))){
     const mins=parseInt(m[1],10)*(/h/.test(m[2])?60:1); const what=(m[3]||'your reminder').trim()||'your reminder';
     showAction(`🔔 Reminder in ${mins} min`); const r=callNative('setReminder', what, mins); return r?r.message:'Reminders need the Android app.';
   }
-  if((m=t.match(/^(?:hey zenix,?\s*)?(?:please\s+)?(?:remember|tandaan mo)(?: that| na)?\s+(.{4,})$/i))){
+  if((m=t.match(/^(?:(?:hey |ok |hi )?(?:zenix|maya),?\s*)?(?:please\s+)?(?:remember|tandaan mo)(?: that| na)?\s+(.{4,})$/i))){
     saveFact(m[1].replace(/[.!?]+$/,'')); return "Got it, I'll remember that.";
   }
   if(/call history|recent calls|missed calls/.test(low)){ const r=callNative('openCallHistory'); return r?r.message:'Call history needs the Android app.'; }
-  if((m=t.match(/^(?:hey zenix,?\s*)?(?:please\s+)?(?:can you\s+)?(?:open|launch|buksan mo(?: ang)?|buksan)\s+(?:the\s+|my\s+)?(.+?)(?:\s+app)?(?:\s+please)?[.!?]*$/i))){
+  if((m=t.match(/^(?:(?:hey |ok |hi )?(?:zenix|maya),?\s*)?(?:please\s+)?(?:can you\s+)?(?:open|launch|buksan mo(?: ang)?|buksan)\s+(?:the\s+|my\s+)?(.+?)(?:\s+app)?(?:\s+please)?[.!?]*$/i))){
     showAction(`📱 Opening ${m[1]}`); const r=callNative('openApp', m[1]); return r?r.message:'Opening apps needs the Android app.';
   }
-  if((m=t.match(/^(?:hey zenix,?\s*)?(?:please\s+)?(?:can you\s+)?(?:call|tawagan mo(?: si)?|tawagan)\s+(.+?)(?:\s+please)?[.!?]*$/i))){
+  if((m=t.match(/^(?:(?:hey |ok |hi )?(?:zenix|maya),?\s*)?(?:please\s+)?(?:can you\s+)?(?:call|tawagan mo(?: si)?|tawagan)\s+(.+?)(?:\s+please)?[.!?]*$/i))){
     showAction(`📞 Calling ${m[1]}`); const r=callNative('makeCall', m[1]); return r?r.message:'Calling needs the Android app.';
   }
   if(/(calendar|schedule|agenda)/.test(low) || /what.*(on|plan).*(today|tomorrow)/.test(low)){
@@ -577,7 +570,7 @@ function quickAction(text){
 }
 function buildPrompt(userText){
   const mem = memories.slice(-10).map(x=>'- '+x).join('\n') || 'Nothing saved yet.';
-  const sys = `You are ZeniX, ${settings.name||'Jim'}'s funny, witty female AI assistant and best buddy. ${settings.name||'Jim'} is a Filipino EMS medic in the UAE who builds apps. You are running offline on his phone right now. Reply in 1 to 3 short spoken sentences, no lists, no emojis. If he speaks Tagalog or Taglish, reply in Taglish. Be honest; if you don't know, say so. Offline you can set alarms, reminders, open apps, make calls and check his calendar; you cannot search the web or send messages.\nThings you remember about him:\n${mem}`;
+  const sys = `You are Maya, ${settings.name||'Jim'}'s funny, witty female AI assistant and best buddy. ${settings.name||'Jim'} is a Filipino EMS medic in the UAE who builds apps. You are running offline on his phone right now. Reply in 1 to 3 short spoken sentences, no lists, no emojis. If he speaks Tagalog or Taglish, reply in Taglish. Be honest; if you don't know, say so. Offline you can set alarms, reminders, open apps, make calls and check his calendar; you cannot search the web or send messages.\nThings you remember about him:\n${mem}`;
   const turns = history.filter(x=>x.who!=='sys').slice(-7, -1);
   let p = `<|im_start|>system\n${sys}<|im_end|>\n`;
   turns.forEach(x=>{ p += `<|im_start|>${x.who==='user'?'user':'assistant'}\n${x.text.slice(0,240)}<|im_end|>\n`; });
@@ -592,7 +585,7 @@ function askOffline(text){
 async function offlineHandle(text){
   const quick = quickAction(text);
   if(quick) return quick;
-  off.thinking=true; $('modeLabel').textContent='Thinking…';
+  off.thinking=true; $('modeLabel').textContent='Thinking…'; setOrb('thinking');
   try{
     let out = await askOffline(text);
     out = out.replace(/<\|im_end\|>[\s\S]*/,'').replace(/<\|im_start\|>[\s\S]*/,'').trim();
@@ -602,12 +595,12 @@ async function offlineHandle(text){
 }
 function offlineSay(text, speakIt){
   addMsg('ai', text);
-  if(off.kind==='talk') $('liveLine').textContent='ZeniX: '+text;
+  if(off.kind==='talk') $('liveLine').textContent='Maya: '+text;
   if(speakIt && typeof kokoro!=='undefined' && kokoro && settings.voice!=='phone' && !isTagalog(text)){
     speech.onIdle = () => { if(off.endAfterSpeak){ off.endAfterSpeak=false; endOffline(); } else if(off.kind==='talk') offListen(); else setOrb('idle'); };
     speakEnqueue(text); return;
   }
-  if(speakIt){ setOrb('speaking'); $('modeLabel').textContent='ZeniX is speaking'; if(Native.setOrbMode) Native.setOrbMode('speaking'); Native.speak(text, settings.offlineLang); }
+  if(speakIt){ setOrb('speaking'); $('modeLabel').textContent='Maya is speaking'; if(Native.setOrbMode) Native.setOrbMode('speaking'); Native.speak(text, settings.offlineLang); }
   else if(off.kind==='talk') offListen();
 }
 function offListen(){
@@ -667,7 +660,7 @@ function startOffline(kind, brain='offline'){
       if(settings.voice!=='phone' && !settings.voice.startsWith('dg:')) loadKokoro().catch(()=>{});
       speech.onIdle = () => offListen();
       speakEnqueue(`Hey ${settings.name||'Jim'}! What's up?`);
-    } else offlineSay(`Hey ${settings.name||'Jim'}, offline ZeniX here. What's up?`, true);
+    } else offlineSay(`Hey ${settings.name||'Jim'}, offline Maya here. What's up?`, true);
   }
   return true;
 }
@@ -694,19 +687,19 @@ function renderOffline(){
   const bar=$('brainBar');
   if(st.state==='ready'){ $('brainText').textContent='Offline brain is installed ✓ (about '+(st.sizeMB/1000).toFixed(1)+' GB)'; $('brainBtn').textContent='Remove'; bar.style.display='none'; }
   else if(st.state==='downloading' || st.state==='paused'){ $('brainText').textContent=(st.state==='paused'?'Paused (waiting for internet) ':'Downloading… ')+st.percent+'%'; $('brainBtn').textContent='Downloading'; bar.style.display='block'; $('brainFill').style.width=st.percent+'%'; setTimeout(renderOffline, 2000); }
-  else { $('brainText').textContent=(st.state==='failed'?'Download failed. Try again on Wi-Fi. ':'')+'Download the on-phone brain once (about 1.6 GB, use Wi-Fi). Then ZeniX works with no internet and no credits.'; $('brainBtn').textContent='Download'; bar.style.display='none'; }
+  else { $('brainText').textContent=(st.state==='failed'?'Download failed. Try again on Wi-Fi. ':'')+'Download the on-phone brain once (about 1.6 GB, use Wi-Fi). Then Maya works with no internet and no credits.'; $('brainBtn').textContent='Download'; bar.style.display='none'; }
 }
 $('brainBtn').onclick = () => {
   if(!Native || !Native.offlineStatus) return;
   let st={}; try{ st=JSON.parse(Native.offlineStatus()); }catch(e){}
   if(st.state==='ready'){ if(confirm('Remove the offline brain from this phone?')){ Native.offlineDelete(); renderOffline(); } return; }
   if(st.state==='downloading') return;
-  Native.offlineDownload(); toast('Download started — you can keep using ZeniX'); setTimeout(renderOffline, 800);
+  Native.offlineDownload(); toast('Download started — you can keep using Maya'); setTimeout(renderOffline, 800);
 };
-document.querySelectorAll('[data-mode]').forEach(b=>b.onclick=()=>{ settings.mode=b.dataset.mode; store.set('settings',settings); renderOffline(); toast(b.dataset.mode==='auto'?'Auto: cloud when online, offline when not':b.dataset.mode==='offline'?'ZeniX will stay offline':'ZeniX will always use the cloud'); });
+document.querySelectorAll('[data-mode]').forEach(b=>b.onclick=()=>{ settings.mode=b.dataset.mode; store.set('settings',settings); renderOffline(); toast(b.dataset.mode==='auto'?'Auto: cloud when online, offline when not':b.dataset.mode==='offline'?'Maya will stay offline':'Maya will always use the cloud'); });
 document.querySelectorAll('[data-lang]').forEach(b=>b.onclick=()=>{ settings.offlineLang=b.dataset.lang; store.set('settings',settings); renderOffline(); });
 window.addEventListener('online', ()=>{ if(settings.mode==='auto') toast('Back online'); });
-window.addEventListener('offline', ()=>{ if(settings.mode==='auto') toast('No internet — ZeniX will use offline mode'); });
+window.addEventListener('offline', ()=>{ if(settings.mode==='auto') toast('No internet — Maya will use offline mode'); });
 renderOffline();
 
 /* ---------- Own brain: Claude API direct + free phone ears + Kokoro voice ---------- */
@@ -739,7 +732,7 @@ let webSearchOn = store.get('websearch', true);
 function ownSystem(){
   const name = settings.name || 'Jim';
   const now = new Date().toLocaleString('en-GB', {timeZone:'Asia/Dubai', weekday:'long', day:'numeric', month:'long', year:'numeric', hour:'2-digit', minute:'2-digit'});
-  return `You are ZeniX, ${name} Porce's personal AI assistant. You are female. ${name} is a Filipino medic in EMS under Civil Defence in the UAE, and builds and sells apps as JPSums. You live in an app on his Samsung phone and can control it. Right now it is ${now} (Dubai).
+  return `You are Maya, ${name} Porce's personal AI assistant. You are female. ${name} is a Filipino medic in EMS under Civil Defence in the UAE, and builds and sells apps as JPSums. You live in an app on his Samsung phone and can control it. Right now it is ${now} (Dubai).
 
 Personality: funny, witty and playful, his best buddy who's also super capable. Tease him, banter, puns, cheeky humour — but get the job done first. Calm and serious when it matters. He calls you "bro"; match his energy.
 
@@ -826,7 +819,7 @@ async function ownTurn(userText, speakIt){
     while((m = pend.match(/^([\s\S]*?[.!?…](?:\s|$)|[\s\S]*?\n)/)) && m[0].trim().length >= 12){ speakEnqueue(m[0]); said++; pend = pend.slice(m[0].length); }
     if(!said && (m = pend.match(/^([\s\S]{24,}?[,;:—])\s/))){ speakEnqueue(m[1]); said++; pend = pend.slice(m[0].length); } };
   for(let round=0; round<5; round++){
-    const r = await claudeStream(ownSystem(), ownMsgs, t => { spoken += t; feed(t); if(off.kind==='talk') $('liveLine').textContent = 'ZeniX: '+spoken.slice(-160); });
+    const r = await claudeStream(ownSystem(), ownMsgs, t => { spoken += t; feed(t); if(off.kind==='talk') $('liveLine').textContent = 'Maya: '+spoken.slice(-160); });
     if(speakIt && pend.trim()){ speakEnqueue(pend); pend=''; }
     const p = PRICES[settings.model] || PRICES['claude-haiku-5-5'];
     usage.inTok += r.u.inTok; usage.outTok += r.u.outTok; usage.cost += (r.u.inTok*p[0] + r.u.outTok*p[1]) / 1e6 + 0.01*(r.u.searches||0); store.set('usage', usage);
@@ -900,11 +893,12 @@ async function pumpSpeech(){
   const item = speech.q.shift();
   if(!item){ if(!speech.streamOpen && speech.onIdle){ const f=speech.onIdle; speech.onIdle=null; f(); } return; }
   if(typeof dg!=='undefined' && dg.active && !dg.paused) dgPause();
-  speech.playing = true; setOrb('speaking'); $('modeLabel').textContent='ZeniX is speaking'; if(Native && Native.setOrbMode) Native.setOrbMode('speaking');
+  speech.playing = true; setOrb('speaking'); $('modeLabel').textContent='Maya is speaking'; if(Native && Native.setOrbMode) Native.setOrbMode('speaking');
   try{
     const audio = item.wav ? await item.wav : null;
     if(audio){
       const url = URL.createObjectURL(audio.toBlob());
+      if(typeof vizCtx!=='undefined' && vizCtx && vizCtx.state!=='running'){ try{ await vizCtx.resume(); }catch(e){} }
       await new Promise(res => { speech.audio.onended = res; speech.audio.onerror = res; speech.audio.src = url; speech.audio.play().catch(res); });
       URL.revokeObjectURL(url);
     } else if(Native && Native.speak){
@@ -919,7 +913,7 @@ function stopSpeech(){ speech.q=[]; speech.streamOpen=false; speech.onIdle=null;
 
 async function ownRespond(text, speakIt, after){
   speech.streamOpen = true; speech.onIdle = after || null;
-  $('modeLabel').textContent = 'Thinking…'; setOrb('listening');
+  $('modeLabel').textContent = 'Thinking…'; setOrb('thinking');
   let full = '';
   try{ full = await ownTurn(text, speakIt); }
   catch(e){
@@ -954,13 +948,13 @@ document.querySelectorAll('[data-model]').forEach(b => b.onclick = () => { setti
 document.querySelectorAll('[data-voice]').forEach(b => b.onclick = async () => {
   settings.voice=b.dataset.voice; store.set('settings',settings); renderBrain(); renderHD();
   if(speech.playing || speech.q.length) stopSpeech();
-  if(settings.voice.startsWith('dg:')){ if(!dgKey()){ toast('Add your Deepgram key below first'); return; } speakEnqueue(`Hi ${settings.name||'Jim'}, I'm ZeniX. How do I sound?`); return; }
+  if(settings.voice.startsWith('dg:')){ if(!dgKey()){ toast('Add your Deepgram key below first'); return; } speakEnqueue(`Hi ${settings.name||'Jim'}, I'm Maya. How do I sound?`); return; }
   if(settings.voice!=='phone' && !kokoro){
-    kokoroProgress(0); toast('Getting the natural voices ready, you can keep using ZeniX');
-    loadKokoro().then(()=>speakEnqueue(`Hi ${settings.name||'Jim'}, I'm ZeniX. How do I sound?`)).catch(()=>toast('Could not load the natural voices. Check your internet.'));
+    kokoroProgress(0); toast('Getting the natural voices ready, you can keep using Maya');
+    loadKokoro().then(()=>speakEnqueue(`Hi ${settings.name||'Jim'}, I'm Maya. How do I sound?`)).catch(()=>toast('Could not load the natural voices. Check your internet.'));
     return;
   }
-  speakEnqueue(`Hi ${settings.name||'Jim'}, I'm ZeniX. How do I sound?`);
+  speakEnqueue(`Hi ${settings.name||'Jim'}, I'm Maya. How do I sound?`);
 });
 $('keySave').onclick = () => { const v=$('keyInput').value.trim(); if(!/^sk-ant-/.test(v)){ toast('That does not look like a Claude API key (starts with sk-ant-)'); return; } store.set('apikey', v); $('keyInput').value=''; renderBrain(); toast('API key saved on this phone only'); };
 $('keyClear').onclick = () => { store.set('apikey',''); renderBrain(); };
@@ -973,7 +967,7 @@ function renderHD(){
     const b=document.createElement('button');
     b.textContent = `${v.locale.replace('en-','')} ${i+1}${v.quality>=400?' HD':''}`;
     b.classList.toggle('sel', settings.voice==='phone' && settings.phoneVoice===v.name);
-    b.onclick=()=>{ settings.voice='phone'; settings.phoneVoice=v.name; store.set('settings',settings); applyPhoneVoice(); stopSpeech(); renderBrain(); renderHD(); speakEnqueue(`Hi ${settings.name||'Jim'}, I'm ZeniX. How do I sound?`); };
+    b.onclick=()=>{ settings.voice='phone'; settings.phoneVoice=v.name; store.set('settings',settings); applyPhoneVoice(); stopSpeech(); renderBrain(); renderHD(); speakEnqueue(`Hi ${settings.name||'Jim'}, I'm Maya. How do I sound?`); };
     box.appendChild(b);
   });
 }
@@ -1079,16 +1073,16 @@ document.querySelectorAll('nav button').forEach(b => b.onclick = () => {
 });
 
 /* ---------- Me tab ---------- */
-$('memAdd').onclick = () => { const v=$('memInput').value.trim(); if(!v) return; saveFact(v); $('memInput').value=''; toast('ZeniX will remember that'); };
+$('memAdd').onclick = () => { const v=$('memInput').value.trim(); if(!v) return; saveFact(v); $('memInput').value=''; toast('Maya will remember that'); };
 $('memSearch').addEventListener('input', ()=>{ memShown=40; renderMem(); });
 $('memMore').onclick = () => { memShown+=60; renderMem(); };
 $('memExport').onclick = () => {
-  const data = JSON.stringify({app:'ZeniX', saved:new Date().toISOString(), memories, history});
-  if(Native && Native.shareText){ Native.shareText('ZeniX memory backup', data); }
+  const data = JSON.stringify({app:'Maya', saved:new Date().toISOString(), memories, history});
+  if(Native && Native.shareText){ Native.shareText('Maya memory backup', data); }
   else { try{ navigator.clipboard.writeText(data); toast('Backup copied'); }catch(e){ toast('Could not back up'); } }
 };
 $('memImport').onclick = () => {
-  const t = prompt('Paste your ZeniX memory backup here');
+  const t = prompt('Paste your Maya memory backup here');
   if(!t) return;
   try{
     const j = JSON.parse(t); let added=0;
@@ -1109,17 +1103,194 @@ const vt=$('chatVoiceToggle'); vt.classList.toggle('on', settings.chatVoice);
 vt.onclick = () => { settings.chatVoice=!settings.chatVoice; vt.classList.toggle('on',settings.chatVoice); store.set('settings',settings); if(convo && session==='chat') convo.setVolume({volume:settings.chatVoice?1:0}); };
 $('clearBtn').onclick = () => { if(confirm('Clear all chat history?')){ history=[]; store.set('history',history); renderChat(); toast('History cleared'); } };
 
+/* ---------- Maya neon ring orb (reacts to voices) ---------- */
+const MayaOrb = (() => {
+  const cv = document.getElementById('mayaOrb'); if(!cv) return null;
+  const ctx = cv.getContext('2d');
+  let S = 280, DPR = 1;
+  function resize(){ DPR = Math.min(window.devicePixelRatio||1, 2); S = cv.clientWidth || 280; cv.width = Math.round(S*DPR); cv.height = Math.round(S*DPR); }
+  resize(); window.addEventListener('resize', resize);
+  const N = 84; const bars = new Float32Array(N).fill(0.1);
+  let state = 'idle', level = 0, target = 0, flash = 0.6, hot = Math.PI/2, spec = null, lastBlink = 0, prev = 0;
+  const t0 = performance.now();
+  const TAU = Math.PI*2;
+  const noise = x => (Math.sin(x*1.7) + Math.sin(x*2.9+1.3) + Math.sin(x*4.3+2.1)) / 3;
+  const angDiff = (a,b) => { let d = (a-b) % TAU; if(d > Math.PI) d -= TAU; if(d < -Math.PI) d += TAU; return d; };
+  function setState(s){ if(s !== state){ state = s; flash = Math.max(flash, 0.7); } }
+  function feed(l){ if(!(l >= 0)) return; target = Math.max(target, Math.min(1, l)); }
+  function feedSpectrum(a){ spec = a; }
+
+  const gcv = document.createElement('canvas'); const gctx = gcv.getContext('2d');
+  function sizeGlow(){ gcv.width = Math.round(S*DPR*0.5); gcv.height = gcv.width; }
+  sizeGlow(); window.addEventListener('resize', sizeGlow);
+
+  function ring(c, rad, dx, dy, t, L){
+    c.beginPath();
+    for(let i=0;i<=120;i++){
+      const th = i/120*TAU;
+      const r = rad*(1 + 0.015*Math.sin(3*th + t*1.3) + 0.012*L*Math.sin(5*th - t*4));
+      const x = dx + r*Math.cos(th), y = dy + r*Math.sin(th);
+      i ? c.lineTo(x,y) : c.moveTo(x,y);
+    }
+    c.closePath();
+  }
+  // shared transform for the wobbling, tilted ring
+  function tilt(c, scale, t){
+    c.setTransform(scale,0,0,scale,0,0);
+    c.translate(S/2, S/2);
+    c.rotate(Math.sin(t*0.4)*0.2);
+    c.scale(1, 0.92 + 0.05*Math.sin(t*0.8));
+  }
+  const barColor = (w, s, i, alpha) => w > 0.22
+    ? `hsla(${10 + 28*(1-w)},100%,${60 + 12*(s===0)}%,${alpha})`
+    : `hsla(${(285 + (i%6)*8 - s*7 + 360)%360},100%,${86 - s*4}%,${alpha*0.9})`;
+
+  function frame(now){
+    const t = (now - t0)/1000;
+    pollLevels(t);
+    level = Math.max(target, level*0.9); target *= 0.82;
+    const L = level;
+    if(L - prev > 0.35 && now - lastBlink > 600){ flash = Math.max(flash, 0.55); lastBlink = now; }
+    prev = L;
+    const R = S*0.32;
+    const spin = state==='thinking' ? t*2.2 : t*0.25;
+    hot += state==='thinking' ? 0.09 : 0.012 + L*0.05;
+    const boost = 0.8 + 0.35*L + flash*0.35;
+
+    // bar heights for this frame
+    for(let i=0;i<N;i++){
+      let sv;
+      if(spec && spec.length){ const half = N/2, j = i < half ? i : N-1-i; sv = spec[Math.min(spec.length-1, Math.floor(j/half*spec.length*0.6))]/255; }
+      else sv = 0.5 + 0.5*noise(i*0.45 + t*(state==='speaking' ? 7 : 3));
+      const idle = (state==='idle' || state==='thinking') ? 0.1 + 0.08*(0.5 + 0.5*noise(i*0.3 + t*1.5)) : 0.08;
+      bars[i] += ((idle + L*sv*1.15) - bars[i]) * 0.35;
+    }
+
+    // ---- pass 1: soft glow (drawn small, then blurred) ----
+    gctx.setTransform(1,0,0,1,0,0); gctx.clearRect(0,0,gcv.width,gcv.height);
+    tilt(gctx, DPR*0.5, t);
+    gctx.globalCompositeOperation = 'lighter';
+    const glows = [['60,80,255',36,0.45,-6,-4],['255,40,200',22,0.34,4,2],['140,60,255',14,0.40,0,0],['30,200,255',8,0.42,7,-3]];
+    for(const [col,w,a,dx,dy] of glows){
+      gctx.strokeStyle = `rgba(${col},${Math.min(0.6, a*boost)})`;
+      gctx.lineWidth = w*(1 + L*0.35);
+      ring(gctx, R*(1 + L*0.03), dx, dy, t, L); gctx.stroke();
+    }
+    gctx.lineCap = 'butt';
+    for(let i=0;i<N;i++){
+      const th = i/N*TAU + spin*0.3, w = Math.exp(-Math.pow(angDiff(th, hot), 2)/0.45);
+      const len = R*(0.06 + bars[i]*0.42);
+      gctx.strokeStyle = barColor(w, 0, i, 0.28*(0.6 + 0.6*L));
+      gctx.lineWidth = R*0.05;
+      gctx.beginPath(); gctx.moveTo(Math.cos(th)*R*0.9, Math.sin(th)*R*0.9); gctx.lineTo(Math.cos(th)*(R*0.95+len), Math.sin(th)*(R*0.95+len)); gctx.stroke();
+    }
+
+    // ---- main canvas ----
+    ctx.setTransform(1,0,0,1,0,0); ctx.clearRect(0,0,cv.width,cv.height);
+    // dark glass centre with a faint rainbow sheen
+    tilt(ctx, DPR, t);
+    const g = ctx.createRadialGradient(-R*0.25, -R*0.3, R*0.05, 0, 0, R);
+    g.addColorStop(0, 'rgba(60,50,110,0.35)'); g.addColorStop(0.7, 'rgba(8,6,18,0.9)'); g.addColorStop(1, 'rgba(8,6,18,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0,0,R*0.97,0,TAU); ctx.fill();
+    ctx.globalCompositeOperation = 'lighter';
+    const sheen = ctx.createLinearGradient(R*0.2, -R*0.6, R*0.9, R*0.5);
+    sheen.addColorStop(0, 'rgba(255,60,120,0)'); sheen.addColorStop(0.5, 'rgba(80,255,160,0.10)'); sheen.addColorStop(1, 'rgba(60,120,255,0)');
+    ctx.fillStyle = sheen; ctx.beginPath(); ctx.arc(0,0,R*0.85,-1.2,1.3); ctx.fill();
+    for(let k=0;k<3;k++){
+      const a0 = spin*0.5 + k*1.2 + 2.3;
+      ctx.strokeStyle = `rgba(170,190,255,${0.05 + 0.03*k + flash*0.05})`;
+      ctx.lineWidth = 2 + k*1.5;
+      ctx.beginPath(); ctx.arc(-R*0.06, 0, R*(0.58 + 0.08*k), a0, a0 + 0.8 + 0.3*k); ctx.stroke();
+    }
+    // the blurred glow
+    ctx.setTransform(1,0,0,1,0,0);
+    ctx.filter = `blur(${Math.round(5*DPR)}px)`;
+    ctx.drawImage(gcv, 0, 0, cv.width, cv.height);
+    ctx.filter = 'none';
+    // crisp core ring
+    tilt(ctx, DPR, t);
+    ctx.strokeStyle = `rgba(255,225,255,${Math.min(0.85, 0.65*boost)})`; ctx.lineWidth = 1.8*(1 + L*0.4);
+    ring(ctx, R*(1 + L*0.03), 0, 0, t, L); ctx.stroke();
+    ctx.strokeStyle = `rgba(255,90,220,${Math.min(0.5, 0.32*boost)})`; ctx.lineWidth = 4*(1 + L*0.4);
+    ring(ctx, R*(1 + L*0.03), 1, 1, t, L); ctx.stroke();
+    // dotted inner ring
+    ctx.setLineDash([2,6]); ctx.lineDashOffset = -t*18;
+    ctx.strokeStyle = `rgba(255,255,255,${0.55 + 0.3*L})`; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(0,0,R*0.86,0,TAU); ctx.stroke(); ctx.setLineDash([]);
+    // crisp LED segments
+    const seg = R*0.05;
+    for(let i=0;i<N;i++){
+      const th = i/N*TAU + spin*0.3, w = Math.exp(-Math.pow(angDiff(th, hot), 2)/0.45);
+      const n = 2 + Math.round(bars[i]*8), cos = Math.cos(th), sin = Math.sin(th);
+      for(let s=0;s<n;s++){
+        const rr = R*0.92 + s*seg*1.2;
+        const alpha = (1 - s/(n+1)*0.75) * (0.4 + 0.35*Math.min(1, L+0.25));
+        ctx.fillStyle = barColor(w, s, i, alpha);
+        ctx.save(); ctx.translate(cos*rr, sin*rr); ctx.rotate(th);
+        ctx.fillRect(-seg*0.4, -seg*0.3, seg*0.8, seg*0.6);
+        ctx.restore();
+      }
+    }
+    if(flash > 0.02){
+      ctx.fillStyle = `rgba(255,170,250,${flash*0.2})`;
+      ctx.beginPath(); ctx.arc(0,0,R*0.9,0,TAU); ctx.fill();
+      flash *= 0.9;
+    }
+    ctx.globalCompositeOperation = 'source-over';
+    requestAnimationFrame(frame);
+  }
+
+  // where the voice levels come from
+  function pollLevels(t){
+    spec = null;
+    try{
+      if(typeof convo!=='undefined' && convo && typeof session!=='undefined' && session==='talk'){
+        if(state==='speaking'){ feed((convo.getOutputVolume ? convo.getOutputVolume() : 0)*1.8); if(convo.getOutputByteFrequencyData) spec = convo.getOutputByteFrequencyData(); }
+        else { feed((convo.getInputVolume ? convo.getInputVolume() : 0)*2.2); if(convo.getInputByteFrequencyData) spec = convo.getInputByteFrequencyData(); }
+        return;
+      }
+    }catch(e){}
+    if(typeof speech!=='undefined' && speech.playing){
+      if(vizAnalyser && speech.audio && !speech.audio.paused){
+        vizAnalyser.getByteFrequencyData(vizBuf); spec = vizBuf;
+        let sum=0; for(let i=0;i<vizBuf.length*0.6;i++) sum += vizBuf[i];
+        feed(sum/(vizBuf.length*0.6)/255*2.2);
+      } else feed(0.35 + 0.35*Math.abs(noise(t*7)));   // phone voice: no audio data, animate a talking rhythm
+    } else if(state==='thinking'){ feed(0.15 + 0.1*Math.abs(Math.sin(t*3))); }
+  }
+  requestAnimationFrame(frame);
+  return { setState, feed, feedSpectrum };
+})();
+window.MayaOrb = MayaOrb;
+/* mic level from the phone (0..1) */
+window.zenixRms = (v) => { if(MayaOrb) MayaOrb.feed(v); };
+
+/* analyse Maya's own voice (Kokoro / Deepgram audio) for the orb */
+let vizCtx = null, vizAnalyser = null, vizBuf = null;
+function initVoiceViz(){
+  try{
+    if(vizCtx){ if(vizCtx.state!=='running') vizCtx.resume(); return; }
+    if(typeof speech==='undefined' || !speech.audio) return;
+    vizCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const src = vizCtx.createMediaElementSource(speech.audio);
+    vizAnalyser = vizCtx.createAnalyser(); vizAnalyser.fftSize = 256; vizAnalyser.smoothingTimeConstant = 0.6;
+    src.connect(vizAnalyser); vizAnalyser.connect(vizCtx.destination);
+    vizBuf = new Uint8Array(vizAnalyser.frequencyBinCount);
+  }catch(e){ vizAnalyser = null; }
+}
+document.addEventListener('click', initVoiceViz, {once:true});
+
 /* ---------- app updates ---------- */
-window.zenixUpdateAvailable = (name) => { $('updText').textContent = 'New ZeniX '+(name?('v'+name+' '):'')+'is ready'; $('updBar').style.display='flex'; };
+window.zenixUpdateAvailable = (name) => { $('updText').textContent = 'New Maya '+(name?('v'+name+' '):'')+'is ready'; $('updBar').style.display='flex'; };
 window.zenixUpdateFailed = () => { toast('Update download failed. Try again on Wi-Fi.'); $('updBtn').textContent='Retry'; };
 $('updBtn').onclick = () => {
   const r = Native && Native.startUpdate ? Native.startUpdate() : '';
-  if(r==='permission'){ toast('Allow "Install unknown apps" for ZeniX, then tap Update now again'); }
+  if(r==='permission'){ toast('Allow "Install unknown apps" for Maya, then tap Update now again'); }
   else if(r==='downloading'){ $('updBtn').textContent='Downloading…'; toast('Downloading the update, the install screen will pop up'); }
   else toast('Could not start the update');
 };
 if(Native && Native.checkUpdate){ Native.checkUpdate(); document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) Native.checkUpdate(); }); }
-if(Native && Native.appVersion){ try{ document.querySelector('#view-settings .card:last-child .muted').textContent = 'ZeniX runs on ElevenLabs voice with a Claude brain, plus an optional on-phone brain. Version '+Native.appVersion(); }catch(e){} }
+if(Native && Native.appVersion){ try{ document.querySelector('#view-settings .card:last-child .muted').textContent = 'Maya runs on ElevenLabs voice with a Claude brain, plus an optional on-phone brain. Version '+Native.appVersion(); }catch(e){} }
 
 greet(); renderChat(); renderMem(); setInterval(greet, 60000);
 </script>

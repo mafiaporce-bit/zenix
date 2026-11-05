@@ -17,7 +17,7 @@ class ReminderReceiver : BroadcastReceiver() {
         )
         val n = Notification.Builder(context, MainActivity.CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notify)
-            .setContentTitle("ZeniX reminder")
+            .setContentTitle("Maya reminder")
             .setContentText(text)
             .setStyle(Notification.BigTextStyle().bigText(text))
             .setAutoCancel(true)

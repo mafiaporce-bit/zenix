@@ -14,7 +14,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 import kotlin.concurrent.thread
 
-/** Checks GitHub for a newer ZeniX and installs it with one tap. */
+/** Checks GitHub for a newer Maya and installs it with one tap. */
 class Updater(private val activity: MainActivity) {
 
     companion object {
@@ -62,8 +62,8 @@ class Updater(private val activity: MainActivity) {
         File(dir, APK_NAME).delete()
         val dm = activity.getSystemService(DownloadManager::class.java)
         val req = DownloadManager.Request(Uri.parse(BASE + "ZeniX.apk"))
-            .setTitle("ZeniX update")
-            .setDescription("Downloading the new ZeniX")
+            .setTitle("Maya update")
+            .setDescription("Downloading the new Maya")
             .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE)
             .setDestinationInExternalFilesDir(activity, "updates", APK_NAME)
         downloadId = dm.enqueue(req)

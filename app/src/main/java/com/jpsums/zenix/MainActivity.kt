@@ -60,7 +60,7 @@ class MainActivity : Activity() {
         instance = java.lang.ref.WeakReference(this)
         webView = WebView(this)
         setContentView(webView)
-        // Keep ZeniX's page running at full speed while another app is open
+        // Keep Maya's page running at full speed while another app is open
         webView.setRendererPriorityPolicy(WebView.RENDERER_PRIORITY_IMPORTANT, false)
         webView.settings.apply {
             javaScriptEnabled = true
@@ -159,13 +159,13 @@ class MainActivity : Activity() {
     private fun createNotificationChannel() {
         val nm = getSystemService(NotificationManager::class.java)
         if (nm.getNotificationChannel(CHANNEL_ID) == null) {
-            val ch = NotificationChannel(CHANNEL_ID, "ZeniX reminders", NotificationManager.IMPORTANCE_HIGH)
-            ch.description = "Reminders set by ZeniX"
+            val ch = NotificationChannel(CHANNEL_ID, "Maya reminders", NotificationManager.IMPORTANCE_HIGH)
+            ch.description = "Reminders set by Maya"
             nm.createNotificationChannel(ch)
         }
         if (nm.getNotificationChannel(VOICE_CHANNEL_ID) == null) {
-            val ch = NotificationChannel(VOICE_CHANNEL_ID, "ZeniX voice chat", NotificationManager.IMPORTANCE_LOW)
-            ch.description = "Shows while ZeniX is listening"
+            val ch = NotificationChannel(VOICE_CHANNEL_ID, "Maya voice chat", NotificationManager.IMPORTANCE_LOW)
+            ch.description = "Shows while Maya is listening"
             nm.createNotificationChannel(ch)
         }
     }

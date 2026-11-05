@@ -10,7 +10,7 @@ import android.graphics.Shader
 import android.view.View
 import android.view.animation.AccelerateDecelerateInterpolator
 
-/** ZeniX's floating see-through orb. Pulses when she speaks, breathes softly when listening. */
+/** Maya's floating see-through orb. Pulses when she speaks, breathes softly when listening. */
 class OrbView(context: Context) : View(context) {
 
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)

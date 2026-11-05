@@ -18,7 +18,7 @@ import java.util.Locale
 import java.util.concurrent.Executors
 
 /**
- * ZeniX's offline side: an AI brain that runs on the phone (no internet, no credits),
+ * Maya's offline side: an AI brain that runs on the phone (no internet, no credits),
  * plus the phone's own speech recognition and text-to-speech.
  */
 class OfflineBrain(private val activity: MainActivity) {
@@ -37,6 +37,7 @@ class OfflineBrain(private val activity: MainActivity) {
     private var tts: TextToSpeech? = null
     @Volatile private var ttsReady = false
     private var recognizer: SpeechRecognizer? = null
+    @Volatile private var lastRms = 0L
 
     init {
         tts = TextToSpeech(activity) { status -> ttsReady = status == TextToSpeech.SUCCESS }
@@ -85,8 +86,8 @@ class OfflineBrain(private val activity: MainActivity) {
         if (f.exists() && f.length() >= MODEL_BYTES) return status()
         if (f.exists()) f.delete()
         val req = DownloadManager.Request(Uri.parse(MODEL_URL))
-            .setTitle("ZeniX offline brain")
-            .setDescription("Downloading ZeniX's on-phone AI (about 1.6 GB)")
+            .setTitle("Maya offline brain")
+            .setDescription("Downloading Maya's on-phone AI (about 1.6 GB)")
             .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE)
             .setDestinationInExternalFilesDir(activity, "models", MODEL_FILE)
             .setAllowedOverMetered(true)
@@ -133,7 +134,10 @@ class OfflineBrain(private val activity: MainActivity) {
     private val listener = object : RecognitionListener {
         override fun onReadyForSpeech(params: Bundle?) { js("window.zenixOnListening && window.zenixOnListening()") }
         override fun onBeginningOfSpeech() {}
-        override fun onRmsChanged(rmsdB: Float) {}
+        override fun onRmsChanged(rmsdB: Float) {
+            val now = System.currentTimeMillis()
+            if (now - lastRms > 70) { lastRms = now; val v = ((rmsdB + 2f) / 12f).coerceIn(0f, 1f); js("window.zenixRms && window.zenixRms($v)") }
+        }
         override fun onBufferReceived(buffer: ByteArray?) {}
         override fun onEndOfSpeech() {}
         override fun onError(error: Int) { js("window.zenixOnSpeechError && window.zenixOnSpeechError($error)") }

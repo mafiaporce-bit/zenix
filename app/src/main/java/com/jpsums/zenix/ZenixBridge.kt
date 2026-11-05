@@ -20,7 +20,7 @@ import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
 
-/** Everything ZeniX can do on the phone. Each method returns a JSON string {ok, message}. */
+/** Everything Maya can do on the phone. Each method returns a JSON string {ok, message}. */
 class ZenixBridge(private val activity: MainActivity) {
 
     private fun ok(msg: String) = JSONObject().put("ok", true).put("message", msg).toString()
@@ -140,7 +140,7 @@ class ZenixBridge(private val activity: MainActivity) {
         return null
     }
 
-    /** Close-match contact names, so ZeniX can ask "did you mean…". */
+    /** Close-match contact names, so Maya can ask "did you mean…". */
     private fun suggestContacts(query: String): List<String> {
         if (!has(Manifest.permission.READ_CONTACTS)) return emptyList()
         val out = LinkedHashSet<String>()
