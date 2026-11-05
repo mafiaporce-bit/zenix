@@ -762,7 +762,12 @@ Recent chat (context only):
 ${recentChatText()}`;
 }
 
+function cleanMsgs(messages){
+  return messages.map(m => typeof m.content==='string' ? m : Object.assign({}, m, {content: m.content.filter(c => !((c.type==='thinking' && (!c.signature || !c.thinking)) ))}))
+    .filter(m => typeof m.content==='string' ? m.content.trim() : m.content.length);
+}
 async function claudeStream(system, messages, onText){
+  messages = cleanMsgs(messages);
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method:'POST',
     headers:{'content-type':'application/json','x-api-key':getKey(),'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
@@ -791,11 +796,14 @@ async function claudeStream(system, messages, onText){
       else if(ev.type==='content_block_start'){ const cb=ev.content_block;
         if(cb.type==='tool_use') blocks[ev.index] = {type:'tool_use', id:cb.id, name:cb.name, json:''};
         else if(cb.type==='text') blocks[ev.index] = {type:'text', text:''};
+        else if(cb.type==='thinking') blocks[ev.index] = {type:'server', raw:{type:'thinking', thinking:cb.thinking||'', signature:cb.signature||''}};
         else if(cb.type==='server_tool_use'){ blocks[ev.index] = {type:'server', raw:cb, json:''}; if(off.kind==='talk') $('actionLine').textContent='🔎 Searching the web…'; }
         else { blocks[ev.index] = {type:'server', raw:cb}; if(cb.type==='web_search_tool_result') u.searches=(u.searches||0)+1; } }
       else if(ev.type==='content_block_delta'){ const b=blocks[ev.index]; if(!b) continue;
         if(ev.delta.type==='text_delta'){ b.text += ev.delta.text; onText && onText(ev.delta.text); }
-        else if(ev.delta.type==='input_json_delta'){ b.json = (b.json||'') + ev.delta.partial_json; } }
+        else if(ev.delta.type==='input_json_delta'){ b.json = (b.json||'') + ev.delta.partial_json; }
+        else if(ev.delta.type==='thinking_delta' && b.raw){ b.raw.thinking += ev.delta.thinking||''; }
+        else if(ev.delta.type==='signature_delta' && b.raw){ b.raw.signature = (b.raw.signature||'') + (ev.delta.signature||''); } }
       else if(ev.type==='message_delta'){ stop = ev.delta.stop_reason; if(ev.usage) u.outTok += ev.usage.output_tokens||0; }
       else if(ev.type==='error'){ throw new Error((ev.error&&ev.error.message)||'Claude error'); }
     }
