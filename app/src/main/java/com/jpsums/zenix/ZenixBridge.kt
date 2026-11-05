@@ -58,6 +58,34 @@ class ZenixBridge(private val activity: MainActivity) {
     @JavascriptInterface fun stopListening(): String { activity.brain.stopListening(); return ok("stopped") }
     @JavascriptInterface fun speak(text: String, lang: String): String { activity.brain.speak(text, lang); return ok("speaking") }
     @JavascriptInterface fun stopSpeaking(): String { activity.brain.stopSpeaking(); return ok("stopped") }
+    /** Deepgram Aura voice: fetches MP3 in the background, returns it via window.zenixDG(id, base64, error). */
+    @JavascriptInterface fun dgSpeak(id: String, text: String, model: String, key: String): String {
+        kotlin.concurrent.thread {
+            val q = { v: String -> JSONObject.quote(v) }
+            try {
+                val url = java.net.URL("https://api.deepgram.com/v1/speak?model=" + java.net.URLEncoder.encode(model, "UTF-8") + "&encoding=mp3")
+                val c = url.openConnection() as java.net.HttpURLConnection
+                c.requestMethod = "POST"; c.doOutput = true
+                c.connectTimeout = 8000; c.readTimeout = 20000
+                c.setRequestProperty("Authorization", "Token $key")
+                c.setRequestProperty("Content-Type", "application/json")
+                c.outputStream.use { it.write(JSONObject().put("text", text).toString().toByteArray()) }
+                val code = c.responseCode
+                if (code !in 200..299) {
+                    val err = try { c.errorStream?.bufferedReader()?.readText() ?: "" } catch (_: Exception) { "" }
+                    activity.runJs("window.zenixDG && window.zenixDG(${q(id)}, '', ${q("$code $err".take(200))})")
+                } else {
+                    val bytes = c.inputStream.use { it.readBytes() }
+                    val b64 = android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
+                    activity.runJs("window.zenixDG && window.zenixDG(${q(id)}, '$b64', '')")
+                }
+            } catch (e: Exception) {
+                activity.runJs("window.zenixDG && window.zenixDG(${q(id)}, '', ${q(e.message ?: "network error")})")
+            }
+        }
+        return ok("fetching")
+    }
+
     @JavascriptInterface fun finishListening(): String { activity.brain.finishListening(); return ok("ok") }
     @JavascriptInterface fun listVoices(): String = activity.brain.listVoices()
     @JavascriptInterface fun setPhoneVoice(name: String, rate: String): String {

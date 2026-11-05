@@ -187,6 +187,18 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
         <p class="muted" id="voiceProg" style="display:none;margin-top:6px"></p>
         <p class="muted" style="margin:10px 0 6px">Google HD voices (instant, recommended for speed)</p>
         <div class="seg small" id="hdVoices" style="flex-wrap:wrap"></div>
+        <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line)">
+          <h3 style="font-size:15px">Fast cloud voice · Deepgram</h3>
+          <p class="muted" style="margin:4px 0 8px">Faster ears and natural voices, about $1/hour. New Deepgram accounts get $200 free.</p>
+          <p class="muted" style="margin:0 0 6px">Ears</p>
+          <div class="seg small"><button data-ears="phone">Phone</button><button data-ears="deepgram">Deepgram</button></div>
+          <p class="muted" style="margin:10px 0 6px">Deepgram voices (tap to hear)</p>
+          <div class="seg small" style="flex-wrap:wrap">
+            <button data-voice="dg:aura-2-thalia-en">Thalia</button><button data-voice="dg:aura-2-andromeda-en">Andromeda</button><button data-voice="dg:aura-2-helena-en">Helena</button><button data-voice="dg:aura-2-luna-en">Luna</button><button data-voice="dg:aura-2-asteria-en">Asteria</button>
+          </div>
+          <p class="muted" id="dgState" style="margin:10px 0 6px"></p>
+          <div class="row"><input type="password" id="dgInput" placeholder="Paste Deepgram API key" autocomplete="off" style="width:100%;height:46px;border-radius:12px;border:1px solid var(--line);background:var(--surface2);color:var(--text);padding:0 12px;font:14px Inter,sans-serif"><button class="btn-line" id="dgSave">Save</button></div>
+        </div>
         <div class="row" style="margin-top:6px"><p class="muted" id="usageText"></p><button class="btn-line" id="usageReset">Reset</button></div>
         <div class="row"><span></span><button class="btn-line red" id="keyClear">Remove key</button></div>
       </div>
@@ -602,6 +614,7 @@ function offListen(){
   if(!off.active || off.kind!=='talk') return;
   setOrb('listening'); $('modeLabel').textContent = off.brain==='own' ? 'Listening…' : 'Listening… (offline)';
   if(Native.setOrbMode) Native.setOrbMode('listening');
+  if(off.brain==='own' && useDGEars()){ dgListen(); return; }
   if(off.brain==='own' && Native.startListeningOnline) Native.startListeningOnline(settings.offlineLang);
   else Native.startListening(settings.offlineLang);
 }
@@ -651,7 +664,7 @@ function startOffline(kind, brain='offline'){
     $('talkBtn').classList.add('end'); $('talkLabel').textContent='End chat';
     if(Native.keepAwake) Native.keepAwake('true');
     if(brain==='own'){
-      if(settings.voice!=='phone') loadKokoro().catch(()=>{});
+      if(settings.voice!=='phone' && !settings.voice.startsWith('dg:')) loadKokoro().catch(()=>{});
       speech.onIdle = () => offListen();
       speakEnqueue(`Hey ${settings.name||'Jim'}! What's up?`);
     } else offlineSay(`Hey ${settings.name||'Jim'}, offline ZeniX here. What's up?`, true);
@@ -662,7 +675,7 @@ function endOffline(){
   if(!off.active) return;
   off.active=false; off.kind=null;
   try{ Native.stopListening(); Native.stopSpeaking(); }catch(e){}
-  stopSpeech();
+  stopSpeech(); dgClose();
   if(Native.keepAwake) Native.keepAwake('false');
   setStatus('off'); resetTalkUI(); addMsg('sys','Offline chat ended');
 }
@@ -868,15 +881,17 @@ function nativeSay(text, lang){ return new Promise(res => { nativeSpeakResolve =
 function speakEnqueue(text){
   text = text.replace(/[*_#`>]/g,'').replace(/\s+/g,' ').trim(); if(!text) return;
   const item = { text, wav:null };
-  const usePhone = settings.voice==='phone' || isTagalog(text) || !kokoro;
+  if(settings.voice.startsWith('dg:') && dgKey() && !isTagalog(text)){ item.wav = dgTTS(text).catch(()=>null); speech.q.push(item); pumpSpeech(); return; }
+  const usePhone = settings.voice==='phone' || settings.voice.startsWith('dg:') || isTagalog(text) || !kokoro;
   if(!usePhone){ item.wav = genChain = genChain.then(() => kokoro.generate(text, {voice:settings.voice})).catch(() => null); }
-  else if(settings.voice!=='phone' && !kokoro){ loadKokoro().catch(()=>{}); }
+  else if(settings.voice!=='phone' && !settings.voice.startsWith('dg:') && !kokoro){ loadKokoro().catch(()=>{}); }
   speech.q.push(item); pumpSpeech();
 }
 async function pumpSpeech(){
   if(speech.playing) return;
   const item = speech.q.shift();
   if(!item){ if(!speech.streamOpen && speech.onIdle){ const f=speech.onIdle; speech.onIdle=null; f(); } return; }
+  if(typeof dg!=='undefined' && dg.active && !dg.paused) dgPause();
   speech.playing = true; setOrb('speaking'); $('modeLabel').textContent='ZeniX is speaking'; if(Native && Native.setOrbMode) Native.setOrbMode('speaking');
   try{
     const audio = item.wav ? await item.wav : null;
@@ -931,6 +946,7 @@ document.querySelectorAll('[data-model]').forEach(b => b.onclick = () => { setti
 document.querySelectorAll('[data-voice]').forEach(b => b.onclick = async () => {
   settings.voice=b.dataset.voice; store.set('settings',settings); renderBrain(); renderHD();
   if(speech.playing || speech.q.length) stopSpeech();
+  if(settings.voice.startsWith('dg:')){ if(!dgKey()){ toast('Add your Deepgram key below first'); return; } speakEnqueue(`Hi ${settings.name||'Jim'}, I'm ZeniX. How do I sound?`); return; }
   if(settings.voice!=='phone' && !kokoro){
     kokoroProgress(0); toast('Getting the natural voices ready, you can keep using ZeniX');
     loadKokoro().then(()=>speakEnqueue(`Hi ${settings.name||'Jim'}, I'm ZeniX. How do I sound?`)).catch(()=>toast('Could not load the natural voices. Check your internet.'));
@@ -957,7 +973,83 @@ function applyPhoneVoice(){ if(Native && Native.setPhoneVoice) Native.setPhoneVo
 applyPhoneVoice();
 setTimeout(renderHD, 1500);
 renderBrain();
-if(settings.engine==='own' && settings.voice!=='phone' && navigator.onLine) setTimeout(()=>loadKokoro().catch(()=>{}), 3000);
+if(settings.engine==='own' && settings.voice!=='phone' && !settings.voice.startsWith('dg:') && navigator.onLine) setTimeout(()=>loadKokoro().catch(()=>{}), 3000);
+
+/* ---------- Deepgram: fast cloud ears + Aura voices (middle option) ---------- */
+if(!settings.ears) settings.ears='phone';
+const dgKey = () => (store.get('dgkey','')||'').trim();
+const useDGEars = () => settings.ears==='deepgram' && !!dgKey() && settings.offlineLang!=='fil-PH';
+const DG_VOICES = [['dg:aura-2-thalia-en','Thalia'],['dg:aura-2-andromeda-en','Andromeda'],['dg:aura-2-helena-en','Helena'],['dg:aura-2-luna-en','Luna'],['dg:aura-2-asteria-en','Asteria']];
+const dgWait = {}; let dgSeq = 0;
+function dgTTS(text){
+  return new Promise((resolve, reject) => {
+    const id = 'd'+(++dgSeq); dgWait[id] = {resolve, reject};
+    Native.dgSpeak(id, text, settings.voice.slice(3), dgKey());
+    usage.cost += text.length * 0.00003; store.set('usage', usage);
+  });
+}
+window.zenixDG = (id, b64, err) => {
+  const w = dgWait[id]; if(!w) return; delete dgWait[id];
+  if(err){ if(/401|403/.test(err)) toast('Deepgram key not accepted. Check it in the Me tab.'); return w.reject(new Error(err)); }
+  const bin = atob(b64); const arr = new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++) arr[i] = bin.charCodeAt(i);
+  w.resolve({ toBlob: () => new Blob([arr], {type:'audio/mpeg'}) });
+};
+
+const dg = { ws:null, rec:null, stream:null, buf:'', ka:null, active:false, paused:true, t0:0 };
+async function dgOpen(){
+  dg.stream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true, noiseSuppression:true, autoGainControl:true}});
+  const qs = new URLSearchParams({model:'nova-3', language:'en', smart_format:'true', interim_results:'true', endpointing:'350', utterance_end_ms:'1000', vad_events:'true'});
+  dg.ws = new WebSocket('wss://api.deepgram.com/v1/listen?'+qs.toString(), ['token', dgKey()]);
+  await new Promise((res, rej) => { dg.ws.onopen = res; dg.ws.onerror = () => rej(new Error('Could not connect to Deepgram')); setTimeout(() => rej(new Error('Deepgram timed out')), 8000); });
+  dg.ws.onmessage = (e) => {
+    let m; try{ m = JSON.parse(e.data); }catch(x){ return; }
+    if(m.type==='Results'){
+      const alt = m.channel && m.channel.alternatives && m.channel.alternatives[0];
+      const t = (alt && alt.transcript) || '';
+      if(m.is_final && t) dg.buf += (dg.buf ? ' ' : '') + t;
+      if(!dg.paused && off.kind==='talk') $('liveLine').textContent = 'You: ' + (dg.buf + (m.is_final ? '' : ' ' + t)).trim();
+      if(m.speech_final && dg.buf.trim()) dgFinish();
+    } else if(m.type==='UtteranceEnd' && dg.buf.trim()) dgFinish();
+  };
+  dg.ws.onclose = () => { const was = dg.active; dgClose(); if(was && off.active && off.brain==='own'){ toast('Deepgram disconnected, using phone listening'); offListen(); } };
+  const mime = window.MediaRecorder && MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : '';
+  dg.rec = new MediaRecorder(dg.stream, mime ? {mimeType:mime} : undefined);
+  dg.rec.ondataavailable = (e) => { if(e.data && e.data.size && dg.ws && dg.ws.readyState===1) dg.ws.send(e.data); };
+  dg.rec.start(250); dg.rec.pause(); dg.paused = true; dg.active = true;
+  dg.ka = setInterval(() => { if(dg.ws && dg.ws.readyState===1) dg.ws.send(JSON.stringify({type:'KeepAlive'})); }, 5000);
+}
+function dgTrackTime(){ if(dg.t0){ usage.cost += (Date.now()-dg.t0)/60000 * 0.0048; store.set('usage', usage); dg.t0=0; } }
+function dgPause(){ if(dg.rec && dg.rec.state==='recording') dg.rec.pause(); dg.paused = true; dgTrackTime(); }
+function dgResume(){ dg.buf=''; if(dg.rec && dg.rec.state==='paused') dg.rec.resume(); dg.paused = false; dg.t0 = Date.now(); }
+function dgFinish(){ const t = dg.buf.trim(); dg.buf=''; dgPause(); if(t && window.zenixOnSpeech) window.zenixOnSpeech(t); }
+function dgClose(){
+  dgTrackTime(); dg.active=false; dg.paused=true;
+  clearInterval(dg.ka); dg.ka=null;
+  try{ if(dg.ws && dg.ws.readyState===1){ dg.ws.send(JSON.stringify({type:'CloseStream'})); } }catch(e){}
+  try{ dg.ws && dg.ws.close(); }catch(e){} dg.ws=null;
+  try{ dg.rec && dg.rec.state!=='inactive' && dg.rec.stop(); }catch(e){} dg.rec=null;
+  try{ dg.stream && dg.stream.getTracks().forEach(t=>t.stop()); }catch(e){} dg.stream=null;
+}
+/* Called by offListen for Own brain when Deepgram ears are on */
+function dgListen(){
+  setOrb('listening'); $('modeLabel').textContent='Listening…'; if(Native.setOrbMode) Native.setOrbMode('listening');
+  if(dg.active){ dgResume(); return; }
+  dgOpen().then(() => { if(off.active && off.kind==='talk') dgResume(); })
+    .catch(e => { dgClose(); toast(e.message+' — using phone listening'); if(Native.startListeningOnline) Native.startListeningOnline(settings.offlineLang); });
+}
+
+function renderDG(){
+  document.querySelectorAll('[data-ears]').forEach(b => b.classList.toggle('sel', b.dataset.ears===settings.ears));
+  $('dgState').textContent = dgKey() ? 'Deepgram key saved on this phone ✓' : 'No Deepgram key yet';
+}
+document.querySelectorAll('[data-ears]').forEach(b => b.onclick = () => {
+  if(b.dataset.ears==='deepgram' && !dgKey()){ toast('Add your Deepgram key first'); return; }
+  settings.ears=b.dataset.ears; store.set('settings',settings); renderDG();
+  toast(settings.ears==='deepgram' ? 'Deepgram ears on: faster and more accurate' : 'Using phone listening (free)');
+});
+$('dgSave').onclick = () => { const v=$('dgInput').value.trim(); if(v.length<20){ toast('That does not look like a Deepgram key'); return; } store.set('dgkey', v); $('dgInput').value=''; settings.ears='deepgram'; if(!settings.voice.startsWith('dg:')) settings.voice='dg:aura-2-thalia-en'; store.set('settings',settings); renderDG(); renderBrain(); toast('Deepgram key saved. Ears and voice switched to Deepgram.'); };
+renderDG();
 
 /* ---------- Chat ---------- */
 function sendText(text){
