@@ -170,11 +170,23 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
     <div class="card">
       <h3>Maya brain</h3>
       <div class="seg"><button data-engine="own">Own brain</button><button data-engine="eleven">ElevenLabs</button></div>
-      <p class="muted" style="margin:8px 0">Own brain uses Claude directly with your key: about 60× cheaper and no ElevenLabs credits. ElevenLabs gives the premium Jessica voice.</p>
+      <p class="muted" style="margin:8px 0">Own brain uses your own key (Claude or the Open brain): much cheaper and no ElevenLabs credits. ElevenLabs gives the premium Jessica voice.</p>
       <div id="ownBox">
-        <div class="seg small" style="margin:6px 0"><button data-model="claude-haiku-5-5">Haiku · fast</button><button data-model="claude-sonnet-5-5">Sonnet · smarter</button></div>
-        <p class="muted" id="keyState" style="margin:8px 0 6px"></p>
-        <div class="row"><input type="password" id="keyInput" placeholder="Paste Claude API key (sk-ant-…)" autocomplete="off" style="width:100%;height:46px;border-radius:12px;border:1px solid var(--line);background:var(--surface2);color:var(--text);padding:0 12px;font:14px Inter,sans-serif"><button class="btn-line" id="keySave">Save</button></div>
+        <p class="muted" style="margin:6px 0">Which brain</p>
+        <div class="seg small" style="margin:6px 0"><button data-provider="claude">Claude</button><button data-provider="openrouter">Open brain · Grok</button></div>
+        <div id="claudeBox">
+          <div class="seg small" style="margin:6px 0"><button data-model="claude-haiku-5-5">Haiku · fast</button><button data-model="claude-sonnet-5-5">Sonnet · smarter</button></div>
+          <p class="muted" id="keyState" style="margin:8px 0 6px"></p>
+          <div class="row"><input type="password" id="keyInput" placeholder="Paste Claude API key (sk-ant-…)" autocomplete="off" style="width:100%;height:46px;border-radius:12px;border:1px solid var(--line);background:var(--surface2);color:var(--text);padding:0 12px;font:14px Inter,sans-serif"><button class="btn-line" id="keySave">Save</button></div>
+        </div>
+        <div id="orBox" style="display:none">
+          <p class="muted" style="margin:6px 0 8px">The Open brain runs through OpenRouter: Grok and other more open AIs with one key. Get a key at openrouter.ai → Keys and add a few dollars of credit.</p>
+          <div class="seg small" id="orModels" style="flex-wrap:wrap;margin:6px 0"></div>
+          <div class="row"><input id="orCustom" placeholder="Or type any OpenRouter model id" autocomplete="off" style="width:100%;height:42px;border-radius:12px;border:1px solid var(--line);background:var(--surface2);color:var(--text);padding:0 12px;font:13px Inter,sans-serif"><button class="btn-line" id="orCustomSave">Use</button></div>
+          <p class="muted" id="orState" style="margin:8px 0 6px"></p>
+          <div class="row"><input type="password" id="orInput" placeholder="Paste OpenRouter key (sk-or-…)" autocomplete="off" style="width:100%;height:46px;border-radius:12px;border:1px solid var(--line);background:var(--surface2);color:var(--text);padding:0 12px;font:14px Inter,sans-serif"><button class="btn-line" id="orSave">Save</button></div>
+          <div class="row" style="margin-top:6px"><span></span><button class="btn-line" id="orTest">Test key</button></div>
+        </div>
         <p class="muted" style="margin:10px 0 6px">Voice (tap to hear)</p>
         <div class="seg small" id="voiceBtns" style="flex-wrap:wrap"></div>
         <p class="muted" id="voiceProg" style="display:none;margin-top:6px"></p>
@@ -257,7 +269,7 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
     </div>
     <div class="card">
       <h3>About</h3>
-      <p class="muted">Maya runs on ElevenLabs voice with a Claude brain. Needs internet. Version 2.0 · Android</p>
+      <p class="muted">Maya runs on the brain you pick: Claude, the Open brain (Grok) or ElevenLabs. Needs internet (or the offline brain). Version 2.0 · Android</p>
     </div>
   </section>
 </main>
@@ -657,7 +669,7 @@ function startOffline(kind, brain='offline'){
   if(!Native || !Native.offlineAsk){ toast('This mode needs the Android app'); return false; }
   const goMe = () => document.querySelector('nav button[data-view="settings"]').click();
   if(brain==='offline' && !offlineReady()){ toast('Download the offline brain first (Me tab)'); goMe(); return false; }
-  if(brain==='own' && !getKey()){ toast('Add your Claude API key in the Me tab first'); goMe(); return false; }
+  if(brain==='own' && !brainKey()){ toast(settings.provider==='openrouter' ? 'Add your OpenRouter key in the Me tab first' : 'Add your Claude API key in the Me tab first'); goMe(); return false; }
   off.active=true; off.kind=kind; off.brain=brain; off.endAfterSpeak=false; if(typeof dg!=='undefined') dg.failed=false;
   if(brain==='own'){ $('dot').className='dot on'; $('statusText').textContent='Online'; }
   else { $('dot').className='dot busy'; $('statusText').textContent='Offline'; }
@@ -720,6 +732,10 @@ if(!settings.voice) settings.voice='af_heart';
 let usage = store.get('usage', {inTok:0, outTok:0, cost:0});
 const PRICES = {'claude-haiku-5-5':[0.10,0.50], 'claude-sonnet-5-5':[2,10]};
 const getKey = () => (store.get('apikey','')||'').trim();
+if(!settings.provider) settings.provider='claude';
+if(!settings.orModel) settings.orModel='x-ai/grok-4.3';
+const orKey = () => (store.get('orkey','')||'').trim();
+const brainKey = () => settings.provider==='openrouter' ? orKey() : getKey();
 let ownMsgs = [];
 
 const TOOL_DEFS = [
@@ -836,6 +852,7 @@ function trimOwnMsgs(){
 }
 
 async function ownTurn(userText, speakIt, opts={}){
+  if(settings.provider==='openrouter') return orTurn(userText, speakIt, opts);
   const lastMsg = ownMsgs[ownMsgs.length-1];
   if(lastMsg && lastMsg.role==='user' && Array.isArray(lastMsg.content)) lastMsg.content.push({type:'text', text:userText});
   else ownMsgs.push({role:'user', content:userText});
@@ -867,6 +884,104 @@ async function ownTurn(userText, speakIt, opts={}){
     ownMsgs.push({role:'user', content:results});
     // she already answered and only saved a memory: no need to wait for Claude again
     if(spoken.trim() && calls.length && calls.every(c => c.name==='remember')) break;
+    spoken += ' ';
+  }
+  return spoken.trim();
+}
+
+/* ---------- Open brain: Grok and other open models through OpenRouter (one key) ---------- */
+const OR_MODELS = [
+  ['x-ai/grok-4.3', 'Grok · fast'],
+  ['x-ai/grok-4.7', 'Grok 4.7 · smartest'],
+  ['cognitivecomputations/dolphin-mistral-24b-venice-edition:free', 'Venice · uncensored (free)']
+];
+const OR_PRICES = {'x-ai/grok-4.3':[1.25,2.5], 'x-ai/grok-4.7':[2,6]};
+let orNoTools = store.get('ornotools', {});    // models that can't use phone tools
+let orNoReason = store.get('ornoreason', {});  // models where reasoning can't be switched off
+let orWebOn = true;                            // retried every time the app opens
+
+function orToolList(){
+  const t = TOOL_DEFS.map(d => ({type:'function', function:{name:d.name, description:d.description, parameters:d.input_schema}}));
+  if(orWebOn) t.push({type:'openrouter:web_search', parameters:{max_results:3}});
+  return t;
+}
+
+async function orStream(system, messages, onText, signal){
+  const model = settings.orModel || 'x-ai/grok-4.3';
+  for(let attempt=0; attempt<4; attempt++){
+    const body = { model, stream:true, max_tokens:700, temperature:0.8,
+      messages: [{role:'system', content:system[0]}, {role:'system', content:system[1]}].concat(messages) };
+    if(!orNoTools[model]) body.tools = orToolList();
+    if(!orNoReason[model]) body.reasoning = {effort:'none'};
+    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method:'POST', signal,
+      headers:{'content-type':'application/json', 'authorization':'Bearer '+orKey(), 'HTTP-Referer':'https://github.com/mafiaporce-bit/zenix', 'X-Title':'Maya'},
+      body: JSON.stringify(body)
+    });
+    if(!res.ok){
+      let msg = res.status+''; try{ const j=await res.json(); msg = (j.error&&j.error.message)||msg; }catch(e){}
+      if(res.status===401) throw new Error('Your OpenRouter key is not valid. Check it in the Me tab.');
+      if(res.status===402) throw new Error('Your OpenRouter account is out of credit. Top up at openrouter.ai.');
+      if(res.status===429) throw new Error('The open brain is busy right now, try again in a moment.');
+      if(orWebOn && /web.?search|server.?tool|openrouter:/i.test(msg)){ orWebOn=false; continue; }
+      if(body.tools && /tool|function/i.test(msg)){ orNoTools[model]=true; store.set('ornotools', orNoTools); continue; }
+      if(body.reasoning && /reason|effort|thinking/i.test(msg)){ orNoReason[model]=true; store.set('ornoreason', orNoReason); continue; }
+      throw new Error(msg);
+    }
+    const reader = res.body.getReader(); const dec = new TextDecoder();
+    let buf='', text='', finish=null, cost=null; const calls=[]; const u={inTok:0, outTok:0};
+    for(;;){
+      const {value, done} = await reader.read(); if(done) break;
+      buf += dec.decode(value, {stream:true});
+      let idx;
+      while((idx = buf.indexOf('\n')) >= 0){
+        const line = buf.slice(0, idx).trim(); buf = buf.slice(idx+1);
+        if(!line.startsWith('data:')) continue;           // skips ": OPENROUTER PROCESSING" keep-alives
+        const data = line.slice(5).trim(); if(data==='[DONE]') continue;
+        let ev; try{ ev = JSON.parse(data); }catch(e){ continue; }
+        if(ev.error) throw new Error(ev.error.message || 'Open brain error');
+        if(ev.usage){ u.inTok = ev.usage.prompt_tokens||0; u.outTok = ev.usage.completion_tokens||0; if(typeof ev.usage.cost==='number') cost = ev.usage.cost; }
+        const ch = ev.choices && ev.choices[0]; if(!ch) continue;
+        const d = ch.delta || {};
+        if(d.content){ text += d.content; onText && onText(d.content); }
+        if(d.tool_calls) d.tool_calls.forEach((tc, k) => {
+          const i = typeof tc.index==='number' ? tc.index : k;
+          const c = calls[i] || (calls[i] = {id:'', name:'', args:''});
+          if(tc.id) c.id = tc.id;
+          if(tc.function){ if(tc.function.name) c.name += tc.function.name; if(tc.function.arguments) c.args += tc.function.arguments; }
+        });
+        if(ch.finish_reason) finish = ch.finish_reason;
+      }
+    }
+    if(cost===null){ const p = OR_PRICES[model] || [0,0]; cost = (u.inTok*p[0] + u.outTok*p[1]) / 1e6; }
+    return {text, calls: calls.filter(c => c && c.name).map((c,i) => Object.assign(c, {id: c.id || ('call_'+Date.now()+'_'+i)})), finish, cost, u};
+  }
+  throw new Error('The open brain could not answer. Try another model in the Me tab.');
+}
+
+async function orTurn(userText, speakIt, opts={}){
+  ownMsgs.push({role:'user', content:userText});
+  trimOwnMsgs();
+  let spoken = '', pend = '', said = 0;
+  const feed = t => { if(!speakIt) return; pend += t;
+    let m;
+    while((m = pend.match(/^([\s\S]*?[.!?…](?:\s|$)|[\s\S]*?\n)/)) && m[0].trim().length >= 12){ speakEnqueue(m[0]); said++; pend = pend.slice(m[0].length); }
+    if(!said && (m = pend.match(/^([\s\S]{24,}?[,;:—])\s/))){ speakEnqueue(m[1]); said++; pend = pend.slice(m[0].length); } };
+  for(let round=0; round<5; round++){
+    const r = await orStream(ownSystem(), ownMsgs, t => { spoken += t; feed(t); if(off.kind==='talk' && !speech.hold) $('liveLine').textContent = 'Maya: '+spoken.slice(-160); }, opts.signal);
+    if(speakIt && pend.trim()){ speakEnqueue(pend); pend=''; }
+    usage.inTok += r.u.inTok; usage.outTok += r.u.outTok; usage.cost += r.cost; store.set('usage', usage);
+    const msg = {role:'assistant', content: r.text || (r.calls.length ? null : '')};
+    if(r.calls.length) msg.tool_calls = r.calls.map(c => ({id:c.id, type:'function', function:{name:c.name, arguments:c.args || '{}'}}));
+    if(r.text.trim() || r.calls.length) ownMsgs.push(msg);
+    if(!r.calls.length) break;
+    if(opts.confirmed){ const ok = await opts.confirmed; if(!ok) throw new DOMException('cancelled', 'AbortError'); }   // never act before Jim has really finished
+    for(const c of r.calls){
+      let input = {}; try{ input = c.args ? JSON.parse(c.args) : {}; }catch(e){}
+      let out; try{ out = clientTools[c.name] ? await clientTools[c.name](input) : 'Unknown tool'; }catch(e){ out = 'Error: '+e.message; }
+      ownMsgs.push({role:'tool', tool_call_id:c.id, content:String(out)});
+    }
+    if(spoken.trim() && r.calls.every(c => c.name==='remember')) break;
     spoken += ' ';
   }
   return spoken.trim();
@@ -973,12 +1088,19 @@ function renderBrain(){
   document.querySelectorAll('[data-model]').forEach(b => b.classList.toggle('sel', b.dataset.model===settings.model));
   document.querySelectorAll('[data-voice]').forEach(b => b.classList.toggle('sel', b.dataset.voice===settings.voice));
   $('ownBox').style.display = settings.engine==='own' ? 'block' : 'none';
+  const isOR = settings.provider==='openrouter';
+  document.querySelectorAll('[data-provider]').forEach(b => b.classList.toggle('sel', b.dataset.provider===settings.provider));
+  $('claudeBox').style.display = isOR ? 'none' : 'block';
+  $('orBox').style.display = isOR ? 'block' : 'none';
+  document.querySelectorAll('[data-ormodel]').forEach(b => b.classList.toggle('sel', b.dataset.ormodel===settings.orModel));
+  if(!OR_MODELS.some(m => m[0]===settings.orModel)) $('orCustom').value = settings.orModel;
+  $('orState').textContent = orKey() ? 'OpenRouter key saved on this phone ✓' : 'No OpenRouter key yet';
   $('keyState').textContent = getKey() ? 'API key saved on this phone ✓' : 'No API key yet';
   $('usageText').textContent = `Spent so far on this phone: about $${usage.cost.toFixed(usage.cost<1?4:2)} (${Math.round((usage.inTok+usage.outTok)/1000)}k tokens)`;
 }
 const vbox = $('voiceBtns');
 KOKORO_VOICES.forEach(([id,label]) => { const b=document.createElement('button'); b.dataset.voice=id; b.textContent=label; vbox.appendChild(b); });
-document.querySelectorAll('[data-engine]').forEach(b => b.onclick = () => { settings.engine=b.dataset.engine; store.set('settings',settings); renderBrain(); toast(settings.engine==='own'?'Own brain: Claude direct, ElevenLabs credits not used':'ElevenLabs: premium Jessica voice (uses credits)'); });
+document.querySelectorAll('[data-engine]').forEach(b => b.onclick = () => { settings.engine=b.dataset.engine; store.set('settings',settings); renderBrain(); toast(settings.engine==='own'?'Own brain: your own key, ElevenLabs credits not used':'ElevenLabs: premium Jessica voice (uses credits)'); });
 document.querySelectorAll('[data-model]').forEach(b => b.onclick = () => { settings.model=b.dataset.model; store.set('settings',settings); renderBrain(); });
 document.querySelectorAll('[data-voice]').forEach(b => b.onclick = async () => {
   settings.voice=b.dataset.voice; store.set('settings',settings); renderBrain(); renderHD();
@@ -992,7 +1114,53 @@ document.querySelectorAll('[data-voice]').forEach(b => b.onclick = async () => {
   speakEnqueue(`Hi ${settings.name||'Jim'}, I'm Maya. How do I sound?`);
 });
 $('keySave').onclick = () => { const v=$('keyInput').value.trim(); if(!/^sk-ant-/.test(v)){ toast('That does not look like a Claude API key (starts with sk-ant-)'); return; } store.set('apikey', v); $('keyInput').value=''; renderBrain(); toast('API key saved on this phone only'); };
-$('keyClear').onclick = () => { store.set('apikey',''); renderBrain(); };
+$('keyClear').onclick = () => { if(settings.provider==='openrouter') store.set('orkey',''); else store.set('apikey',''); renderBrain(); };
+
+/* Open brain settings */
+const orBoxEl = $('orModels');
+OR_MODELS.forEach(([id,label]) => { const b=document.createElement('button'); b.dataset.ormodel=id; b.textContent=label; orBoxEl.appendChild(b); });
+function setBrain(provider, model){
+  const changed = provider!==settings.provider || (model && model!==settings.orModel);
+  settings.provider = provider; if(model) settings.orModel = model;
+  store.set('settings', settings);
+  if(changed) ownMsgs.length = 0;   // the two brains keep chats in different formats
+  renderBrain();
+}
+document.querySelectorAll('[data-provider]').forEach(b => b.onclick = () => {
+  setBrain(b.dataset.provider);
+  toast(settings.provider==='openrouter' ? (orKey() ? 'Open brain on: '+(OR_MODELS.find(m=>m[0]===settings.orModel)||[0,settings.orModel])[1] : 'Open brain: paste your OpenRouter key below') : 'Claude brain on');
+});
+document.querySelectorAll('[data-ormodel]').forEach(b => b.onclick = () => {
+  $('orCustom').value = ''; setBrain('openrouter', b.dataset.ormodel);
+  toast(/:free$/.test(b.dataset.ormodel) ? 'Venice: free and uncensored, but slower and no phone skills' : b.textContent+' on');
+});
+$('orCustomSave').onclick = () => {
+  const v = $('orCustom').value.trim();
+  if(!/^[\w.-]+\/[\w.:-]+$/.test(v)){ toast('Model ids look like x-ai/grok-4.3 (copy it from openrouter.ai/models)'); return; }
+  setBrain('openrouter', v); toast('Using '+v);
+};
+$('orSave').onclick = () => {
+  const v = $('orInput').value.trim();
+  if(/^sk-ant-/.test(v)){ toast('That\'s a Claude key. The Open brain needs an OpenRouter key (sk-or-…)'); return; }
+  if(!/^sk-or-/.test(v)){ toast('That does not look like an OpenRouter key (starts with sk-or-)'); return; }
+  store.set('orkey', v); $('orInput').value=''; setBrain('openrouter'); toast('OpenRouter key saved on this phone only');
+  $('orTest').click();
+};
+$('orTest').onclick = async () => {
+  if(!orKey()){ toast('Paste your OpenRouter key first'); return; }
+  $('orState').textContent = 'Testing…';
+  try{
+    const r = await fetch('https://openrouter.ai/api/v1/key', {headers:{authorization:'Bearer '+orKey()}});
+    if(r.status===401){ $('orState').textContent = 'That key was not accepted. Copy it again from openrouter.ai → Keys.'; return; }
+    if(!r.ok){ $('orState').textContent = 'OpenRouter answered '+r.status+'. Try again in a minute.'; return; }
+    const d = ((await r.json())||{}).data || {};
+    let left = '';
+    try{ const c = await fetch('https://openrouter.ai/api/v1/credits', {headers:{authorization:'Bearer '+orKey()}});
+      if(c.ok){ const cd=((await c.json())||{}).data||{}; if(typeof cd.total_credits==='number') left = ` · credit left about $${Math.max(0, cd.total_credits-(cd.total_usage||0)).toFixed(2)}`; } }catch(e){}
+    if(!left && typeof d.limit_remaining==='number') left = ` · credit left about $${d.limit_remaining.toFixed(2)}`;
+    $('orState').textContent = 'Key works ✓' + left + (d.is_free_tier ? ' · add credit to use Grok' : '');
+  }catch(e){ $('orState').textContent = 'Could not reach OpenRouter. Check your internet.'; }
+};
 $('usageReset').onclick = () => { usage={inTok:0,outTok:0,cost:0}; store.set('usage',usage); renderBrain(); };
 function renderHD(){
   const box=$('hdVoices'); if(!box) return; box.innerHTML='';
