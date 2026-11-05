@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0B0F1A">
+<title>ZeniX</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F6F4FB; --surface:#FFFFFF; --surface2:#F0ECF8; --text:#151226; --muted:#6A6483;
+  --line:#E2DCF0; --accent:#8B5CF6; --accent2:#EC4899; --danger:#E5484D; --ok:#16A34A;
+  --bubble-user:#8B5CF6; --bubble-user-text:#fff; --bubble-ai:#FFFFFF;
+  --shadow:0 8px 30px rgba(40,20,80,.08);
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#0D0B17; --surface:#16132A; --surface2:#1F1A3A; --text:#F1EEFF; --muted:#9A93B8;
+    --line:#2A2448; --accent:#A78BFA; --accent2:#F472B6; --bubble-ai:#1F1A3A;
+    --shadow:0 8px 30px rgba(0,0,0,.35);
+  }
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font-family:Inter,system-ui,sans-serif}
+body{display:flex;flex-direction:column;min-height:100dvh;overflow-x:hidden}
+button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
+
+header{padding:calc(env(safe-area-inset-top) + 12px) 16px 10px;display:flex;align-items:center;gap:12px}
+.logo{width:40px;height:40px;border-radius:12px;background:#0D0B17;display:grid;place-items:center;box-shadow:var(--shadow)}
+.brand h1{margin:0;font:700 20px/1 'Space Grotesk',sans-serif;letter-spacing:.5px}
+.brand h1 b{color:var(--accent2)}
+.brand small{color:var(--muted);font-size:12px}
+.status{margin-left:auto;display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);background:var(--surface);padding:7px 11px;border-radius:999px;border:1px solid var(--line)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--muted)}
+.dot.on{background:var(--ok);box-shadow:0 0 0 4px rgba(22,163,74,.18)}
+.dot.busy{background:#F5A524}
+
+main{flex:1;display:flex;flex-direction:column;padding:0 16px;min-height:0}
+.view{display:none;flex:1;flex-direction:column;min-height:0}
+.view.active{display:flex}
+
+.hero{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:10px 0 4px;text-align:center}
+.greet{font:600 22px/1.25 'Space Grotesk',sans-serif;margin:0}
+.sub{color:var(--muted);margin:0;font-size:14px}
+.orb-wrap{position:relative;width:220px;height:220px;display:grid;place-items:center}
+.orb{width:180px;height:180px;border-radius:50%;
+  background:radial-gradient(circle at 35% 30%,#FFE1F2 0%,var(--accent2) 25%,var(--accent) 62%,#2A1761 100%);
+  box-shadow:0 20px 60px rgba(139,92,246,.45), inset 0 -18px 40px rgba(0,0,0,.25);transition:transform .25s ease}
+.ring{position:absolute;inset:0;border-radius:50%;border:2px solid var(--accent2);opacity:0}
+.listening .ring{animation:pulse 1.8s ease-out infinite}
+.listening .ring.r2{animation-delay:.6s}
+.speaking .orb{animation:speak .45s ease-in-out infinite alternate}
+.idle .orb{animation:float 4s ease-in-out infinite}
+@keyframes pulse{0%{transform:scale(.8);opacity:.7}100%{transform:scale(1.15);opacity:0}}
+@keyframes speak{from{transform:scale(.96)}to{transform:scale(1.06)}}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+.mode-label{font-size:13px;font-weight:600;color:var(--accent);min-height:18px;letter-spacing:.3px}
+.live-line{min-height:44px;max-width:340px;font-size:15px;opacity:.9}
+.action{min-height:22px;font-size:12.5px;color:var(--muted)}
+
+.controls{display:flex;gap:14px;justify-content:center;align-items:center;padding:6px 0 14px}
+.btn-main{height:60px;min-width:200px;padding:0 26px;border-radius:999px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;font-weight:600;font-size:16px;display:flex;align-items:center;justify-content:center;gap:10px;box-shadow:0 10px 28px rgba(139,92,246,.35)}
+.btn-main.end{background:var(--danger);box-shadow:0 10px 28px rgba(229,72,77,.3)}
+.btn-round{width:52px;height:52px;border-radius:50%;background:var(--surface);border:1px solid var(--line);display:grid;place-items:center}
+.btn-round.off{background:var(--danger);color:#fff;border-color:var(--danger)}
+.btn-round[disabled]{opacity:.4}
+
+.chat{flex:1;overflow-y:auto;padding:8px 2px 12px;display:flex;flex-direction:column;gap:10px;min-height:0}
+.msg{max-width:84%;padding:11px 14px;border-radius:18px;line-height:1.45;font-size:15px;white-space:pre-wrap;word-wrap:break-word}
+.msg.user{align-self:flex-end;background:var(--bubble-user);color:var(--bubble-user-text);border-bottom-right-radius:6px}
+.msg.ai{align-self:flex-start;background:var(--bubble-ai);border:1px solid var(--line);border-bottom-left-radius:6px}
+.msg time{display:block;font-size:10.5px;opacity:.6;margin-top:4px}
+.sys{align-self:center;font-size:12px;color:var(--muted);background:var(--surface2);padding:5px 10px;border-radius:999px;text-align:center}
+.empty{margin:auto;text-align:center;color:var(--muted);font-size:14px;padding:20px}
+.composer{display:flex;gap:8px;padding:8px 0 12px;align-items:flex-end}
+.composer textarea{flex:1;resize:none;max-height:120px;min-height:48px;border-radius:24px;border:1px solid var(--line);background:var(--surface);color:var(--text);padding:13px 16px;font:15px Inter,sans-serif;outline:none}
+.composer textarea:focus{border-color:var(--accent)}
+.send{width:48px;height:48px;border-radius:50%;background:var(--accent);color:#fff;display:grid;place-items:center;flex-shrink:0}
+.chips{display:flex;gap:8px;overflow-x:auto;padding:2px 0 4px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex-shrink:0;padding:9px 13px;border-radius:999px;background:var(--surface);border:1px solid var(--line);font-size:13px;min-height:38px}
+
+.card{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:16px;margin-bottom:12px;box-shadow:var(--shadow)}
+.card h3{margin:0 0 10px;font:600 16px 'Space Grotesk',sans-serif}
+.row{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:44px}
+.row p{margin:0;font-size:14px}
+.row small{color:var(--muted);display:block;font-size:12px}
+input[type=text]{width:100%;height:46px;border-radius:12px;border:1px solid var(--line);background:var(--surface2);color:var(--text);padding:0 12px;font:14px Inter,sans-serif;outline:none}
+.toggle{width:50px;height:30px;border-radius:999px;background:var(--line);position:relative;flex-shrink:0;transition:.2s}
+.toggle::after{content:'';position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:#fff;transition:.2s}
+.toggle.on{background:var(--accent)}
+.toggle.on::after{left:23px}
+.btn-line{height:44px;padding:0 16px;border-radius:12px;border:1px solid var(--line);background:var(--surface2);font-weight:500;font-size:14px}
+.btn-line.red{color:var(--danger)}
+.settings{overflow-y:auto;padding-bottom:12px}
+.mem{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--line);font-size:14px}
+.mem:first-of-type{border-top:0}
+.mem span{flex:1}
+.mem button{width:36px;height:36px;border-radius:10px;color:var(--danger)}
+.muted{color:var(--muted);font-size:13px;margin:0}
+
+nav{display:flex;justify-content:space-around;background:var(--surface);border-top:1px solid var(--line);padding:6px 8px calc(env(safe-area-inset-bottom) + 6px)}
+nav button{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:11px;color:var(--muted);min-height:50px;justify-content:center;border-radius:12px}
+nav button.active{color:var(--accent);font-weight:600}
+footer{text-align:center;font-size:10.5px;color:var(--muted);padding:8px 16px 10px;background:var(--surface)}
+.toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 96px);transform:translateX(-50%) translateY(20px);background:#1A1530;color:#fff;padding:11px 16px;border-radius:12px;font-size:13px;opacity:0;pointer-events:none;transition:.25s;max-width:90%;text-align:center;z-index:9}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <svg viewBox="0 0 40 40" width="26" height="26"><defs><radialGradient id="lg" cx="40%" cy="35%" r="70%"><stop offset="0" stop-color="#FFE1F2"/><stop offset=".45" stop-color="#EC4899"/><stop offset="1" stop-color="#6D28D9"/></radialGradient></defs><circle cx="20" cy="20" r="16" fill="url(#lg)"/><path d="M14 14h12L14 26h12" stroke="#fff" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </div>
+  <div class="brand"><h1>ZENI<b>X</b></h1><small>Personal AI Assistant</small></div>
+  <div class="status"><span class="dot" id="dot"></span><span id="statusText">Offline</span></div>
+</header>
+
+<main>
+  <section class="view active" id="view-talk">
+    <div class="hero">
+      <p class="greet" id="greet">Hi Jim</p>
+      <p class="sub">Tap the button and just talk to ZeniX</p>
+      <div class="orb-wrap idle" id="orbWrap">
+        <div class="ring"></div><div class="ring r2"></div>
+        <div class="orb"></div>
+      </div>
+      <div class="mode-label" id="modeLabel">Ready when you are</div>
+      <div class="live-line" id="liveLine"></div>
+      <div class="action" id="actionLine"></div>
+    </div>
+    <div class="controls">
+      <button class="btn-round" id="muteBtn" disabled aria-label="Mute microphone">
+        <svg class="i" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+      </button>
+      <button class="btn-main" id="talkBtn">
+        <svg class="i" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+        <span id="talkLabel">Talk to ZeniX</span>
+      </button>
+      <button class="btn-round" id="volBtn" disabled aria-label="Mute ZeniX voice">
+        <svg class="i" viewBox="0 0 24 24"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/></svg>
+      </button>
+    </div>
+  </section>
+
+  <section class="view" id="view-chat">
+    <div class="chat" id="chat"></div>
+    <div class="chips">
+      <button class="chip">What's on my calendar today?</button>
+      <button class="chip">Set an alarm for 5:30 am</button>
+      <button class="chip">Any new messages?</button>
+      <button class="chip">Open Gemini</button>
+    </div>
+    <div class="composer">
+      <textarea id="input" rows="1" placeholder="Message ZeniX…"></textarea>
+      <button class="send" id="sendBtn" aria-label="Send">
+        <svg class="i" viewBox="0 0 24 24"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+      </button>
+    </div>
+  </section>
+
+  <section class="view settings" id="view-settings">
+    <div class="card">
+      <h3>What ZeniX remembers</h3>
+      <div id="memList"></div>
+      <div class="row" style="margin-top:8px">
+        <input type="text" id="memInput" placeholder="Add something for her to remember" maxlength="200">
+        <button class="btn-line" id="memAdd">Add</button>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Phone permissions</h3>
+      <p class="muted" id="permText">Allow calls, contacts, messages, calendar and notifications so ZeniX can help.</p>
+      <div class="row"><span></span><button class="btn-line" id="permBtn">Allow permissions</button></div>
+    </div>
+    <div class="card">
+      <h3>Voice in chat</h3>
+      <div class="row">
+        <div><p>ZeniX speaks chat replies</p><small>Turn off for silent text replies</small></div>
+        <button class="toggle on" id="chatVoiceToggle" aria-label="Toggle voice in chat"></button>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Your name</h3>
+      <input type="text" id="nameInput" placeholder="Jim" maxlength="30">
+    </div>
+    <div class="card">
+      <h3>Conversation history</h3>
+      <div class="row">
+        <div><p id="histCount">0 messages saved</p><small>Stored only on this phone</small></div>
+        <button class="btn-line red" id="clearBtn">Clear</button>
+      </div>
+    </div>
+    <div class="card">
+      <h3>About</h3>
+      <p class="muted">ZeniX runs on ElevenLabs voice with a Claude brain. Needs internet. Version 2.0 · Android</p>
+    </div>
+  </section>
+</main>
+
+<nav>
+  <button class="active" data-view="talk"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/></svg>Talk</button>
+  <button data-view="chat"><svg class="i" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Chat</button>
+  <button data-view="settings"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>Me</button>
+</nav>
+<footer>Copyright © 2026 Zenix_dev@company. All rights reserved. Developed by JPSums</footer>
+<div class="toast" id="toast"></div>
+
+<script type="module">
+import { Conversation } from "https://cdn.jsdelivr.net/npm/@elevenlabs/client/+esm";
+
+const AGENT_ID = "agent_2501m6nhkeb2enqvv0avjabxbz52";
+const $ = id => document.getElementById(id);
+const Native = window.ZenixNative || null; // Android bridge
+
+/* ---------- Storage ---------- */
+const store = {
+  get(k, d){ try{ const v = localStorage.getItem('zenix_'+k); return v ? JSON.parse(v) : d; }catch(e){ return d; } },
+  set(k, v){ try{ localStorage.setItem('zenix_'+k, JSON.stringify(v)); }catch(e){} }
+};
+let history = store.get('history', []);
+let memories = store.get('memories', []);
+let settings = store.get('settings', { name:'Jim', chatVoice:true });
+
+/* ---------- UI helpers ---------- */
+function toast(t){ const el=$('toast'); el.textContent=t; el.classList.add('show'); clearTimeout(toast._t); toast._t=setTimeout(()=>el.classList.remove('show'),2600); }
+function greet(){
+  const h = new Date().getHours();
+  const part = h<5 ? 'Late night' : h<12 ? 'Good morning' : h<17 ? 'Good afternoon' : 'Good evening';
+  $('greet').textContent = `${part}, ${settings.name || 'Jim'}`;
+}
+const fmtTime = ts => new Date(ts).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+function setStatus(s){
+  $('dot').className='dot'+(s==='on'?' on':s==='busy'?' busy':'');
+  $('statusText').textContent = s==='on'?'Online':s==='busy'?'Connecting…':'Offline';
+}
+const setOrb = s => $('orbWrap').className = 'orb-wrap ' + s;
+
+function renderChat(){
+  const c=$('chat'); c.innerHTML='';
+  if(!history.length) c.innerHTML='<div class="empty">Say hi to ZeniX 👋<br>Type below or pick a quick prompt.</div>';
+  history.forEach(m=>{
+    const d=document.createElement('div');
+    if(m.who==='sys'){ d.className='sys'; d.textContent=m.text; }
+    else{ d.className='msg '+m.who; d.textContent=m.text; const t=document.createElement('time'); t.textContent=fmtTime(m.ts); d.appendChild(t); }
+    c.appendChild(d);
+  });
+  c.scrollTop=c.scrollHeight;
+  $('histCount').textContent = `${history.filter(m=>m.who!=='sys').length} messages saved`;
+}
+function addMsg(who, text){
+  if(!text) return;
+  history.push({who, text, ts:Date.now()});
+  if(history.length>300) history = history.slice(-300);
+  store.set('history', history); renderChat();
+}
+function renderMem(){
+  const l=$('memList'); l.innerHTML='';
+  if(!memories.length){ l.innerHTML='<p class="muted">Nothing yet. Tell her "remember that…" in a chat.</p>'; return; }
+  memories.forEach((m,i)=>{
+    const r=document.createElement('div'); r.className='mem';
+    const s=document.createElement('span'); s.textContent=m;
+    const b=document.createElement('button'); b.textContent='✕'; b.setAttribute('aria-label','Forget');
+    b.onclick=()=>{ memories.splice(i,1); store.set('memories',memories); renderMem(); };
+    r.append(s,b); l.appendChild(r);
+  });
+}
+
+/* ---------- Memory for each call ---------- */
+function memoryText(){ return memories.length ? memories.map(m=>'- '+m).join('\n') : 'Nothing saved yet.'; }
+function recentChatText(){
+  const recent = history.filter(m=>m.who!=='sys').slice(-14)
+    .map(m=>(m.who==='user'?'Jim: ':'ZeniX: ')+m.text).join('\n');
+  return recent ? recent.slice(-1800) : 'No previous conversation.';
+}
+
+/* ---------- Phone skills (client tools) ---------- */
+function callNative(method, ...args){
+  if(!Native || typeof Native[method] !== 'function') return null;
+  try{ return JSON.parse(Native[method](...args.map(a => a==null ? '' : String(a)))); }
+  catch(e){ return { ok:false, message:'Phone action failed: '+e.message }; }
+}
+function webFallback(url){ try{ window.open(url, '_blank'); return {ok:true, message:'Opened on the phone.'}; }catch(e){ return {ok:false,message:'Could not open it.'}; } }
+function showAction(t){ $('actionLine').textContent = t; addMsg('sys', t); }
+const reply = r => (r && r.message) ? r.message : JSON.stringify(r);
+
+const clientTools = {
+  set_alarm: async ({hour, minute, label}) => {
+    showAction(`⏰ Alarm ${String(hour).padStart(2,'0')}:${String(minute).padStart(2,'0')}`);
+    return reply(callNative('setAlarm', hour, minute, label||'ZeniX alarm') || {ok:false, message:'Alarms only work in the Android app.'});
+  },
+  set_reminder: async ({text, minutes_from_now}) => {
+    showAction(`🔔 Reminder in ${minutes_from_now} min: ${text}`);
+    return reply(callNative('setReminder', text, minutes_from_now) || {ok:false, message:'Reminders only work in the Android app.'});
+  },
+  open_app: async ({app_name}) => {
+    showAction(`📱 Opening ${app_name}`);
+    return reply(callNative('openApp', app_name) || {ok:false, message:'Opening apps only works in the Android app.'});
+  },
+  make_call: async ({contact}) => {
+    showAction(`📞 Calling ${contact}`);
+    return reply(callNative('makeCall', contact) || webFallback('tel:'+contact.replace(/[^\d+]/g,'')));
+  },
+  send_message: async ({contact, message, app}) => {
+    showAction(`💬 ${app} to ${contact}`);
+    return reply(callNative('sendMessage', contact, message, app) || {ok:false, message:'Messaging only works in the Android app.'});
+  },
+  read_messages: async ({contact, count}) => {
+    showAction('📨 Reading messages');
+    return reply(callNative('readMessages', contact||'', count||5) || {ok:false, message:'Reading messages only works in the Android app.'});
+  },
+  compose_email: async ({to, subject, body}) => {
+    showAction(`✉️ Email: ${subject}`);
+    return reply(callNative('composeEmail', to||'', subject, body) ||
+      webFallback(`mailto:${encodeURIComponent(to||'')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`));
+  },
+  check_calendar: async ({days_from_today, num_days}) => {
+    showAction('📅 Checking calendar');
+    return reply(callNative('checkCalendar', days_from_today||0, num_days||1) || {ok:false, message:'Calendar only works in the Android app.'});
+  },
+  add_calendar_event: async ({title, start_iso, duration_minutes, location}) => {
+    showAction(`📅 Adding: ${title}`);
+    return reply(callNative('addCalendarEvent', title, start_iso, duration_minutes||60, location||'') || {ok:false, message:'Calendar only works in the Android app.'});
+  },
+  web_search: async ({query}) => {
+    showAction(`🔎 ${query}`);
+    const isUrl = /^(https?:\/\/|www\.)|\.[a-z]{2,}(\/|$)/i.test(query) && !/\s/.test(query);
+    const url = isUrl ? (query.startsWith('http') ? query : 'https://'+query) : 'https://www.google.com/search?q='+encodeURIComponent(query);
+    return reply(callNative('openUrl', url) || webFallback(url));
+  },
+  remember: async ({fact}) => {
+    if(fact && !memories.includes(fact)){ memories.push(fact); if(memories.length>60) memories.shift(); store.set('memories', memories); renderMem(); }
+    showAction('🧠 Remembered');
+    return 'Saved. I will remember that.';
+  }
+};
+
+/* ---------- Connection ---------- */
+let convo=null, connecting=false, micMuted=false, voiceMuted=false, session=null, pendingText=null;
+
+async function ensureMic(){
+  if(Native && Native.hasMicPermission && Native.hasMicPermission()!=='true'){
+    Native.requestPermissions(); return false;
+  }
+  try{ const s = await navigator.mediaDevices.getUserMedia({audio:true}); s.getTracks().forEach(t=>t.stop()); return true; }
+  catch(e){ return false; }
+}
+
+async function startSession(kind){
+  if(convo || connecting) return;
+  connecting=true; session=kind; setStatus('busy');
+  if(kind==='talk'){ $('modeLabel').textContent='Connecting to ZeniX…'; $('talkLabel').textContent='Connecting…'; }
+  if(!(await ensureMic())){
+    connecting=false; session=null; setStatus('off'); resetTalkUI();
+    toast('Allow the microphone, then tap again'); return;
+  }
+  try{
+    convo = await Conversation.startSession({
+      agentId: AGENT_ID,
+      connectionType: 'webrtc',
+      dynamicVariables: { user_name: settings.name||'Jim', memory: memoryText(), recent_chat: recentChatText() },
+      clientTools,
+      onConnect: () => {
+        setStatus('on');
+        addMsg('sys', kind==='talk' ? 'Voice chat started' : 'Chat connected');
+        if(kind==='chat'){ convo.setMicMuted(true); micMuted=true; if(!settings.chatVoice) convo.setVolume({volume:0}); }
+        if(Native && Native.keepAwake) Native.keepAwake('true');
+      },
+      onDisconnect: () => { convo=null; session=null; setStatus('off'); resetTalkUI(); addMsg('sys','ZeniX disconnected'); if(Native && Native.keepAwake) Native.keepAwake('false'); },
+      onError: (err) => { console.error(err); toast('ZeniX had a connection problem'); },
+      onMessage: (m) => {
+        const who = (m.source || m.role) === 'user' ? 'user' : 'ai';
+        const text = m.message || m.text || '';
+        if(who==='user' && session==='chat') return;
+        addMsg(who, text);
+        if(session==='talk') $('liveLine').textContent = (who==='ai'?'ZeniX: ':'You: ') + text;
+      },
+      onModeChange: ({mode}) => {
+        if(session!=='talk') return;
+        if(mode==='speaking'){ setOrb('speaking'); $('modeLabel').textContent='ZeniX is speaking'; }
+        else { setOrb('listening'); $('modeLabel').textContent = micMuted ? 'Mic muted' : 'Listening…'; }
+      }
+    });
+    if(kind==='talk'){
+      $('talkBtn').classList.add('end'); $('talkLabel').textContent='End chat';
+      $('muteBtn').disabled=false; $('volBtn').disabled=false;
+      setOrb('listening'); $('modeLabel').textContent='Listening…';
+    }
+    if(pendingText){ convo.sendUserMessage(pendingText); pendingText=null; }
+  }catch(e){
+    console.error(e); convo=null; session=null; setStatus('off'); resetTalkUI();
+    toast('Could not reach ZeniX. Check your internet.');
+  }finally{ connecting=false; }
+}
+async function endSession(){
+  if(!convo) return;
+  try{ await convo.endSession(); }catch(e){}
+  convo=null; session=null; setStatus('off'); resetTalkUI();
+}
+function resetTalkUI(){
+  $('talkBtn').classList.remove('end'); $('talkLabel').textContent='Talk to ZeniX';
+  $('muteBtn').disabled=true; $('volBtn').disabled=true;
+  $('muteBtn').classList.remove('off'); $('volBtn').classList.remove('off');
+  micMuted=false; voiceMuted=false;
+  setOrb('idle'); $('modeLabel').textContent='Ready when you are'; $('liveLine').textContent=''; $('actionLine').textContent='';
+}
+
+$('talkBtn').onclick = async () => {
+  if(convo && session==='talk') return endSession();
+  if(convo && session==='chat') await endSession();
+  startSession('talk');
+};
+$('muteBtn').onclick = () => { if(!convo) return; micMuted=!micMuted; convo.setMicMuted(micMuted); $('muteBtn').classList.toggle('off',micMuted); $('modeLabel').textContent = micMuted?'Mic muted':'Listening…'; };
+$('volBtn').onclick = () => { if(!convo) return; voiceMuted=!voiceMuted; convo.setVolume({volume:voiceMuted?0:1}); $('volBtn').classList.toggle('off',voiceMuted); };
+
+/* ---------- Chat ---------- */
+function sendText(text){
+  text=text.trim(); if(!text) return;
+  addMsg('user', text); $('input').value=''; autoGrow();
+  if(convo){ convo.sendUserMessage(text); return; }
+  pendingText=text; startSession('chat');
+}
+$('sendBtn').onclick = () => sendText($('input').value);
+$('input').addEventListener('keydown', e => { if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); sendText($('input').value); } });
+function autoGrow(){ const t=$('input'); t.style.height='auto'; t.style.height=Math.min(t.scrollHeight,120)+'px'; }
+$('input').addEventListener('input', autoGrow);
+document.querySelectorAll('.chip').forEach(c => c.onclick = () => sendText(c.textContent));
+
+/* ---------- Tabs ---------- */
+document.querySelectorAll('nav button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('nav button').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  b.classList.add('active'); $('view-'+b.dataset.view).classList.add('active');
+  if(b.dataset.view==='chat') renderChat();
+});
+
+/* ---------- Me tab ---------- */
+$('memAdd').onclick = () => { const v=$('memInput').value.trim(); if(!v) return; memories.push(v); store.set('memories',memories); $('memInput').value=''; renderMem(); toast('ZeniX will remember that'); };
+$('permBtn').onclick = () => { if(Native && Native.requestPermissions){ Native.requestPermissions(); } else toast('Permissions are for the Android app'); };
+if(!Native){ $('permText').textContent='You are using the web version. Install the Android app for alarms, calls, messages and calendar.'; }
+$('nameInput').value = settings.name || '';
+$('nameInput').addEventListener('input', e => { settings.name=e.target.value.trim()||'Jim'; store.set('settings',settings); greet(); });
+const vt=$('chatVoiceToggle'); vt.classList.toggle('on', settings.chatVoice);
+vt.onclick = () => { settings.chatVoice=!settings.chatVoice; vt.classList.toggle('on',settings.chatVoice); store.set('settings',settings); if(convo && session==='chat') convo.setVolume({volume:settings.chatVoice?1:0}); };
+$('clearBtn').onclick = () => { if(confirm('Clear all chat history?')){ history=[]; store.set('history',history); renderChat(); toast('History cleared'); } };
+
+greet(); renderChat(); renderMem(); setInterval(greet, 60000);
+</script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="ZenixTheme" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/zenix_bg</item>
+        <item name="android:statusBarColor">@color/zenix_bg</item>
+        <item name="android:navigationBarColor">@color/zenix_bg</item>
+    </style>
+    <color name="zenix_bg">#0D0B17</color>
+    <color name="zenix_icon_bg">#1A1233</color>
+</resources>
