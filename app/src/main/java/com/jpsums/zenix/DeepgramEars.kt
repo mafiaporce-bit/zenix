@@ -31,9 +31,14 @@ class DeepgramEars(private val activity: MainActivity) {
     private fun js(code: String) = activity.runJs(code)
     private fun q(v: String) = JSONObject.quote(v)
 
-    fun open(key: String, lang: String) {
+    @Volatile private var flux = false
+
+    fun open(key: String, lang: String, useFlux: Boolean = false) {
         if (ws != null) { js("window.zenixDGOpen && window.zenixDGOpen(true, '')"); return }
-        val url = "wss://api.deepgram.com/v1/listen?model=nova-3&language=$lang&encoding=linear16&sample_rate=16000&channels=1" +
+        flux = useFlux
+        val url = if (useFlux)
+            "wss://api.deepgram.com/v2/listen?model=flux-general-en&encoding=linear16&sample_rate=16000&eot_threshold=0.75&eager_eot_threshold=0.5&eot_timeout_ms=4000"
+        else "wss://api.deepgram.com/v1/listen?model=nova-3&language=$lang&encoding=linear16&sample_rate=16000&channels=1" +
             "&smart_format=true&interim_results=true&endpointing=350&utterance_end_ms=1000&vad_events=true"
         val req = Request.Builder().url(url).header("Authorization", "Token $key").build()
         ws = client.newWebSocket(req, object : WebSocketListener() {
@@ -69,7 +74,8 @@ class DeepgramEars(private val activity: MainActivity) {
             r.startRecording()
             rec = r
             thread(name = "zenix-dg-mic") {
-                val buf = ByteArray(3200) // 100 ms of audio
+                val buf = ByteArray(if (flux) 2560 else 3200) // 80 ms (Flux) or 100 ms of audio
+                val silence = ByteArray(buf.size)
                 var lastKeepAlive = System.currentTimeMillis()
                 while (rec === r) {
                     val n = try { r.read(buf, 0, buf.size) } catch (_: Exception) { -1 }
@@ -83,6 +89,8 @@ class DeepgramEars(private val activity: MainActivity) {
                         val rms = Math.sqrt(sum / (n / 2).coerceAtLeast(1)) / 32768.0
                         val lvl = (rms * 9).coerceIn(0.0, 1.0)
                         js("window.zenixRms && window.zenixRms(${"%.2f".format(java.util.Locale.US, lvl)})")
+                    } else if (flux && n > 0) {
+                        socket.send(silence.toByteString(0, n))   // Flux likes a continuous stream; send silence while Maya talks
                     } else if (System.currentTimeMillis() - lastKeepAlive > 4000) {
                         socket.send("{\"type\":\"KeepAlive\"}")
                         lastKeepAlive = System.currentTimeMillis()

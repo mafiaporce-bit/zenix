@@ -60,6 +60,7 @@ class ZenixBridge(private val activity: MainActivity) {
     @JavascriptInterface fun stopSpeaking(): String { activity.brain.stopSpeaking(); return ok("stopped") }
     // ---------- Deepgram ears (native) ----------
     @JavascriptInterface fun dgOpen(key: String, lang: String): String { activity.ears.open(key, lang); return ok("opening") }
+    @JavascriptInterface fun dgOpenFlux(key: String): String { activity.ears.open(key, "en", true); return ok("opening") }
     @JavascriptInterface fun dgSending(on: String): String { activity.ears.setSending(on == "true"); return ok("ok") }
     @JavascriptInterface fun dgClose(): String { activity.ears.close(); return ok("closed") }
     @JavascriptInterface fun dgTest(key: String): String { activity.ears.test(key); return ok("testing") }

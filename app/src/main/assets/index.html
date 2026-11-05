@@ -613,11 +613,13 @@ function offListen(){
 }
 window.zenixOnListening = () => { if(off.active && off.kind==='talk') $('modeLabel').textContent = off.brain==='own' ? 'Listening…' : 'Listening… (offline)'; };
 let partialTimer=null;
+const HANGING = /\b(and|or|but|so|because|cause|at|to|the|a|an|for|with|from|of|in|on|into|about|around|like|um+|uh+|uhm|er|ah|my|your|his|her|is|are|was|if|when|then|that|this|can|could|would|will|maybe|also|plus|please|ng|sa|na|yung|ang|mga|kasi|tapos|pero|para|si|ni|kay)$/i;
+function endWait(t){ const w=(t||'').trim().toLowerCase().replace(/[.,!?…]+$/,''); return HANGING.test(w) ? 2300 : 1150; }
 window.zenixOnPartial = (t) => {
   if(!(off.active && off.kind==='talk')) return;
   $('liveLine').textContent='You: '+t;
   clearTimeout(partialTimer);
-  if(t && t.trim().split(/\s+/).length>=1) partialTimer = setTimeout(()=>{ if(Native.finishListening) Native.finishListening(); }, 900);
+  if(t && t.trim()) partialTimer = setTimeout(()=>{ if(Native.finishListening) Native.finishListening(); }, endWait(t));
 };
 window.zenixOnSpeech = async (t) => {
   clearTimeout(partialTimer);
@@ -769,10 +771,10 @@ function cleanMsgs(messages){
   }
   return out;
 }
-async function claudeStream(system, messages, onText){
+async function claudeStream(system, messages, onText, signal){
   messages = cleanMsgs(messages);
   const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method:'POST',
+    method:'POST', signal,
     headers:{'content-type':'application/json','x-api-key':getKey(),'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
     body: JSON.stringify(Object.assign({ model:settings.model, max_tokens:700, stream:true,
       system:[{type:'text', text:system[0], cache_control:{type:'ephemeral'}}, {type:'text', text:system[1]}],
@@ -783,8 +785,8 @@ async function claudeStream(system, messages, onText){
     let msg = res.status+''; try{ const j=await res.json(); msg = (j.error&&j.error.message)||msg; }catch(e){}
     if(res.status===401) msg='Your Claude API key is not valid. Check it in the Me tab.';
     if(res.status===400 && /credit/i.test(msg)) msg='Your Claude API account is out of credit. Top up at platform.claude.com.';
-    if(res.status===400 && webSearchOn && /web.?search/i.test(msg)){ webSearchOn=false; store.set('websearch', false); return claudeStream(system, messages, onText); }
-    if(res.status===400 && fastMode && /thinking|effort|output_config/i.test(msg)){ fastMode=false; store.set('fastmode', false); return claudeStream(system, messages, onText); }
+    if(res.status===400 && webSearchOn && /web.?search/i.test(msg)){ webSearchOn=false; store.set('websearch', false); return claudeStream(system, messages, onText, signal); }
+    if(res.status===400 && fastMode && /thinking|effort|output_config/i.test(msg)){ fastMode=false; store.set('fastmode', false); return claudeStream(system, messages, onText, signal); }
     throw new Error(msg);
   }
   const reader = res.body.getReader(); const dec = new TextDecoder();
@@ -823,7 +825,7 @@ function trimOwnMsgs(){
   }
 }
 
-async function ownTurn(userText, speakIt){
+async function ownTurn(userText, speakIt, opts={}){
   const lastMsg = ownMsgs[ownMsgs.length-1];
   if(lastMsg && lastMsg.role==='user' && Array.isArray(lastMsg.content)) lastMsg.content.push({type:'text', text:userText});
   else ownMsgs.push({role:'user', content:userText});
@@ -834,7 +836,7 @@ async function ownTurn(userText, speakIt){
     while((m = pend.match(/^([\s\S]*?[.!?…](?:\s|$)|[\s\S]*?\n)/)) && m[0].trim().length >= 12){ speakEnqueue(m[0]); said++; pend = pend.slice(m[0].length); }
     if(!said && (m = pend.match(/^([\s\S]{24,}?[,;:—])\s/))){ speakEnqueue(m[1]); said++; pend = pend.slice(m[0].length); } };
   for(let round=0; round<5; round++){
-    const r = await claudeStream(ownSystem(), ownMsgs, t => { spoken += t; feed(t); if(off.kind==='talk') $('liveLine').textContent = 'Maya: '+spoken.slice(-160); });
+    const r = await claudeStream(ownSystem(), ownMsgs, t => { spoken += t; feed(t); if(off.kind==='talk' && !speech.hold) $('liveLine').textContent = 'Maya: '+spoken.slice(-160); }, opts.signal);
     if(speakIt && pend.trim()){ speakEnqueue(pend); pend=''; }
     const p = PRICES[settings.model] || PRICES['claude-haiku-5-5'];
     usage.inTok += r.u.inTok; usage.outTok += r.u.outTok; usage.cost += (r.u.inTok*p[0] + r.u.outTok*p[1]) / 1e6 + 0.01*(r.u.searches||0); store.set('usage', usage);
@@ -846,6 +848,7 @@ async function ownTurn(userText, speakIt){
     if(r.stop === 'pause_turn') continue;
     if(r.stop !== 'tool_use') break;
     const calls = content.filter(c => c.type==='tool_use');
+    if(opts.confirmed){ const ok = await opts.confirmed; if(!ok) throw new DOMException('cancelled', 'AbortError'); }   // never act before Jim has really finished
     const results = [];
     for(const c of calls){
       let out; try{ out = clientTools[c.name] ? await clientTools[c.name](c.input||{}) : 'Unknown tool'; }catch(e){ out = 'Error: '+e.message; }
@@ -907,7 +910,7 @@ function speakEnqueue(text){
   speech.q.push(item); pumpSpeech();
 }
 async function pumpSpeech(){
-  if(speech.playing) return;
+  if(speech.playing || speech.hold) return;
   const item = speech.q.shift();
   if(!item){ if(!speech.streamOpen && speech.onIdle){ const f=speech.onIdle; speech.onIdle=null; f(); } return; }
   if(typeof dg!=='undefined' && dg.active && !dg.paused) dgPause();
@@ -928,20 +931,21 @@ async function pumpSpeech(){
   if(Native && Native.setOrbMode) Native.setOrbMode('listening');
   pumpSpeech();
 }
-function stopSpeech(){ speech.q=[]; speech.streamOpen=false; speech.onIdle=null; try{ speech.audio.pause(); }catch(e){} try{ Native.stopSpeaking(); }catch(e){} if(nativeSpeakResolve){ const r=nativeSpeakResolve; nativeSpeakResolve=null; r(); } speech.playing=false; }
+function stopSpeech(){ speech.hold=false; speech.q=[]; speech.streamOpen=false; speech.onIdle=null; try{ speech.audio.pause(); }catch(e){} try{ Native.stopSpeaking(); }catch(e){} if(nativeSpeakResolve){ const r=nativeSpeakResolve; nativeSpeakResolve=null; r(); } speech.playing=false; }
 
 let turnStart = 0;
-async function ownRespond(text, speakIt, after){
-  turnStart = performance.now();
+async function ownRespond(text, speakIt, after, opts={}){
+  if(!opts.quiet){ turnStart = performance.now(); $('modeLabel').textContent = 'Thinking…'; setOrb('thinking'); }
   speech.streamOpen = true; speech.onIdle = after || null;
-  $('modeLabel').textContent = 'Thinking…'; setOrb('thinking');
   let full = '';
-  try{ full = await ownTurn(text, speakIt); }
+  try{ full = await ownTurn(text, speakIt, opts); }
   catch(e){
+    if(e.name==='AbortError' || (opts.isCancelled && opts.isCancelled())) return;
     if(settings.mode==='auto' && offlineReady() && /fetch|network|Failed/i.test(e.message)){ speech.streamOpen=false; toast('No connection — offline brain answering'); const r=await offlineHandle(text); if(speakIt) speakEnqueue(r); addMsg('ai', r); pumpSpeech(); return; }
     full = 'Sorry bro, I couldn\'t reach my brain. ' + e.message;
     if(speakIt) speakEnqueue(full);
   }
+  if(opts.confirmed){ const ok = await opts.confirmed; if(!ok || (opts.isCancelled && opts.isCancelled())) return; }
   if(full) addMsg('ai', full);
   speech.streamOpen = false; pumpSpeech();
 }
@@ -1022,6 +1026,15 @@ window.zenixDG = (id, b64, err) => {
 const dg = { active:false, paused:true, buf:'', t0:0, opening:null, failed:false };
 window.zenixDGMsg = (txt) => {
   let m; try{ m = JSON.parse(txt); }catch(x){ return; }
+  if(m.type==='TurnInfo'){
+    if(dg.paused) return;
+    const t = (m.transcript||'').trim();
+    if(m.event==='Update' || m.event==='StartOfTurn'){ if(t && off.kind==='talk') $('liveLine').textContent = 'You: '+t; }
+    else if(m.event==='EagerEndOfTurn'){ if(t) dgEager(t); }
+    else if(m.event==='TurnResumed'){ dgCancelEager(); }
+    else if(m.event==='EndOfTurn'){ if(t) dgFinal(t); }
+    return;
+  }
   if(m.type==='Results'){
     const alt = m.channel && m.channel.alternatives && m.channel.alternatives[0];
     const t = (alt && alt.transcript) || '';
@@ -1035,17 +1048,49 @@ window.zenixDGOpen = (ok, err) => { const w=dg.opening; dg.opening=null; if(!w) 
 window.zenixDGClosed = () => { const was=dg.active; dg.active=false; dg.paused=true; if(was && off.active && off.brain==='own' && off.kind==='talk'){ dg.failed=true; toast('Deepgram disconnected, using phone listening'); offListen(); } };
 window.zenixDGTest = (ok, msg) => { $('dgState').textContent = ok ? 'Deepgram key works ✓' : ('✗ '+msg); if(!ok) toast(msg); };
 function dgOpen(){
-  return new Promise((res, rej) => {
+  const attempt = (flux) => new Promise((res, rej) => {
     if(!Native || !Native.dgOpen) return rej(new Error('Deepgram needs the Android app'));
-    dg.opening = {resolve:res, reject:rej}; Native.dgOpen(dgKey(), 'en');
+    dg.opening = {resolve:res, reject:rej};
+    flux ? Native.dgOpenFlux(dgKey()) : Native.dgOpen(dgKey(), 'en');
     setTimeout(() => { if(dg.opening){ dg.opening=null; rej(new Error('Deepgram timed out')); } }, 10000);
-  }).then(() => { dg.active=true; dg.paused=true; });
+  });
+  const tryFlux = !!(Native && Native.dgOpenFlux) && !dg.noFlux;
+  return attempt(tryFlux)
+    .catch(e => { if(tryFlux && !/not accepted/.test(e.message)){ dg.noFlux = true; return attempt(false); } throw e; })
+    .then(() => { dg.active=true; dg.paused=true; dg.flux = tryFlux && !dg.noFlux; });
+}
+/* Flux head start: prepare the answer at "probably done", speak only at "definitely done" */
+let specTurn = null;
+const normT = t => t.toLowerCase().replace(/[^a-z0-9 ]/g,'').replace(/\s+/g,' ').trim();
+const isStopWord = t => /^(stop|bye|goodbye|end chat|that's all|tapos na)\b/i.test(t.trim());
+function startSpeculative(t){
+  const snapLen = ownMsgs.length, snapLast = snapLen ? JSON.stringify(ownMsgs[snapLen-1]) : null;
+  const ctl = new AbortController(); let go; const confirmed = new Promise(r => go = r); let cancelled = false;
+  speech.hold = true;
+  ownRespond(t, true, () => offListen(), {signal:ctl.signal, confirmed, quiet:true, isCancelled:() => cancelled});
+  return {
+    text: t,
+    cancel(){ cancelled = true; try{ ctl.abort(); }catch(e){} stopSpeech(); ownMsgs.length = snapLen; if(snapLast) ownMsgs[snapLen-1] = JSON.parse(snapLast); go(false); },
+    confirm(){ turnStart = performance.now(); $('modeLabel').textContent='Thinking…'; setOrb('thinking'); speech.hold = false; go(true); pumpSpeech(); }
+  };
+}
+function dgEager(t){
+  if(!(off.active && off.brain==='own' && off.kind==='talk') || isStopWord(t)) return;
+  if(specTurn && normT(specTurn.text)===normT(t)) return;
+  dgCancelEager(); specTurn = startSpeculative(t);
+}
+function dgCancelEager(){ if(specTurn){ const s=specTurn; specTurn=null; s.cancel(); } }
+function dgFinal(t){
+  dgPause();
+  if(specTurn && normT(specTurn.text)===normT(t)){ const s=specTurn; specTurn=null; addMsg('user', t); $('liveLine').textContent='You: '+t; s.confirm(); return; }
+  dgCancelEager();
+  if(window.zenixOnSpeech) window.zenixOnSpeech(t);
 }
 function dgTrackTime(){ if(dg.t0){ usage.cost += (Date.now()-dg.t0)/60000 * 0.0048; store.set('usage', usage); dg.t0=0; } }
 function dgPause(){ if(Native && Native.dgSending) Native.dgSending('false'); dg.paused=true; dgTrackTime(); }
 function dgResume(){ dg.buf=''; if(Native && Native.dgSending) Native.dgSending('true'); dg.paused=false; dg.t0=Date.now(); }
 function dgFinish(){ const t=dg.buf.trim(); dg.buf=''; dgPause(); if(t && window.zenixOnSpeech) window.zenixOnSpeech(t); }
-function dgClose(){ dgTrackTime(); const was=dg.active; dg.active=false; dg.paused=true; if(was && Native && Native.dgClose) Native.dgClose(); }
+function dgClose(){ if(typeof specTurn!=='undefined' && specTurn) dgCancelEager(); dgTrackTime(); const was=dg.active; dg.active=false; dg.paused=true; if(was && Native && Native.dgClose) Native.dgClose(); }
 /* Called by offListen for Own brain when Deepgram ears are on */
 function dgListen(){
   setOrb('listening'); $('modeLabel').textContent='Listening…'; if(Native.setOrbMode) Native.setOrbMode('listening');
