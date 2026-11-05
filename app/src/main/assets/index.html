@@ -204,6 +204,14 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
           <p class="muted" id="dgState" style="margin:10px 0 6px"></p>
           <div class="row"><input type="password" id="dgInput" placeholder="Paste Deepgram API key" autocomplete="off" style="width:100%;height:46px;border-radius:12px;border:1px solid var(--line);background:var(--surface2);color:var(--text);padding:0 12px;font:14px Inter,sans-serif"><button class="btn-line" id="dgSave">Save</button></div>
         </div>
+        <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line)">
+          <h3 style="font-size:15px">ElevenLabs voices</h3>
+          <p class="muted" style="margin:4px 0 8px">The best-sounding voices, including your own from ElevenLabs, with any brain above. Uses your ElevenLabs credits (about half a credit per letter spoken). Speaks Tagalog too.</p>
+          <div class="seg small" id="elVoiceBtns" style="flex-wrap:wrap"></div>
+          <p class="muted" id="elState" style="margin:10px 0 6px"></p>
+          <div class="row"><input type="password" id="elInput" placeholder="Paste ElevenLabs API key" autocomplete="off" style="width:100%;height:46px;border-radius:12px;border:1px solid var(--line);background:var(--surface2);color:var(--text);padding:0 12px;font:14px Inter,sans-serif"><button class="btn-line" id="elSave">Save</button></div>
+          <div class="row" style="margin-top:6px"><button class="btn-line red" id="elClear">Remove key</button><button class="btn-line" id="elRefresh">Refresh voices</button></div>
+        </div>
         <div class="row" style="margin-top:6px"><p class="muted" id="usageText"></p><button class="btn-line" id="usageReset">Reset</button></div>
         <div class="row"><span></span><button class="btn-line red" id="keyClear">Remove key</button></div>
       </div>
@@ -679,7 +687,7 @@ function startOffline(kind, brain='offline'){
     $('talkBtn').classList.add('end'); $('talkLabel').textContent='End chat';
     if(Native.keepAwake) Native.keepAwake('true');
     if(brain==='own'){
-      if(settings.voice!=='phone' && !settings.voice.startsWith('dg:')) loadKokoro().catch(()=>{});
+      if(settings.voice!=='phone' && !/^(dg|el):/.test(settings.voice)) loadKokoro().catch(()=>{});
       speech.onIdle = () => offListen();
       speakEnqueue(wakeGreeting ? 'Yes bro?' : `Hey ${settings.name||'Jim'}! What's up?`); wakeGreeting = false;
     } else offlineSay(`Hey ${settings.name||'Jim'}, offline Maya here. What's up?`, true);
@@ -1028,10 +1036,12 @@ function nativeSay(text, lang){ return new Promise(res => { nativeSpeakResolve =
 function speakEnqueue(text){
   text = text.replace(/[*_#`>]/g,'').replace(/\s+/g,' ').trim(); if(!text) return;
   const item = { text, wav:null };
+  if(settings.voice.startsWith('el:') && elKey()){ item.wav = elTTS(text).catch(()=>null); speech.q.push(item); pumpSpeech(); return; }
   if(settings.voice.startsWith('dg:') && dgKey() && !isTagalog(text)){ item.wav = dgTTS(text).catch(()=>null); speech.q.push(item); pumpSpeech(); return; }
-  const usePhone = settings.voice==='phone' || settings.voice.startsWith('dg:') || isTagalog(text) || !kokoro;
+  const cloudVoice = settings.voice.startsWith('dg:') || settings.voice.startsWith('el:');
+  const usePhone = settings.voice==='phone' || cloudVoice || isTagalog(text) || !kokoro;
   if(!usePhone){ item.wav = genChain = genChain.then(() => kokoro.generate(text, {voice:settings.voice})).catch(() => null); }
-  else if(settings.voice!=='phone' && !settings.voice.startsWith('dg:') && !kokoro){ loadKokoro().catch(()=>{}); }
+  else if(settings.voice!=='phone' && !cloudVoice && !kokoro){ loadKokoro().catch(()=>{}); }
   speech.q.push(item); pumpSpeech();
 }
 async function pumpSpeech(){
@@ -1096,15 +1106,16 @@ function renderBrain(){
   if(!OR_MODELS.some(m => m[0]===settings.orModel)) $('orCustom').value = settings.orModel;
   $('orState').textContent = orKey() ? 'OpenRouter key saved on this phone ✓' : 'No OpenRouter key yet';
   $('keyState').textContent = getKey() ? 'API key saved on this phone ✓' : 'No API key yet';
-  $('usageText').textContent = `Spent so far on this phone: about $${usage.cost.toFixed(usage.cost<1?4:2)} (${Math.round((usage.inTok+usage.outTok)/1000)}k tokens)`;
+  $('usageText').textContent = `Spent so far on this phone: about $${usage.cost.toFixed(usage.cost<1?4:2)} (${Math.round((usage.inTok+usage.outTok)/1000)}k tokens)` + (usage.elChars ? ` · ElevenLabs: about ${Math.round(usage.elChars*0.5).toLocaleString()} credits` : '');
 }
 const vbox = $('voiceBtns');
 KOKORO_VOICES.forEach(([id,label]) => { const b=document.createElement('button'); b.dataset.voice=id; b.textContent=label; vbox.appendChild(b); });
-document.querySelectorAll('[data-engine]').forEach(b => b.onclick = () => { settings.engine=b.dataset.engine; store.set('settings',settings); renderBrain(); toast(settings.engine==='own'?'Own brain: your own key, ElevenLabs credits not used':'ElevenLabs: premium Jessica voice (uses credits)'); });
+document.querySelectorAll('[data-engine]').forEach(b => b.onclick = () => { settings.engine=b.dataset.engine; store.set('settings',settings); renderBrain(); toast(settings.engine==='own'?'Own brain: your own key (ElevenLabs only if you pick its voices)':'ElevenLabs: premium Jessica voice (uses credits)'); });
 document.querySelectorAll('[data-model]').forEach(b => b.onclick = () => { settings.model=b.dataset.model; store.set('settings',settings); renderBrain(); });
-document.querySelectorAll('[data-voice]').forEach(b => b.onclick = async () => {
+async function pickVoice(b){
   settings.voice=b.dataset.voice; store.set('settings',settings); renderBrain(); renderHD();
   if(speech.playing || speech.q.length) stopSpeech();
+  if(settings.voice.startsWith('el:')){ if(!elKey()){ toast('Add your ElevenLabs key below first'); return; } speakEnqueue(`Hi ${settings.name||'Jim'}, I'm Maya. How do I sound?`); return; }
   if(settings.voice.startsWith('dg:')){ if(!dgKey()){ toast('Add your Deepgram key below first'); return; } speakEnqueue(`Hi ${settings.name||'Jim'}, I'm Maya. How do I sound?`); return; }
   if(settings.voice!=='phone' && !kokoro){
     kokoroProgress(0); toast('Getting the natural voices ready, you can keep using Maya');
@@ -1112,7 +1123,8 @@ document.querySelectorAll('[data-voice]').forEach(b => b.onclick = async () => {
     return;
   }
   speakEnqueue(`Hi ${settings.name||'Jim'}, I'm Maya. How do I sound?`);
-});
+}
+document.querySelectorAll('[data-voice]').forEach(b => b.onclick = () => pickVoice(b));
 $('keySave').onclick = () => { const v=$('keyInput').value.trim(); if(!/^sk-ant-/.test(v)){ toast('That does not look like a Claude API key (starts with sk-ant-)'); return; } store.set('apikey', v); $('keyInput').value=''; renderBrain(); toast('API key saved on this phone only'); };
 $('keyClear').onclick = () => { if(settings.provider==='openrouter') store.set('orkey',''); else store.set('apikey',''); renderBrain(); };
 
@@ -1179,7 +1191,7 @@ function applyPhoneVoice(){ if(Native && Native.setPhoneVoice) Native.setPhoneVo
 applyPhoneVoice();
 setTimeout(renderHD, 1500);
 renderBrain();
-if(settings.engine==='own' && settings.voice!=='phone' && !settings.voice.startsWith('dg:') && navigator.onLine) setTimeout(()=>loadKokoro().catch(()=>{}), 3000);
+if(settings.engine==='own' && settings.voice!=='phone' && !/^(dg|el):/.test(settings.voice) && navigator.onLine) setTimeout(()=>loadKokoro().catch(()=>{}), 3000);
 
 /* ---------- Deepgram: fast cloud ears + Aura voices (middle option) ---------- */
 if(!settings.ears) settings.ears='phone';
@@ -1290,6 +1302,81 @@ document.querySelectorAll('[data-ears]').forEach(b => b.onclick = () => {
 $('dgSave').onclick = () => { const v=$('dgInput').value.trim(); if(v.length<20){ toast('That does not look like a Deepgram key'); return; } store.set('dgkey', v); $('dgInput').value=''; dg.failed=false; $('dgState').textContent='Checking key with Deepgram…'; if(Native && Native.dgTest) Native.dgTest(v); settings.ears='deepgram'; if(!settings.voice.startsWith('dg:')) settings.voice='dg:aura-2-thalia-en'; store.set('settings',settings); renderDG(); renderBrain(); toast('Deepgram key saved, checking it…'); };
 renderDG();
 if(dgKey() && Native && Native.dgTest) setTimeout(()=>Native.dgTest(dgKey()), 2000);
+
+/* ---------- ElevenLabs voices with any brain (Claude, Grok, Venice…) ---------- */
+const elKey = () => (store.get('elkey','')||'').trim();
+const EL_JESSICA = 'cgSgspJ2msm6clMCkdW9';   // same voice as the ElevenLabs Maya
+const EL_DEFAULT = [{id:EL_JESSICA, name:'Jessica', gender:'female'}, {id:'hpp4J3VqNfWAUOO0d1Us', name:'Bella', gender:'female'}, {id:'EXAVITQu4vr4xnSDxMaL', name:'Sarah', gender:'female'}, {id:'FGY2WhTYpPnrIDTdsKH5', name:'Laura', gender:'female'}];
+let elModel = store.get('elmodel', 'eleven_flash_v2_5');   // fastest + half the credits
+const elWait = {}; let elSeq = 0;
+function elTTS(text){
+  return new Promise((resolve, reject) => {
+    if(!Native || !Native.elSpeak) return reject(new Error('ElevenLabs voice needs the Android app'));
+    const id = 'e'+(++elSeq); elWait[id] = {resolve, reject};
+    Native.elSpeak(id, text, settings.voice.slice(3), elKey(), elModel);
+    usage.elChars = (usage.elChars||0) + text.length; store.set('usage', usage);
+  });
+}
+let elWarned = 0;
+window.zenixEL = (id, b64, err) => {
+  const w = elWait[id]; if(!w) return; delete elWait[id];
+  if(err){
+    const now = Date.now(), warn = now - elWarned > 20000; if(warn) elWarned = now;
+    if(/^40[0-9]/.test(err) && /model/i.test(err) && elModel!=='eleven_turbo_v2_5'){ elModel='eleven_turbo_v2_5'; store.set('elmodel', elModel); }
+    else if(warn && /quota|credit/i.test(err)) toast('ElevenLabs is out of credits, using the phone voice');
+    else if(warn && /permission/i.test(err)) toast('Your ElevenLabs key needs the "Text to Speech" permission');
+    else if(warn && /^40[13]/.test(err)) toast('ElevenLabs key not accepted. Check it in the Me tab.');
+    return w.reject(new Error(err));
+  }
+  const bin = atob(b64); const arr = new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++) arr[i] = bin.charCodeAt(i);
+  w.resolve({ toBlob: () => new Blob([arr], {type:'audio/mpeg'}) });
+};
+function renderEL(){
+  const box = $('elVoiceBtns'); if(!box) return; box.innerHTML = '';
+  const list = store.get('elvoices', null) || EL_DEFAULT;
+  const score = v => (v.gender==='female' ? 0 : 2) + (!v.lang || v.lang==='en' ? 0 : 1);
+  const seen = {};
+  list.slice().sort((a,b) => score(a)-score(b)).slice(0, 24).forEach(v => {
+    let label = (v.name||'Voice').split(/\s+[-|–]\s+|\s*\|\s*/)[0].trim().slice(0, 18);
+    seen[label] = (seen[label]||0) + 1; if(seen[label] > 1) label += ' '+seen[label];
+    const b = document.createElement('button'); b.dataset.voice = 'el:'+v.id; b.textContent = label;
+    b.classList.toggle('sel', settings.voice==='el:'+v.id);
+    b.onclick = () => pickVoice(b); box.appendChild(b);
+  });
+  if(!elKey()) $('elState').textContent = 'No ElevenLabs key yet';
+}
+window.zenixELVoices = (listJson, err, left) => {
+  let list = []; try{ list = JSON.parse(listJson) || []; }catch(e){}
+  if(list.length) store.set('elvoices', list);
+  if(err){
+    $('elState').textContent = /permission/i.test(err) ? 'Key saved ✓ (give it the "Voices: Read" permission to see all your voices here)'
+      : /^40[13]/.test(err) ? '✗ That key was not accepted. Copy it again from elevenlabs.io → Developers → API Keys.'
+      : 'Could not reach ElevenLabs. Check your internet.';
+  } else {
+    $('elState').textContent = 'ElevenLabs key works ✓' + (left >= 0 ? ` · about ${Math.round(left).toLocaleString()} credits left this month` : '');
+  }
+  renderEL();
+};
+$('elSave').onclick = () => {
+  const v = $('elInput').value.trim();
+  if(/^sk-or-/.test(v)){ toast('That\'s your OpenRouter key. It goes in the Open brain box above.'); return; }
+  if(/^sk-ant-/.test(v)){ toast('That\'s your Claude key. It goes in the Claude box above.'); return; }
+  if(v.length < 20){ toast('That does not look like an ElevenLabs key'); return; }
+  store.set('elkey', v); $('elInput').value = '';
+  $('elState').textContent = 'Checking key with ElevenLabs…';
+  if(Native && Native.elVoices) Native.elVoices(v);
+  if(!settings.voice.startsWith('el:')){ settings.voice = 'el:'+EL_JESSICA; store.set('settings', settings); }
+  renderEL(); renderBrain(); renderHD(); toast('ElevenLabs key saved. Maya now speaks with Jessica.');
+};
+$('elClear').onclick = () => {
+  store.set('elkey', ''); store.set('elvoices', null);
+  if(settings.voice.startsWith('el:')){ settings.voice = 'af_heart'; store.set('settings', settings); }
+  renderEL(); renderBrain(); toast('ElevenLabs key removed');
+};
+$('elRefresh').onclick = () => { if(!elKey()){ toast('Paste your ElevenLabs key first'); return; } $('elState').textContent = 'Checking…'; if(Native && Native.elVoices) Native.elVoices(elKey()); };
+renderEL();
+if(elKey() && Native && Native.elVoices) setTimeout(() => Native.elVoices(elKey()), 2500);
 
 /* ---------- Chat ---------- */
 function sendText(text){

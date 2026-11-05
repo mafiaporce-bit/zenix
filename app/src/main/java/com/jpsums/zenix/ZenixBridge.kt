@@ -103,6 +103,76 @@ class ZenixBridge(private val activity: MainActivity) {
         return ok("fetching")
     }
 
+    /** ElevenLabs text-to-speech for one sentence; MP3 goes back to the page as base64. */
+    @JavascriptInterface fun elSpeak(id: String, text: String, voiceId: String, key: String, model: String): String {
+        kotlin.concurrent.thread {
+            val q = { v: String -> JSONObject.quote(v) }
+            try {
+                val url = java.net.URL("https://api.elevenlabs.io/v1/text-to-speech/" + java.net.URLEncoder.encode(voiceId, "UTF-8") + "?output_format=mp3_44100_64")
+                val c = url.openConnection() as java.net.HttpURLConnection
+                c.requestMethod = "POST"; c.doOutput = true
+                c.connectTimeout = 8000; c.readTimeout = 25000
+                c.setRequestProperty("xi-api-key", key)
+                c.setRequestProperty("Content-Type", "application/json")
+                c.setRequestProperty("Accept", "audio/mpeg")
+                val body = JSONObject().put("text", text).put("model_id", model)
+                    .put("voice_settings", JSONObject().put("stability", 0.45).put("similarity_boost", 0.75).put("speed", 1.05))
+                c.outputStream.use { it.write(body.toString().toByteArray()) }
+                val code = c.responseCode
+                if (code !in 200..299) {
+                    val err = try { c.errorStream?.bufferedReader()?.readText() ?: "" } catch (_: Exception) { "" }
+                    activity.runJs("window.zenixEL && window.zenixEL(${q(id)}, '', ${q("$code $err".take(300))})")
+                } else {
+                    val bytes = c.inputStream.use { it.readBytes() }
+                    val b64 = android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
+                    activity.runJs("window.zenixEL && window.zenixEL(${q(id)}, '$b64', '')")
+                }
+            } catch (e: Exception) {
+                activity.runJs("window.zenixEL && window.zenixEL(${q(id)}, '', ${q(e.message ?: "network error")})")
+            }
+        }
+        return ok("fetching")
+    }
+
+    /** Lists the voices in Jim's ElevenLabs account (also works as a key test) plus credits left. */
+    @JavascriptInterface fun elVoices(key: String): String {
+        kotlin.concurrent.thread {
+            val q = { v: String -> JSONObject.quote(v) }
+            fun get(path: String): Pair<Int, String> {
+                val c = java.net.URL("https://api.elevenlabs.io$path").openConnection() as java.net.HttpURLConnection
+                c.connectTimeout = 8000; c.readTimeout = 15000
+                c.setRequestProperty("xi-api-key", key)
+                val code = c.responseCode
+                val txt = try { (if (code in 200..299) c.inputStream else c.errorStream)?.bufferedReader()?.readText() ?: "" } catch (_: Exception) { "" }
+                return code to txt
+            }
+            try {
+                val (code, txt) = get("/v1/voices")
+                val list = org.json.JSONArray()
+                var err = ""
+                if (code in 200..299) {
+                    val arr = JSONObject(txt).optJSONArray("voices") ?: org.json.JSONArray()
+                    for (i in 0 until arr.length()) {
+                        val v = arr.getJSONObject(i)
+                        val labels = v.optJSONObject("labels")
+                        list.put(JSONObject().put("id", v.optString("voice_id")).put("name", v.optString("name"))
+                            .put("gender", labels?.optString("gender") ?: "").put("lang", labels?.optString("language") ?: "")
+                            .put("cat", v.optString("category")))
+                    }
+                } else err = "$code ${txt.take(200)}"
+                var left = -1L
+                try {
+                    val (sc, st) = get("/v1/user/subscription")
+                    if (sc in 200..299) { val s = JSONObject(st); left = s.optLong("character_limit") - s.optLong("character_count") }
+                } catch (_: Exception) { }
+                activity.runJs("window.zenixELVoices && window.zenixELVoices(${q(list.toString())}, ${q(err)}, $left)")
+            } catch (e: Exception) {
+                activity.runJs("window.zenixELVoices && window.zenixELVoices('[]', ${q(e.message ?: "network error")}, -1)")
+            }
+        }
+        return ok("checking")
+    }
+
     @JavascriptInterface fun finishListening(): String { activity.brain.finishListening(); return ok("ok") }
     @JavascriptInterface fun listVoices(): String = activity.brain.listVoices()
     @JavascriptInterface fun setPhoneVoice(name: String, rate: String): String {
