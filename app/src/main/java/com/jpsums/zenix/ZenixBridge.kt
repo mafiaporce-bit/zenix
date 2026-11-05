@@ -177,7 +177,7 @@ class ZenixBridge(private val activity: MainActivity) {
 
     @JavascriptInterface
     fun readMessages(contact: String, count: String): String {
-        if (!has(Manifest.permission.READ_SMS)) return fail("Allow SMS permission so I can read your messages.")
+        if (!has(Manifest.permission.READ_SMS)) return fail("I can't read texts in this version, Google blocks that for apps outside the Play Store. Open your Messages app to check.")
         val n = (count.toIntOrNull() ?: 5).coerceIn(1, 15)
         val filter = if (contact.isNotBlank()) findContact(contact)?.let { lastDigits(it.number) } else null
         val out = StringBuilder()

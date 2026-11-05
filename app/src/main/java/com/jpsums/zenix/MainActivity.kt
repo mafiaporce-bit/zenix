@@ -33,8 +33,6 @@ class MainActivity : Activity() {
                     Manifest.permission.RECORD_AUDIO,
                     Manifest.permission.READ_CONTACTS,
                     Manifest.permission.CALL_PHONE,
-                    Manifest.permission.READ_SMS,
-                    Manifest.permission.SEND_SMS,
                     Manifest.permission.READ_CALENDAR,
                     Manifest.permission.WRITE_CALENDAR
                 )
