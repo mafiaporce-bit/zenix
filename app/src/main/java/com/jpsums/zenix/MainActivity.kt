@@ -26,6 +26,8 @@ class MainActivity : Activity() {
 
     companion object {
         const val CHANNEL_ID = "zenix_reminders"
+        const val VOICE_CHANNEL_ID = "zenix_voice"
+        @Volatile var instance: java.lang.ref.WeakReference<MainActivity>? = null
         private const val PERM_REQUEST = 42
         val ALL_PERMISSIONS: Array<String>
             get() {
@@ -51,8 +53,11 @@ class MainActivity : Activity() {
             .addPathHandler("/assets/", WebViewAssetLoader.AssetsPathHandler(this))
             .build()
 
+        instance = java.lang.ref.WeakReference(this)
         webView = WebView(this)
         setContentView(webView)
+        // Keep ZeniX's page running at full speed while another app is open
+        webView.setRendererPriorityPolicy(WebView.RENDERER_PRIORITY_IMPORTANT, false)
         webView.settings.apply {
             javaScriptEnabled = true
             domStorageEnabled = true
@@ -91,11 +96,27 @@ class MainActivity : Activity() {
         if (missing.isNotEmpty()) requestPermissions(missing.toTypedArray(), PERM_REQUEST)
     }
 
+    /** Called when a voice chat starts/ends: keeps the mic alive while other apps are open. */
     fun setKeepAwake(on: Boolean) {
         runOnUiThread {
-            if (on) window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-            else window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            if (on) {
+                window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                try { startForegroundService(android.content.Intent(this, VoiceService::class.java)) } catch (_: Exception) { }
+            } else {
+                window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                stopService(android.content.Intent(this, VoiceService::class.java))
+            }
         }
+    }
+
+    /** "End chat" tapped in the notification. */
+    fun endChatFromNotification() {
+        runOnUiThread { webView.evaluateJavascript("window.zenixEnd && window.zenixEnd()", null) }
+    }
+
+    override fun onDestroy() {
+        stopService(android.content.Intent(this, VoiceService::class.java))
+        super.onDestroy()
     }
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
@@ -115,6 +136,11 @@ class MainActivity : Activity() {
         if (nm.getNotificationChannel(CHANNEL_ID) == null) {
             val ch = NotificationChannel(CHANNEL_ID, "ZeniX reminders", NotificationManager.IMPORTANCE_HIGH)
             ch.description = "Reminders set by ZeniX"
+            nm.createNotificationChannel(ch)
+        }
+        if (nm.getNotificationChannel(VOICE_CHANNEL_ID) == null) {
+            val ch = NotificationChannel(VOICE_CHANNEL_ID, "ZeniX voice chat", NotificationManager.IMPORTANCE_LOW)
+            ch.description = "Shows while ZeniX is listening"
             nm.createNotificationChannel(ch)
         }
     }

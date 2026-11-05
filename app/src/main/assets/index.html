@@ -399,6 +399,7 @@ async function endSession(){
   if(!convo) return;
   try{ await convo.endSession(); }catch(e){}
   convo=null; session=null; setStatus('off'); resetTalkUI();
+  if(Native && Native.keepAwake) Native.keepAwake('false');
 }
 function resetTalkUI(){
   $('talkBtn').classList.remove('end'); $('talkLabel').textContent='Talk to ZeniX';
@@ -408,6 +409,7 @@ function resetTalkUI(){
   setOrb('idle'); $('modeLabel').textContent='Ready when you are'; $('liveLine').textContent=''; $('actionLine').textContent='';
 }
 
+window.zenixEnd = () => endSession(); // called from the phone notification
 $('talkBtn').onclick = async () => {
   if(convo && session==='talk') return endSession();
   if(convo && session==='chat') await endSession();
