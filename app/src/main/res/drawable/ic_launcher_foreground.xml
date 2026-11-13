@@ -1,13 +1,31 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Maya: a neon ring (violet to magenta) around a white M -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp" android:height="108dp"
     android:viewportWidth="108" android:viewportHeight="108">
-    <path android:fillColor="#8B5CF6"
-        android:pathData="M54,24a30,30 0,1 1,0 60a30,30 0,1 1,0 -60z" />
-    <path android:fillColor="#EC4899"
-        android:pathData="M54,30a24,24 0,1 1,0 48a24,24 0,1 1,0 -48z" />
-    <path android:strokeColor="#FFFFFF" android:strokeWidth="6"
+    <!-- soft glow -->
+    <path android:strokeColor="#B266FF" android:strokeAlpha="0.16" android:strokeWidth="15"
+        android:fillColor="#00000000"
+        android:pathData="M54,29a25,25 0,1 1,0 50a25,25 0,1 1,0 -50z" />
+    <path android:strokeColor="#FF3FD2" android:strokeAlpha="0.22" android:strokeWidth="9"
+        android:fillColor="#00000000"
+        android:pathData="M54,29a25,25 0,1 1,0 50a25,25 0,1 1,0 -50z" />
+    <!-- the ring -->
+    <path android:strokeWidth="5" android:fillColor="#00000000"
+        android:pathData="M54,29a25,25 0,1 1,0 50a25,25 0,1 1,0 -50z">
+        <aapt:attr name="android:strokeColor">
+            <gradient android:type="linear"
+                android:startX="32" android:startY="32" android:endX="76" android:endY="76"
+                android:startColor="#B266FF" android:endColor="#FF3FD2" />
+        </aapt:attr>
+    </path>
+    <path android:strokeColor="#FFFFFF" android:strokeAlpha="0.85" android:strokeWidth="1.1"
+        android:fillColor="#00000000"
+        android:pathData="M54,29a25,25 0,1 1,0 50a25,25 0,1 1,0 -50z" />
+    <!-- M -->
+    <path android:strokeColor="#FFFFFF" android:strokeWidth="4.6"
         android:strokeLineCap="round" android:strokeLineJoin="round"
         android:fillColor="#00000000"
-        android:pathData="M42,42H66L42,66H66" />
+        android:pathData="M44,63V46L54,58L64,46V63" />
 </vector>

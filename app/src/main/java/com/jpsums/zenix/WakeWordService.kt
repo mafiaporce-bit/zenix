@@ -15,6 +15,7 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.os.PowerManager
+import android.provider.Settings
 import org.json.JSONObject
 import org.vosk.Model
 import org.vosk.Recognizer
@@ -23,6 +24,9 @@ import org.vosk.android.SpeechService
 import java.io.File
 import java.util.zip.ZipInputStream
 import kotlin.concurrent.thread
+
+/** One extra call into the listening engine: is this word in its dictionary? (-1 = no) */
+interface VoskExtra : com.sun.jna.Library { fun vosk_model_find_word(model: com.sun.jna.Pointer, word: String): Int }
 
 /**
  * Always-on "Hey Maya" listener. Runs Vosk fully on the phone and only reacts to the wake
@@ -41,6 +45,11 @@ class WakeWordService : Service() {
         @Volatile var current: WakeWordService? = null
         @Volatile var unpacking = false
         @Volatile var lastError = ""
+        @Volatile var lastHeard = ""
+        @Volatile var lastHeardAt = 0L
+        @Volatile var activeNames = ""
+        const val ALERT_CHANNEL = "zenix_wake_alert"
+        const val ALERT_ID = 11
 
         fun modelDir(c: Context) = File(c.filesDir, "vosk-model")
         fun zipFile(c: Context) = File(c.getExternalFilesDir("models"), "vosk.zip")
@@ -68,6 +77,8 @@ class WakeWordService : Service() {
             }
             o.put("state", state).put("percent", pct).put("running", current != null)
                 .put("listening", current?.isListening() == true).put("error", lastError)
+                .put("heard", lastHeard).put("heardAgo", if (lastHeardAt > 0) (System.currentTimeMillis() - lastHeardAt) / 1000 else -1)
+                .put("names", activeNames)
             return o.toString()
         }
 
@@ -112,6 +123,7 @@ class WakeWordService : Service() {
     private val main = Handler(Looper.getMainLooper())
     private var model: Model? = null
     private var speech: SpeechService? = null
+    private var recog: Recognizer? = null
     @Volatile private var paused = false
     private var lastTrigger = 0L
     private var wakeLock: PowerManager.WakeLock? = null
@@ -126,6 +138,13 @@ class WakeWordService : Service() {
         val nm = getSystemService(NotificationManager::class.java)
         if (nm.getNotificationChannel(CHANNEL) == null) {
             nm.createNotificationChannel(NotificationChannel(CHANNEL, "Hey Maya", NotificationManager.IMPORTANCE_MIN))
+        }
+        if (nm.getNotificationChannel(ALERT_CHANNEL) == null) {
+            // silent but high priority: lets Maya open over the lock screen when she hears her name
+            val ch = NotificationChannel(ALERT_CHANNEL, "Hey Maya heard you", NotificationManager.IMPORTANCE_HIGH)
+            ch.setSound(null, null); ch.enableVibration(false)
+            ch.description = "Opens Maya when you say Hey Maya"
+            nm.createNotificationChannel(ch)
         }
     }
 
@@ -159,23 +178,51 @@ class WakeWordService : Service() {
         return START_STICKY
     }
 
+    // ---------- what she listens for ----------
+    private val greetWords = listOf("hey", "hi", "okay", "hello")
+    private val nameWords = listOf("maya", "maia", "mya")          // real spellings of the name
+    private val soundAlikes = listOf("my a", "my ah", "my uh")     // used only if the listener doesn't know "maya"
+
+    /** True/false if the listener's dictionary has the word; null if that can't be checked. */
+    private val voskExtra: VoskExtra? by lazy {
+        try { com.sun.jna.Native.load("vosk", VoskExtra::class.java) } catch (_: Throwable) { null }
+    }
+    private fun knows(m: Model, word: String): Boolean? = try {
+        voskExtra?.let { it.vosk_model_find_word(m.pointer, word) >= 0 }
+    } catch (_: Throwable) { null }
+
+    /** Builds the short list of phrases to listen for, using only words the listener really knows. */
+    private fun grammarFor(m: Model): String {
+        val canCheck = knows(m, "hey") != null
+        val greets = if (canCheck) greetWords.filter { knows(m, it) == true }.ifEmpty { listOf("hey") } else greetWords
+        var names = if (canCheck) nameWords.filter { knows(m, it) == true } else nameWords + soundAlikes.take(1)
+        if (names.isEmpty()) names = soundAlikes.filter { p -> p.split(" ").all { knows(m, it) == true } }.ifEmpty { soundAlikes.take(1) }
+        activeNames = names.joinToString(", ")
+        val arr = org.json.JSONArray()
+        for (g in greets) for (n in names) arr.put("$g $n")
+        arr.put("[unk]")
+        return arr.toString()
+    }
+
+    private val wakeRegex = Regex("\\b(hey|hi|okay|hello)\\s+(maya|maia|mya|my a|my ah|my uh)\\b")
+
     private fun startListening() {
         if (speech != null || paused) return
         if (!modelReady(this)) { lastError = "Wake word not downloaded yet"; return }
         thread {
             try {
                 if (model == null) model = Model(modelDir(this).absolutePath)
-                val rec = Recognizer(model!!, 16000.0f, "[\"hey maya\", \"hi maya\", \"okay maya\", \"maya\", \"[unk]\"]")
+                val rec = Recognizer(model!!, 16000.0f, grammarFor(model!!))
                 main.post {
                     if (paused || speech != null) { rec.close(); return@post }
                     try {
                         val s = SpeechService(rec, 16000.0f)
                         s.startListening(listener)
-                        speech = s
+                        speech = s; recog = rec
                         lastError = ""
                     } catch (e: Exception) { lastError = "Mic busy: ${e.message}"; rec.close() }
                 }
-            } catch (e: Exception) { lastError = "Wake model error: ${e.message}" }
+            } catch (e: Throwable) { lastError = "Wake model error: ${e.message}" }
         }
     }
 
@@ -189,8 +236,10 @@ class WakeWordService : Service() {
 
     private fun check(hyp: String?, key: String) {
         val text = try { JSONObject(hyp ?: "{}").optString(key) } catch (_: Exception) { "" }
-        if (!text.contains("maya")) return
         val now = System.currentTimeMillis()
+        val clean = text.replace("[unk]", " ").trim().replace(Regex("\\s+"), " ")
+        if (clean.isNotEmpty()) { lastHeard = clean; lastHeardAt = now }   // shown in Settings, to check she can hear you
+        if (!wakeRegex.containsMatchIn(text)) return
         if (now - lastTrigger < 3000) return
         lastTrigger = now
         triggered()
@@ -198,40 +247,46 @@ class WakeWordService : Service() {
 
     private fun triggered() {
         pause()   // free the microphone for the conversation
-        try {   // wake the screen if the phone is asleep (Maya then shows over the lock screen)
-            val pm = getSystemService(PowerManager::class.java)
-            if (!pm.isInteractive) {
-                @Suppress("DEPRECATION")
-                pm.newWakeLock(PowerManager.SCREEN_BRIGHT_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP or PowerManager.ON_AFTER_RELEASE, "maya:screen").acquire(8000)
-            }
+        val pm = getSystemService(PowerManager::class.java)
+        val km = getSystemService(android.app.KeyguardManager::class.java)
+        val asleep = !pm.isInteractive
+        val locked = km.isKeyguardLocked
+        if (asleep) try {   // wake the screen (Maya then shows over the lock screen)
+            @Suppress("DEPRECATION")
+            pm.newWakeLock(PowerManager.SCREEN_BRIGHT_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP or PowerManager.ON_AFTER_RELEASE, "maya:screen").acquire(8000)
         } catch (_: Exception) { }
         val i = Intent(this, MainActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
             .putExtra("wake", true)
-        val opened = try { startActivity(i); true } catch (_: Exception) { false }
-        val act = MainActivity.instance?.get()
-        if (act != null && MainActivity.inForeground) act.onWake()
-        if (!opened) {
-            // fallback: a tap-to-talk notification
+        try { startActivity(i) } catch (_: Exception) { }
+        // Screen off, locked, or no "Display over other apps": Android may ignore the line above,
+        // so also raise a silent full-screen alert, the same way an incoming call opens its screen.
+        if (!MainActivity.inForeground && (asleep || locked || !Settings.canDrawOverlays(this))) try {
             val pi = PendingIntent.getActivity(this, 4, i, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-            val n = Notification.Builder(this, MainActivity.VOICE_CHANNEL_ID)
+            val n = Notification.Builder(this, ALERT_CHANNEL)
                 .setSmallIcon(R.drawable.ic_notify).setContentTitle("Maya heard you").setContentText("Tap to talk")
-                .setContentIntent(pi).setAutoCancel(true).build()
-            getSystemService(NotificationManager::class.java).notify(11, n)
-            main.postDelayed({ resume() }, 8000)
-        }
+                .setCategory(Notification.CATEGORY_CALL)
+                .setFullScreenIntent(pi, true).setContentIntent(pi)
+                .setAutoCancel(true).setTimeoutAfter(20000).build()
+            getSystemService(NotificationManager::class.java).notify(ALERT_ID, n)
+        } catch (_: Exception) { }
+        // If no voice chat has started after a while (Maya couldn't open, or nothing was said), listen again.
+        main.postDelayed({ if (current === this && paused && VoiceService.current == null) resume() }, 15000)
     }
 
     private fun stopEngine() {
         val s = speech; speech = null
+        val r = recog; recog = null
         try { s?.stop() } catch (_: Exception) {}
         try { s?.shutdown() } catch (_: Exception) {}
+        try { r?.close() } catch (_: Exception) {}
     }
 
     fun pause() { paused = true; stopEngine() }
     fun resume() { if (!paused) return; paused = false; main.postDelayed({ startListening() }, 400) }
 
     override fun onDestroy() {
+        main.removeCallbacksAndMessages(null)
         stopEngine()
         try { model?.close() } catch (_: Exception) {}
         model = null

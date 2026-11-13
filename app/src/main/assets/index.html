@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#0B0F1A">
 <title>Maya</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
 <style>
 :root{
   --bg:#06050C; --surface:#121022; --surface2:#1B1733; --text:#F3F0FF; --muted:#9C95BC;
@@ -377,8 +377,16 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
       <details class="set-item" data-sec="wake">
         <summary><span class="ico amber"><svg viewBox="0 0 24 24"><path d="M12 3l1.8 4.7L18.5 9l-4.7 1.8L12 15.5l-1.8-4.7L5.5 9l4.7-1.3L12 3zM19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9L19 15z"/></svg></span><span class="set-t"><b>"Hey Maya"</b><span id="sumWake"></span></span><svg class="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></summary>
         <div class="set-body">
-          <p class="hint">Say "Hey Maya" to start talking, even in another app. It listens on your phone only; nothing is sent until you say it.</p>
+          <p class="hint">Say "Hey Maya" to start talking, even in another app or with the screen off. It listens on your phone only; nothing is sent until you say it. A voice chat that goes quiet ends by itself.</p>
           <div class="toggle-row"><span class="status-line" style="margin:0" id="wakeState">Off</span><button class="btn-line" id="wakeBtn">Turn on</button></div>
+          <p class="status-line" id="wakeDiag" style="display:none"></p>
+          <div id="wakeFix" style="display:none">
+            <p class="sub-label">Still needed for screen-off and other apps</p>
+            <div class="toggle-row" id="wfOverlay"><div><b>Display over other apps</b><small>Lets Maya pop up from any app</small></div><button class="btn-line" id="wfOverlayBtn">Allow</button></div>
+            <div class="toggle-row" id="wfFull"><div><b>Full-screen alerts</b><small>Lets Maya open over the lock screen</small></div><button class="btn-line" id="wfFullBtn">Allow</button></div>
+            <div class="toggle-row" id="wfBatt"><div><b>Battery: unrestricted</b><small>Stops the phone putting Maya to sleep</small></div><button class="btn-line" id="wfBattBtn">Allow</button></div>
+          </div>
+          <p class="hint" style="margin:12px 0 0">After restarting the phone, open Maya once so she starts listening again.</p>
         </div>
       </details>
       <details class="set-item" data-sec="orb">
@@ -496,6 +504,7 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
         <div class="set-body">
           <p class="hint" id="aboutText">Maya runs on the brain you pick: Claude, the Open brain (Grok) or ElevenLabs. Needs internet, or the offline brain.</p>
           <div class="toggle-row"><span class="status-line" style="margin:0" id="verText">Version …</span><button class="btn-line" id="updCheck">Check for updates</button></div>
+          <div class="toggle-row" id="updAlt"><span class="status-line" style="margin:0">Update not installing?</span><button class="btn-line" id="updBrowser">Download in browser</button></div>
         </div>
       </details>
     </div>
@@ -512,7 +521,14 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
 <div class="toast" id="toast"></div>
 
 <script type="module">
-import { Conversation } from "https://cdn.jsdelivr.net/npm/@elevenlabs/client/+esm";
+/* The ElevenLabs agent code is fetched only when that brain is used, so Maya opens even with no internet */
+let ConversationApi = null;
+async function loadConversation(){
+  if(ConversationApi) return ConversationApi;
+  const m = await Promise.race([import("https://cdn.jsdelivr.net/npm/@elevenlabs/client/+esm"),
+    new Promise((_, rej) => setTimeout(() => rej(new Error('the ElevenLabs code did not load')), 12000))]);
+  ConversationApi = m.Conversation; return ConversationApi;
+}
 
 const AGENT_ID = "agent_2501m6nhkeb2enqvv0avjabxbz52";
 const $ = id => document.getElementById(id);
@@ -670,6 +686,7 @@ function addMsg(who, text){
   if(history.length>3000) history = history.slice(-3000);
   store.set('history', history); renderChat();
 }
+function stopTyping(){ chatTyping = false; clearTimeout(chatTypingTimer); renderChat(); }
 let memShown=40;
 function renderMem(){
   const l=$('memList'); l.innerHTML='';
@@ -802,17 +819,22 @@ async function ensureMic(){
   catch(e){ return false; }
 }
 
+const agentTalk = { lastActive:0, userSpoke:false, speaking:false, fromWake:false };   // used to end a silent voice chat by itself
+
 async function startSession(kind){
   if(convo || connecting) return;
-  await wakePauseNow();
-  connecting=true; session=kind; setStatus('busy');
+  connecting=true; session=kind; setStatus('busy');   // set before any waiting, so two taps can't start two chats
   if(kind==='talk'){ $('modeLabel').textContent='Connecting to Maya…'; $('talkLabel').textContent='Connecting…'; }
-  if(!(await ensureMic())){
-    connecting=false; session=null; setStatus('off'); resetTalkUI();
-    toast('Allow the microphone, then tap again'); return;
-  }
+  agentTalk.fromWake = kind==='talk' && wakeGreeting; wakeGreeting = false;
+  let dropped = false;
   try{
-    convo = await Conversation.startSession({
+    await wakePauseNow();
+    if(!(await ensureMic())){
+      session=null; setStatus('off'); resetTalkUI(); pendingText=null; stopTyping(); wakeResumeLater();
+      toast('Allow the microphone, then tap again'); return;
+    }
+    const Conversation = await loadConversation();
+    const c = await Conversation.startSession({
       agentId: AGENT_ID,
       connectionType: 'webrtc',
       dynamicVariables: { user_name: settings.name||'Jim', memory: memoryText(), recent_chat: recentChatText() },
@@ -820,25 +842,31 @@ async function startSession(kind){
       onConnect: () => {
         setStatus('on');
         addMsg('sys', kind==='talk' ? 'Voice chat started' : 'Chat connected');
-        if(kind==='chat'){ convo.setMicMuted(true); micMuted=true; if(!settings.chatVoice) convo.setVolume({volume:0}); }
+        agentTalk.lastActive = Date.now() + 8000; agentTalk.userSpoke = true; agentTalk.speaking = false;
         if(Native && Native.keepAwake) Native.keepAwake('true');
       },
-      onDisconnect: () => { convo=null; session=null; setStatus('off'); resetTalkUI(); addMsg('sys','Maya disconnected'); if(Native && Native.keepAwake) Native.keepAwake('false'); wakeResumeLater(); },
+      onDisconnect: () => { dropped = true; const had = !!convo; convo=null; session=null; setStatus('off'); resetTalkUI(); if(had) addMsg('sys','Maya disconnected'); if(Native && Native.keepAwake) Native.keepAwake('false'); wakeResumeLater(); },
       onError: (err) => { console.error(err); toast('Maya had a connection problem'); },
       onMessage: (m) => {
         const who = (m.source || m.role) === 'user' ? 'user' : 'ai';
         const text = m.message || m.text || '';
+        if(who==='user'){ agentTalk.lastActive = Date.now(); agentTalk.userSpoke = true; }
         if(who==='user' && session==='chat') return;
         addMsg(who, text);
         if(session==='talk') $('liveLine').textContent = (who==='ai'?'Maya: ':'You: ') + (who==='ai' ? stripTags(text) : text);
       },
       onModeChange: ({mode}) => {
+        agentTalk.speaking = mode==='speaking';
+        if(!agentTalk.speaking && agentTalk.userSpoke){ agentTalk.lastActive = Date.now(); agentTalk.userSpoke = false; }   // the quiet clock starts when she finishes answering
         if(Native && Native.setOrbMode) Native.setOrbMode(mode);
         if(session!=='talk') return;
         if(mode==='speaking'){ setOrb('speaking'); $('modeLabel').textContent='Maya is speaking'; }
         else { setOrb('listening'); $('modeLabel').textContent = micMuted ? 'Mic muted' : 'Listening…'; }
       }
     });
+    if(dropped){ try{ await c.endSession(); }catch(e){} throw new Error('the connection dropped'); }
+    convo = c;
+    if(kind==='chat'){ try{ c.setMicMuted(true); micMuted=true; if(!settings.chatVoice) c.setVolume({volume:0}); }catch(e){} }
     if(kind==='talk'){
       $('talkBtn').classList.add('end'); $('talkLabel').textContent='End chat';
       $('muteBtn').disabled=false; $('volBtn').disabled=false;
@@ -847,19 +875,33 @@ async function startSession(kind){
     if(pendingText){ convo.sendUserMessage(pendingText); pendingText=null; }
   }catch(e){
     console.error(e); convo=null; session=null; setStatus('off'); resetTalkUI();
+    if(Native && Native.keepAwake) Native.keepAwake('false');
     if(settings.mode==='auto' && offlineReady()){
       toast('Cloud unreachable — switching to offline Maya');
       if(kind==='talk') startOffline('talk'); else if(pendingText){ const t=pendingText; pendingText=null; offlineChat(t); }
-    } else toast('Could not reach Maya. Check your internet.');
+    } else { pendingText=null; stopTyping(); toast('Could not reach Maya. Check your internet.'); wakeResumeLater(); }
   }finally{ connecting=false; }
 }
 async function endSession(){
-  if(!convo) return;
-  try{ await convo.endSession(); }catch(e){}
+  const c = convo; if(!c) return;
+  try{ await c.endSession(); }catch(e){}
   convo=null; session=null; setStatus('off'); resetTalkUI();
   if(Native && Native.keepAwake) Native.keepAwake('false');
   wakeResumeLater();
 }
+/* A voice chat nobody is talking in ends by itself: saves credits, and gives the screen back after "Hey Maya" */
+setInterval(() => {
+  const now = Date.now();
+  if(convo && session==='talk' && !connecting){
+    if(agentTalk.speaking || !agentTalk.lastActive) return;
+    if(now - agentTalk.lastActive > (agentTalk.fromWake ? 40000 : 150000)){ addMsg('sys', 'Voice chat ended (it went quiet)'); endSession(); }
+    return;
+  }
+  if(off.active && off.kind==='talk'){
+    if(speech.playing || speech.q.length || speech.streamOpen || speech.hold || off.thinking || !off.quietSince) return;
+    if(now - off.quietSince > (off.fromWake ? 30000 : 120000)){ endOffline(true); addMsg('sys', 'Voice chat ended (it went quiet)'); }
+  }
+}, 3000);
 function resetTalkUI(){
   $('talkBtn').classList.remove('end'); $('talkLabel').textContent='Talk to Maya';
   $('muteBtn').disabled=true; $('volBtn').disabled=true;
@@ -870,7 +912,7 @@ function resetTalkUI(){
 
 window.zenixEnd = () => { if(off.active) endOffline(); else endSession(); }; // called from the phone notification
 $('talkBtn').onclick = async () => {
-  if(off.active){ const wasChat = off.kind==='chat'; endOffline(); if(!wasChat) return; }
+  if(off.active){ const wasChat = off.kind==='chat'; endOffline(wasChat); if(!wasChat) return; }
   if(convo && session==='talk') return endSession();
   if(wantOffline()){ if(convo) await endSession(); startOffline('talk'); return; }
   if(settings.engine==='own'){ if(convo) await endSession(); startOffline('talk','own'); return; }
@@ -893,9 +935,11 @@ const MapView = (() => {
     if(window.L) return Promise.resolve();
     if(loading) return loading;
     loading = new Promise((res, rej) => {
+      const fail = () => { loading = null; rej(new Error('the map could not load (check internet)')); };
+      const timer = setTimeout(fail, 12000);   // never leave Maya waiting on a map that isn't coming
       const css = document.createElement('link'); css.rel = 'stylesheet'; css.href = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css'; document.head.appendChild(css);
       const js = document.createElement('script'); js.src = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js';
-      js.onload = () => res(); js.onerror = () => { loading = null; rej(new Error('the map could not load (check internet)')); };
+      js.onload = () => { clearTimeout(timer); res(); }; js.onerror = () => { clearTimeout(timer); fail(); };
       document.head.appendChild(js);
     });
     return loading;
@@ -914,23 +958,28 @@ const MapView = (() => {
   function clear(){ if(layer){ layer.remove(); layer = null; } $('routeCard').classList.remove('on'); }
   function set(l){ clear(); layer = l.addTo(map); }
   const pin = (cls) => L.divIcon({className:'', html:`<div class="maya-pin ${cls||''}"></div>`, iconSize:[16,16], iconAnchor:[8,8]});
-  return { open, close, clear, set, pin, get map(){ return map; } };
+  return { open, close, clear, set, pin, get map(){ return map; }, get empty(){ return !layer; } };
 })();
 $('mapClose').onclick = () => MapView.close();
 
 const UAE_BBOX = '51.4,22.5,56.5,26.2';
+/* fetch that gives up after a few seconds instead of hanging */
+const fetchT = (url, ms) => { const c = new AbortController(); const t = setTimeout(() => c.abort(), ms || 8000); return fetch(url, {signal:c.signal}).finally(() => clearTimeout(t)); };
 async function geocode(q){
   q = String(q||'').trim(); if(!q) throw new Error('no place was given');
+  const flat = v => String(v||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
   const photon = async (extra) => {
-    const r = await fetch('https://photon.komoot.io/api/?limit=1&q=' + encodeURIComponent(q) + extra); if(!r.ok) throw new Error('search ' + r.status);
+    const r = await fetchT('https://photon.komoot.io/api/?limit=1&q=' + encodeURIComponent(q) + extra, 7000); if(!r.ok) throw new Error('search ' + r.status);
     const f = ((await r.json()).features || [])[0]; if(!f) return null; const p = f.properties || {};
     const area = [p.city || p.county || p.state, p.country].filter(Boolean).filter((v,i,a) => a.indexOf(v)===i && v!==p.name).join(', ');
-    return {lat:f.geometry.coordinates[1], lon:f.geometry.coordinates[0], name:p.name || q, area, extent:p.extent};
+    return {lat:f.geometry.coordinates[1], lon:f.geometry.coordinates[0], name:p.name || q, area, extent:p.extent, kind:p.type || '', cc:String(p.countrycode||'').toUpperCase()};
   };
-  let g = null;
-  try{ g = await photon('&bbox=' + UAE_BBOX) || await photon('&lat=24.8&lon=55.0'); }catch(e){}
+  // look inside the UAE and worldwide together; a city or country with exactly that name abroad wins ("Manila", "Paris")
+  const [uae, world] = await Promise.all([photon('&bbox=' + UAE_BBOX).catch(() => null), photon('&lat=24.8&lon=55.0').catch(() => null)]);
+  const abroad = world && world.cc && world.cc!=='AE' && /^(city|country|state|county|town|region|island)$/.test(world.kind) && flat(world.name)===flat(q);
+  let g = abroad ? world : (uae || world);
   if(!g){
-    try{ const r = await fetch('https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=' + encodeURIComponent(q)); const j = await r.json();
+    try{ const r = await fetchT('https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=' + encodeURIComponent(q), 7000); const j = await r.json();
       if(j[0]) g = {lat:+j[0].lat, lon:+j[0].lon, name:j[0].name || q, area:(j[0].display_name||'').split(',').slice(-2).join(',').trim()}; }catch(e){}
   }
   if(!g) throw new Error(`I couldn't find "${q}" on the map`);
@@ -938,14 +987,20 @@ async function geocode(q){
 }
 const HERE_RE = /^(here|my location|current location|where i am|me|my place|this place|dito)$/i;
 function myLocation(){
-  return new Promise((res, rej) => {
+  const ask = (precise, ms) => new Promise((res, rej) => {
     if(!navigator.geolocation) return rej(new Error('no GPS'));
-    navigator.geolocation.getCurrentPosition(p => res({lat:p.coords.latitude, lon:p.coords.longitude, name:'Your location', area:''}), e => rej(e), {enableHighAccuracy:true, timeout:8000, maximumAge:60000});
+    const t = setTimeout(() => rej(new Error('timeout')), ms + 1500);   // some phones never answer: don't hang
+    navigator.geolocation.getCurrentPosition(
+      p => { clearTimeout(t); res({lat:p.coords.latitude, lon:p.coords.longitude, name:'Your location', area:''}); },
+      e => { clearTimeout(t); rej(e); }, {enableHighAccuracy:precise, timeout:ms, maximumAge:120000});
   });
+  // the first time, Android shows its "allow location" box: give Jim time to answer it
+  const firstTime = !!(Native.hasLocation && Native.hasLocation()!=='true');
+  return ask(false, firstTime ? 20000 : 6000).catch(e => { if(e && e.code===1) throw e; return ask(true, 10000); });
 }
 async function findPlace(q){
   if(HERE_RE.test(String(q||'').trim())){
-    try{ return await myLocation(); }catch(e){ throw new Error("I can't see his location yet, so ask Jim where he's starting from"); }
+    try{ return await myLocation(); }catch(e){ throw new Error("I can't see his location (Location is off or not allowed for Maya), so ask Jim where he's starting from"); }
   }
   return geocode(q);
 }
@@ -953,7 +1008,7 @@ async function driveRoute(a, b){
   const path = `/route/v1/driving/${a.lon},${a.lat};${b.lon},${b.lat}?overview=full&geometries=geojson`;
   let j = null;
   for(const base of ['https://router.project-osrm.org', 'https://routing.openstreetmap.de/routed-car']){
-    try{ const r = await fetch(base + path); j = await r.json(); if(j && j.code==='Ok' && j.routes && j.routes[0]) break; }catch(e){ j = null; }
+    try{ const r = await fetchT(base + path, 9000); j = await r.json(); if(j && j.code==='Ok' && j.routes && j.routes[0]) break; }catch(e){ j = null; }
   }
   if(!j || j.code!=='Ok') throw new Error('no driving route was found');
   const rt = j.routes[0];
@@ -973,7 +1028,7 @@ clientTools.show_map = async ({place}) => {
     if(g.extent) m.fitBounds([[g.extent[3], g.extent[0]], [g.extent[1], g.extent[2]]], {padding:[24,24]}); else m.setView([g.lat, g.lon], 14);
     $('mapTitle').textContent = g.name; $('mapSub').textContent = g.area || 'Map';
     return `The map inside the app now shows ${g.name}${g.area ? ', ' + g.area : ''}. Tell Jim in a few words.`;
-  }catch(e){ return 'Map problem: ' + e.message + '.'; }
+  }catch(e){ if(!MapView.map || MapView.empty) MapView.close(); return 'Map problem: ' + e.message + '.'; }
 };
 clientTools.show_route = async ({from, to}) => {
   showAction(`🗺️ ${from} → ${to}`);
@@ -993,12 +1048,12 @@ clientTools.show_route = async ({from, to}) => {
     $('routeCard').classList.add('on');
     routeNav = `https://www.google.com/maps/dir/?api=1&origin=${a.lat},${a.lon}&destination=${b.lat},${b.lon}&travelmode=driving`;
     return `Route shown on the map inside the app: ${a.name} to ${b.name}, ${km} km, about ${sayDur(r.sec)} by car in usual traffic (no live traffic data)${r.via ? ', mostly via ' + r.via : ''}. Tell Jim the time and distance in one short sentence; if it's rush hour, say it may take longer. A Navigate button on the card opens Google Maps if he wants directions.`;
-  }catch(e){ return 'Route problem: ' + e.message + '.'; }
+  }catch(e){ if(!MapView.map || MapView.empty) MapView.close(); return 'Route problem: ' + e.message + '.'; }
 };
 clientTools.close_map = async () => { MapView.close(); return 'Map closed.'; };
 window.MayaTools = clientTools;
 /* On the lock screen, private actions need Jim's fingerprint / face first */
-const PRIVATE_TOOLS = ['make_call','send_message','open_call_history','check_calendar','add_calendar_event','compose_email','open_app','open_website','web_search'];
+const PRIVATE_TOOLS = ['make_call','send_message','read_messages','open_call_history','check_calendar','add_calendar_event','compose_email','open_app','open_website','web_search'];
 let unlockWait = null;
 window.zenixUnlocked = (ok) => { const w = unlockWait; unlockWait = null; if(w) w(!!ok); };
 function unlockFirst(){
@@ -1019,7 +1074,10 @@ PRIVATE_TOOLS.forEach(name => {
 /* ---------- Offline mode (on-phone brain) ---------- */
 if(!settings.mode) settings.mode='auto';
 if(!settings.offlineLang || (settings.offlineLang==='en-US' && !settings.langMigrated)){ settings.offlineLang='en-PH'; settings.langMigrated=true; }
-const off = { active:false, kind:null, waiting:{}, seq:0, thinking:false };
+const off = { active:false, kind:null, waiting:{}, seq:0, thinking:false, quietSince:0, langFallback:'', fromWake:false };
+const listenLang = () => off.langFallback || settings.offlineLang;
+/* when no voice chat is running, the Talk screen goes back to its resting look */
+function idleLook(){ if((off.active && off.kind==='talk') || convo || connecting) return; setOrb('idle'); $('modeLabel').textContent='Ready when you are'; }
 function offlineReady(){ if(!Native || !Native.offlineStatus) return false; try{ return JSON.parse(Native.offlineStatus()).state==='ready'; }catch(e){ return false; } }
 function wantOffline(){ return settings.mode==='offline' || (settings.mode==='auto' && !navigator.onLine); }
 
@@ -1092,16 +1150,19 @@ function offlineSay(text, speakIt){
   }
   if(speakIt){ setOrb('speaking'); $('modeLabel').textContent='Maya is speaking'; if(Native.setOrbMode) Native.setOrbMode('speaking'); Native.speak(text, settings.offlineLang); }
   else if(off.kind==='talk') offListen();
+  else idleLook();
 }
 function offListen(){
   if(!off.active || off.kind!=='talk') return;
   setOrb('listening'); $('modeLabel').textContent = off.brain==='own' ? 'Listening…' : 'Listening… (offline)';
   if(Native.setOrbMode) Native.setOrbMode('listening');
+  if(!off.quietSince) off.quietSince = Date.now();
   if(off.brain==='own' && useDGEars()){ dgListen(); return; }
-  if(off.brain==='own' && Native.startListeningOnline) Native.startListeningOnline(settings.offlineLang);
-  else Native.startListening(settings.offlineLang);
+  if(off.brain==='own' && Native.startListeningOnline) Native.startListeningOnline(listenLang());
+  else Native.startListening(listenLang());
 }
-window.zenixOnListening = () => { if(off.active && off.kind==='talk') $('modeLabel').textContent = off.brain==='own' ? 'Listening…' : 'Listening… (offline)'; };
+let srErrs = 0;
+window.zenixOnListening = () => { srErrs = 0; if(off.active && off.kind==='talk') $('modeLabel').textContent = off.brain==='own' ? 'Listening…' : 'Listening… (offline)'; };
 let partialTimer=null;
 const HANGING = /\b(and|or|but|so|because|cause|at|to|the|a|an|for|with|from|of|in|on|into|about|around|like|um+|uh+|uhm|er|ah|my|your|his|her|is|are|was|if|when|then|that|this|can|could|would|will|maybe|also|plus|please|ng|sa|na|yung|ang|mga|kasi|tapos|pero|para|si|ni|kay)$/i;
 function endWait(t){ const w=(t||'').trim().toLowerCase().replace(/[.,!?…]+$/,''); return HANGING.test(w) ? 2300 : 1150; }
@@ -1109,14 +1170,15 @@ window.zenixOnPartial = (t) => {
   if(!(off.active && off.kind==='talk')) return;
   $('liveLine').textContent='You: '+t;
   clearTimeout(partialTimer);
-  if(t && t.trim()) partialTimer = setTimeout(()=>{ if(Native.finishListening) Native.finishListening(); }, endWait(t));
+  if(t && t.trim()){ off.quietSince = Date.now(); partialTimer = setTimeout(()=>{ if(Native.finishListening) Native.finishListening(); }, endWait(t)); }
 };
 window.zenixOnSpeech = async (t) => {
   clearTimeout(partialTimer);
   if(!off.active || off.kind!=='talk') return;
   if(!t){ offListen(); return; }
+  srErrs = 0; off.quietSince = 0;
   addMsg('user', t); $('liveLine').textContent='You: '+t;
-  if(/^(stop|bye|goodbye|end chat|that's all|tapos na)\b/i.test(t.trim())){
+  if(isStopWord(t)){
     if(off.brain==='own'){ speech.onIdle=()=>endOffline(); speakEnqueue('Okay bro, talk later!'); return; }
     offlineSay('Okay bro, talk later!', true); off.endAfterSpeak=true; return; }
   if(off.brain==='own'){ ownRespond(t, true, ()=>offListen()); return; }
@@ -1125,8 +1187,14 @@ window.zenixOnSpeech = async (t) => {
 };
 window.zenixOnSpeechError = (code) => {
   if(!off.active || off.kind!=='talk') return;
-  if(code===6 || code===7 || code===8 || code===5){ setTimeout(offListen, 350); return; }
-  toast(code===-3 ? 'Voice chat on a computer needs Chrome or Edge' : code===9 ? 'Allow the microphone for Maya, then tap Talk again' : code===-1 ? 'Offline listening is not available on this phone' : 'Mic problem ('+code+'). Tap Talk again.');
+  if(code===6 || code===7){ srErrs = 0; setTimeout(offListen, 350); return; }   // nothing was said: keep listening
+  srErrs++;
+  // this phone has no ears for that language: carry on in US English
+  if((code===12 || code===13) && !off.langFallback && settings.offlineLang!=='en-US'){ off.langFallback = 'en-US'; setTimeout(offListen, 300); return; }
+  // busy mic or a network blip: try again, a little slower each time, then give up instead of looping forever
+  if((code===8 || code===5 || code===3 || code===2 || code===1) && srErrs <= 6){ setTimeout(offListen, Math.min(2500, 350*srErrs)); return; }
+  toast(code===-3 ? 'Voice chat on a computer needs Chrome or Edge' : code===9 ? 'Allow the microphone for Maya, then tap Talk again' : code===-1 ? 'Offline listening is not available on this phone'
+    : (code===1 || code===2) ? 'Listening needs the internet. Check your connection.' : code===3 ? 'Another app is using the microphone.' : 'Mic problem ('+code+'). Tap Talk again.');
   endOffline();
 };
 window.zenixOnSpeakDone = () => {
@@ -1134,17 +1202,19 @@ window.zenixOnSpeakDone = () => {
   if(!off.active) return;
   if(Native.setOrbMode) Native.setOrbMode('listening');
   if(off.endAfterSpeak){ off.endAfterSpeak=false; endOffline(); return; }
-  if(off.kind==='talk') offListen(); else { setOrb('idle'); }
+  if(off.kind==='talk') offListen(); else idleLook();
 };
 function startOffline(kind, brain='offline'){
   if(brain!=='own' && !Native.offlineAsk){ toast('The offline brain needs the Android app'); return false; }
   const goMe = () => document.querySelector('nav button[data-view="settings"]').click();
-  if(brain==='offline' && !offlineReady()){ toast('Download the offline brain first (Me tab)'); goMe(); return false; }
-  if(brain==='own' && !brainKey()){ toast(settings.provider==='openrouter' ? 'Add your OpenRouter key in the Me tab first' : 'Add your Claude API key in the Me tab first'); goMe(); return false; }
-  off.active=true; off.kind=kind; off.brain=brain; off.endAfterSpeak=false; if(typeof dg!=='undefined') dg.failed=false;
+  if(brain==='offline' && !offlineReady()){ toast('Download the offline brain first (Settings → Offline mode)'); goMe(); return false; }
+  if(brain==='own' && !brainKey()){ toast(settings.provider==='openrouter' ? 'Add your OpenRouter key in Settings first' : 'Add your Claude key in Settings first'); goMe(); return false; }
+  off.active=true; off.kind=kind; off.brain=brain; off.endAfterSpeak=false; off.quietSince=0; off.langFallback=''; srErrs=0; if(typeof dg!=='undefined') dg.failed=false;
   if(brain==='own'){ $('dot').className='dot on'; $('statusText').textContent='Online'; }
   else { $('dot').className='dot busy'; $('statusText').textContent='Offline'; }
-  addMsg('sys', (brain==='own'?'':'Offline ') + (kind==='talk'?'voice chat started':'chat'));
+  if(kind==='talk') addMsg('sys', brain==='own' ? 'Voice chat started' : 'Offline voice chat started');
+  else if(brain!=='own') addMsg('sys', 'Offline chat');
+  off.fromWake = kind==='talk' && wakeGreeting;
   if(kind==='talk'){
     if(settings.wake && Native.wakePause) Native.wakePause();
     $('talkBtn').classList.add('end'); $('talkLabel').textContent='End chat';
@@ -1153,21 +1223,23 @@ function startOffline(kind, brain='offline'){
       if(settings.voice!=='phone' && !/^(dg|el):/.test(settings.voice)) loadKokoro().catch(()=>{});
       speech.onIdle = () => offListen();
       speakEnqueue(wakeGreeting ? 'Yes bro?' : `Hey ${settings.name||'Jim'}! What's up?`); wakeGreeting = false;
-    } else offlineSay(`Hey ${settings.name||'Jim'}, offline Maya here. What's up?`, true);
+    } else { wakeGreeting = false; offlineSay(`Hey ${settings.name||'Jim'}, offline Maya here. What's up?`, true); }
   }
   return true;
 }
-function endOffline(){
+function endOffline(quiet){
   if(!off.active) return;
-  off.active=false; off.kind=null;
+  const wasTalk = off.kind==='talk';
+  off.active=false; off.kind=null; off.quietSince=0; off.thinking=false;
+  clearTimeout(partialTimer);
   try{ Native.stopListening(); Native.stopSpeaking(); }catch(e){}
   stopSpeech(); dgClose();
   if(Native.keepAwake) Native.keepAwake('false');
-  setStatus('off'); resetTalkUI(); addMsg('sys','Chat ended');
+  setStatus('off'); resetTalkUI(); if(wasTalk && !quiet) addMsg('sys','Voice chat ended');
   wakeResumeLater();
 }
 async function offlineChat(text){
-  if(!off.active && !startOffline('chat')) return;
+  if(!off.active && !startOffline('chat')){ stopTyping(); return; }
   const reply = await offlineHandle(text);
   offlineSay(reply, settings.chatVoice);
 }
@@ -1237,7 +1309,10 @@ let webSearchOn = true;   // retried every time the app opens
 function ownSystem(){
   const name = settings.name || 'Jim';
   const now = new Date().toLocaleString('en-GB', {timeZone:'Asia/Dubai', weekday:'long', day:'numeric', month:'long', year:'numeric', hour:'2-digit', minute:'2-digit'});
-  const dynamic = `Right now it is ${now} (Dubai).` + (ownMsgs.length <= 1 ? `\n\nRecent chat from before (context only):\n${recentChatText()}` : '');
+  const noTools = settings.provider==='openrouter' && !!orNoTools[settings.orModel || 'x-ai/grok-4.3'];
+  const dynamic = `Right now it is ${now} (Dubai).`
+    + (noTools ? `\n\nThis brain can only talk: it has no phone tools and no web search. If he asks for a phone action (alarm, call, message, map, opening an app) or something you'd need to look up, tell him in one short line that this brain can't, and that Grok or Claude in Settings can.` : '')
+    + (ownMsgs.length <= 1 ? `\n\nRecent chat from before (context only):\n${recentChatText()}` : '');
   return [`You are Maya, ${name} Porce's personal AI assistant. You are female. ${name} is a Filipino medic in EMS under Civil Defence in the UAE, and builds and sells apps as JPSums. You live in an app on his Samsung phone and can control it.
 
 Personality: funny, witty and playful, his best buddy who's also super capable. Crack jokes, tease him, talk openly about sex and adult stuff, banter, puns, cheeky humour — but get the job done first. Calm and serious when it matters. He calls you "bro"; match his energy.
@@ -1275,19 +1350,35 @@ function cleanMsgs(messages){
   }
   return out;
 }
+/* fetch for the brains: gives up when nothing arrives for a while, instead of "Thinking…" forever */
+async function brainFetch(url, opts, outer){
+  const ctl = new AbortController(); let timedOut = false, timer = 0;
+  const arm = ms => { clearTimeout(timer); timer = setTimeout(() => { timedOut = true; try{ ctl.abort(); }catch(e){} }, ms); };
+  const onOuter = () => { try{ ctl.abort(); }catch(e){} };
+  if(outer){ if(outer.aborted) onOuter(); else outer.addEventListener('abort', onOuter, {once:true}); }
+  const done = () => { clearTimeout(timer); if(outer) outer.removeEventListener('abort', onOuter); };
+  const fail = e => { done(); throw (timedOut ? new Error('timeout') : e); };
+  arm(30000);
+  let res; try{ res = await fetch(url, Object.assign({}, opts, {signal:ctl.signal})); }catch(e){ fail(e); }
+  return {res, arm, done, fail};
+}
 async function claudeStream(system, messages, onText, signal){
   messages = cleanMsgs(messages);
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method:'POST', signal,
+  const g = await brainFetch('https://api.anthropic.com/v1/messages', {
+    method:'POST',
     headers:{'content-type':'application/json','x-api-key':getKey(),'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
     body: JSON.stringify(Object.assign({ model:settings.model, max_tokens:700, stream:true,
       system:[{type:'text', text:system[0], cache_control:{type:'ephemeral'}}, {type:'text', text:system[1]}],
       tools: webSearchOn ? TOOL_DEFS.concat([WEB_SEARCH]) : TOOL_DEFS, messages },
       fastMode ? { thinking:{type:'disabled'}, output_config:{effort:'low'} } : {}))
-  });
+  }, signal);
+  const res = g.res;
   if(!res.ok){
     let msg = res.status+''; try{ const j=await res.json(); msg = (j.error&&j.error.message)||msg; }catch(e){}
-    if(res.status===401) msg='Your Claude API key is not valid. Check it in the Me tab.';
+    g.done();
+    if(res.status===401) msg='Your Claude key is not valid. Check it in Settings → Keys.';
+    if(res.status===429) msg='Claude is busy right now, try again in a moment.';
+    if(res.status===529 || res.status===503) msg='Claude is overloaded right now, try again in a moment.';
     if(res.status===400 && /credit/i.test(msg)) msg='Your Claude API account is out of credit. Top up at platform.claude.com.';
     if(res.status===400 && webSearchOn && /web.?search/i.test(msg)){ webSearchOn=false; store.set('websearch', false); return claudeStream(system, messages, onText, signal); }
     if(res.status===400 && fastMode && /thinking|effort|output_config/i.test(msg)){ fastMode=false; store.set('fastmode', false); return claudeStream(system, messages, onText, signal); }
@@ -1295,7 +1386,9 @@ async function claudeStream(system, messages, onText, signal){
   }
   const reader = res.body.getReader(); const dec = new TextDecoder();
   let buf='', stop=null; const blocks=[]; const u={inTok:0, outTok:0};
-  for(;;){
+  const cacheRead = /haiku/.test(settings.model) ? 0.1 : 0.05;
+  try{ for(;;){
+    g.arm(45000);
     const {value, done} = await reader.read(); if(done) break;
     buf += dec.decode(value, {stream:true});
     let idx;
@@ -1303,7 +1396,7 @@ async function claudeStream(system, messages, onText, signal){
       const chunk = buf.slice(0, idx); buf = buf.slice(idx+2);
       const line = chunk.split('\n').find(l => l.startsWith('data:')); if(!line) continue;
       let ev; try{ ev = JSON.parse(line.slice(5)); }catch(e){ continue; }
-      if(ev.type==='message_start'){ const us=ev.message.usage||{}; u.inTok += (us.input_tokens||0) + 1.25*(us.cache_creation_input_tokens||0) + 0.1*(us.cache_read_input_tokens||0); }
+      if(ev.type==='message_start'){ const us=ev.message.usage||{}; u.inTok += (us.input_tokens||0) + 1.25*(us.cache_creation_input_tokens||0) + cacheRead*(us.cache_read_input_tokens||0); }
       else if(ev.type==='content_block_start'){ const cb=ev.content_block;
         if(cb.type==='tool_use') blocks[ev.index] = {type:'tool_use', id:cb.id, name:cb.name, json:''};
         else if(cb.type==='text') blocks[ev.index] = {type:'text', text:''};
@@ -1318,7 +1411,7 @@ async function claudeStream(system, messages, onText, signal){
       else if(ev.type==='message_delta'){ stop = ev.delta.stop_reason; if(ev.usage) u.outTok += ev.usage.output_tokens||0; }
       else if(ev.type==='error'){ throw new Error((ev.error&&ev.error.message)||'Claude error'); }
     }
-  }
+  } }catch(e){ g.fail(e); }finally{ g.done(); }
   return {blocks, stop, u};
 }
 
@@ -1332,10 +1425,18 @@ function trimOwnMsgs(){
     clean.push(m);
   }
   if(clean.length !== ownMsgs.length) ownMsgs.splice(0, ownMsgs.length, ...clean);
-  while(ownMsgs.length > 24){
-    ownMsgs.shift();
-    while(ownMsgs.length && !(ownMsgs[0].role==='user' && typeof ownMsgs[0].content==='string')) ownMsgs.shift();
-  }
+  // the list must begin with Jim speaking (not with a leftover tool result)
+  const words = m => Array.isArray(m.content) ? m.content.filter(c => c && c.type==='text') : [];
+  const startsClean = m => m.role==='user' && (typeof m.content==='string' || (Array.isArray(m.content) && m.content.length && !m.content.some(c => c && c.type==='tool_result')));
+  const fixStart = () => {
+    while(ownMsgs.length && !startsClean(ownMsgs[0])){
+      const f = ownMsgs[0];
+      if(f.role==='user' && words(f).length){ f.content = words(f); break; }   // old tool result + new words: keep the words
+      ownMsgs.shift();
+    }
+  };
+  while(ownMsgs.length > 24){ ownMsgs.shift(); fixStart(); }
+  fixStart();
 }
 
 async function ownTurn(userText, speakIt, opts={}){
@@ -1407,14 +1508,16 @@ async function orStream(system, messages, onText, signal){
     // switch thinking off for speed; try the different ways providers accept it
     const rm = OR_REASON_OFF[orNoReason[model]||0];
     if(rm) body.reasoning = rm;
-    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method:'POST', signal,
+    const g = await brainFetch('https://openrouter.ai/api/v1/chat/completions', {
+      method:'POST',
       headers:{'content-type':'application/json', 'authorization':'Bearer '+orKey(), 'HTTP-Referer':'https://github.com/mafiaporce-bit/zenix', 'X-Title':'Maya'},
       body: JSON.stringify(body)
-    });
+    }, signal);
+    const res = g.res;
     if(!res.ok){
       let msg = res.status+''; try{ const j=await res.json(); msg = (j.error&&j.error.message)||msg; }catch(e){}
-      if(res.status===401) throw new Error('Your OpenRouter key is not valid. Check it in the Me tab.');
+      g.done();
+      if(res.status===401) throw new Error('Your OpenRouter key is not valid. Check it in Settings → Keys.');
       if(res.status===402) throw new Error('Your OpenRouter account is out of credit. Top up at openrouter.ai.');
       if(res.status===429) throw new Error('The open brain is busy right now, try again in a moment.');
       if(body.frequency_penalty && /frequency/i.test(msg)){ orNoPenalty=true; continue; }
@@ -1425,7 +1528,8 @@ async function orStream(system, messages, onText, signal){
     }
     const reader = res.body.getReader(); const dec = new TextDecoder();
     let buf='', text='', finish=null, cost=null; const calls=[]; const u={inTok:0, outTok:0};
-    for(;;){
+    try{ for(;;){
+      g.arm(45000);
       const {value, done} = await reader.read(); if(done) break;
       buf += dec.decode(value, {stream:true});
       let idx;
@@ -1448,11 +1552,11 @@ async function orStream(system, messages, onText, signal){
         });
         if(ch.finish_reason) finish = ch.finish_reason;
       }
-    }
+    } }catch(e){ g.fail(e); }finally{ g.done(); }
     if(cost===null){ const p = OR_PRICES[model] || [0,0]; cost = (u.inTok*p[0] + u.outTok*p[1]) / 1e6; }
     return {text, calls: calls.filter(c => c && c.name).map((c,i) => Object.assign(c, {id: c.id || ('call_'+Date.now()+'_'+i)})), finish, cost, u};
   }
-  throw new Error('The open brain could not answer. Try another model in the Me tab.');
+  throw new Error('The open brain could not answer. Try another model in Settings → Brain.');
 }
 
 async function orTurn(userText, speakIt, opts={}){
@@ -1538,7 +1642,7 @@ function speakEnqueue(text){
 async function pumpSpeech(){
   if(speech.playing || speech.hold) return;
   const item = speech.q.shift();
-  if(!item){ if(!speech.streamOpen && speech.onIdle){ const f=speech.onIdle; speech.onIdle=null; f(); } return; }
+  if(!item){ if(!speech.streamOpen){ const f=speech.onIdle; speech.onIdle=null; if(f) f(); else idleLook(); } return; }
   if(typeof dg!=='undefined' && dg.active && !dg.paused) dgPause();
   if(turnStart){ const d=(performance.now()-turnStart)/1000; const b = turnTok ? (turnTok-turnStart)/1000 : 0; turnStart=0; turnTok=0;
     const parts = [];
@@ -1550,7 +1654,8 @@ async function pumpSpeech(){
     turnEars = 0; turnHead = false; turnSearched = false; }
   speech.playing = true; setOrb('speaking'); $('modeLabel').textContent='Maya is speaking'; if(Native && Native.setOrbMode) Native.setOrbMode('speaking');
   try{
-    const audio = item.wav ? await item.wav : null;
+    // a cloud voice that takes too long is skipped for the phone's own voice, so she never goes silent
+    const audio = item.wav ? await Promise.race([item.wav, new Promise(r => setTimeout(() => r(null), 15000))]) : null;
     if(audio){
       const url = URL.createObjectURL(audio.toBlob());
       if(typeof vizCtx!=='undefined' && vizCtx && vizCtx.state!=='running'){ try{ await vizCtx.resume(); }catch(e){} }
@@ -1573,18 +1678,23 @@ function speedNote(){
   return '';
 }
 async function ownRespond(text, speakIt, after, opts={}){
+  off.quietSince = 0;
   if(!opts.quiet){ turnStart = performance.now(); turnTok = 0; turnSearched = false; $('modeLabel').textContent = 'Thinking…'; setOrb('thinking'); }
   speech.streamOpen = true; speech.onIdle = after || null;
   let full = '';
   try{ full = await ownTurn(text, speakIt, opts); }
   catch(e){
     if(e.name==='AbortError' || (opts.isCancelled && opts.isCancelled())) return;
-    if(!opts.retried && /messages\.\d|invalid input|tool_call|tool_use|tool_result|expected object|roles must alternate/i.test(e.message)){
+    const why = String((e && e.message) || e);
+    if(!opts.retried && /messages\.\d|invalid input|tool_call|tool_use|tool_result|expected object|roles must alternate|at least one message/i.test(why)){
       ownMsgs.length = 0;   // the saved chat got out of shape: start fresh and try again
       return ownRespond(text, speakIt, after, Object.assign({}, opts, {retried:true, quiet:true}));
     }
-    if(settings.mode==='auto' && offlineReady() && /fetch|network|Failed/i.test(e.message)){ speech.streamOpen=false; toast('No connection — offline brain answering'); const r=await offlineHandle(text); if(speakIt) speakEnqueue(r); addMsg('ai', r); pumpSpeech(); return; }
-    full = 'Sorry bro, I couldn\'t reach my brain. ' + e.message;
+    const net = /Failed to fetch|NetworkError|Load failed|network|timeout/i.test(why);
+    if(settings.mode==='auto' && offlineReady() && net){ speech.streamOpen=false; toast('No connection — offline brain answering'); const r=await offlineHandle(text); if(speakIt) speakEnqueue(r); addMsg('ai', r); pumpSpeech(); return; }
+    full = why==='timeout' ? 'Sorry bro, that is taking too long. Check the internet and ask me again.'
+      : net ? 'Sorry bro, I can\'t reach the internet right now.'
+      : 'Sorry bro, I couldn\'t reach my brain. ' + why;
     if(speakIt) speakEnqueue(full);
   }
   if(opts.confirmed){ const ok = await opts.confirmed; if(!ok || (opts.isCancelled && opts.isCancelled())) return; }
@@ -1716,7 +1826,7 @@ function dgTTS(text){
 }
 window.zenixDG = (id, b64, err) => {
   const w = dgWait[id]; if(!w) return; delete dgWait[id];
-  if(err){ if(/401|403/.test(err)) toast('Deepgram key not accepted. Check it in the Me tab.'); return w.reject(new Error(err)); }
+  if(err){ if(/401|403/.test(err)) toast('Deepgram key not accepted. Check it in Settings → Keys.'); return w.reject(new Error(err)); }
   const bin = atob(b64); const arr = new Uint8Array(bin.length);
   for(let i=0;i<bin.length;i++) arr[i] = bin.charCodeAt(i);
   w.resolve({ toBlob: () => new Blob([arr], {type:'audio/mpeg'}) });
@@ -1728,7 +1838,7 @@ window.zenixDGMsg = (txt) => {
   if(m.type==='TurnInfo'){
     if(dg.paused) return;
     const t = (m.transcript||'').trim();
-    if(m.event==='Update' || m.event==='StartOfTurn'){ if(t && t!==dg.lastT){ dg.lastT=t; dg.lastHeard=performance.now(); } if(t && off.kind==='talk') $('liveLine').textContent = 'You: '+t; }
+    if(m.event==='Update' || m.event==='StartOfTurn'){ if(t && t!==dg.lastT){ dg.lastT=t; dg.lastHeard=performance.now(); off.quietSince=Date.now(); } if(t && off.kind==='talk') $('liveLine').textContent = 'You: '+t; }
     else if(m.event==='EagerEndOfTurn'){ if(t) dgEager(t); }
     else if(m.event==='TurnResumed'){ dgCancelEager(); }
     else if(m.event==='EndOfTurn'){ if(t) dgFinal(t); }
@@ -1738,20 +1848,23 @@ window.zenixDGMsg = (txt) => {
     const alt = m.channel && m.channel.alternatives && m.channel.alternatives[0];
     const t = (alt && alt.transcript) || '';
     if(dg.paused) return;
+    if(t) off.quietSince = Date.now();
     if(m.is_final && t) dg.buf += (dg.buf ? ' ' : '') + t;
     if(off.kind==='talk') $('liveLine').textContent = 'You: ' + (dg.buf + (m.is_final ? '' : ' ' + t)).trim();
     if(m.speech_final && dg.buf.trim()) dgFinish();
   } else if(m.type==='UtteranceEnd' && !dg.paused && dg.buf.trim()) dgFinish();
 };
 window.zenixDGOpen = (ok, err) => { const w=dg.opening; dg.opening=null; if(!w) return; ok ? w.resolve() : w.reject(new Error(/401|403/.test(err||'') ? 'Deepgram key not accepted' : ('Could not connect to Deepgram '+(err||'')).trim())); };
-window.zenixDGClosed = () => { const was=dg.active; dg.active=false; dg.paused=true; if(was && off.active && off.brain==='own' && off.kind==='talk'){ dg.failed=true; toast('Deepgram disconnected, using phone listening'); offListen(); } };
+window.zenixDGClosed = () => { const was=dg.active; dg.active=false; dg.paused=true; if(was && off.active && off.brain==='own' && off.kind==='talk'){ dg.failed=true; toast('Deepgram disconnected, using phone listening');
+    // if she's mid-answer, the normal "finished speaking" step starts the phone's listening (no listening to her own voice)
+    if(!(speech.playing || speech.q.length || speech.streamOpen || speech.hold)) offListen(); } };
 window.zenixDGTest = (ok, msg) => { $('dgState').textContent = ok ? 'Deepgram key works ✓' : ('✗ '+msg); if(!ok) toast(msg); };
 function dgOpen(){
   const attempt = (flux) => new Promise((res, rej) => {
     if(!Native || !Native.dgOpen) return rej(new Error('Deepgram needs the Android app'));
-    dg.opening = {resolve:res, reject:rej};
+    const mine = dg.opening = {resolve:res, reject:rej};
     flux ? Native.dgOpenFlux(dgKey()) : Native.dgOpen(dgKey(), 'en');
-    setTimeout(() => { if(dg.opening){ dg.opening=null; rej(new Error('Deepgram timed out')); } }, 10000);
+    setTimeout(() => { if(dg.opening === mine){ dg.opening=null; rej(new Error('Deepgram timed out')); } }, 10000);
   });
   const tryFlux = !!(Native && Native.dgOpenFlux) && !dg.noFlux;
   return attempt(tryFlux)
@@ -1761,7 +1874,8 @@ function dgOpen(){
 /* Flux head start: prepare the answer at "probably done", speak only at "definitely done" */
 let specTurn = null;
 const normT = t => t.toLowerCase().replace(/[^a-z0-9 ]/g,'').replace(/\s+/g,' ').trim();
-const isStopWord = t => /^(stop|bye|goodbye|end chat|that's all|tapos na)\b/i.test(t.trim());
+/* "stop", "okay bye Maya", "that's all" end the chat; "stop the alarm" or "bye-bye to my diet" do not */
+const isStopWord = t => /^(?:(?:ok(?:ay)?|alright|all right|sige)[\s,.!]+)?(?:stop(?: it| now| talking| listening)?|bye(?:[\s-]?bye)?|goodbye|end (?:the )?chat|that'?s all|that is all|tapos na)(?:[\s,.!]+(?:maya|bro|na|po|for now|please|thanks|thank you|salamat))*[\s,.!]*$/i.test(String(t||'').trim());
 function startSpeculative(t){
   const snap = JSON.stringify(ownMsgs);
   const ctl = new AbortController(); let go; const confirmed = new Promise(r => go = r); let cancelled = false;
@@ -1778,10 +1892,10 @@ function dgEager(t){
   if(specTurn && normT(specTurn.text)===normT(t)) return;
   dgCancelEager(); specTurn = startSpeculative(t);
 }
-function dgCancelEager(){ if(specTurn){ const s=specTurn; specTurn=null; s.cancel(); } }
+function dgCancelEager(){ if(specTurn){ const s=specTurn; specTurn=null; s.cancel(); if(off.active && off.kind==='talk') off.quietSince = Date.now(); } }
 function dgFinal(t){
   turnEars = dg.lastHeard ? (performance.now()-dg.lastHeard)/1000 : 0; dg.lastHeard=0; dg.lastT='';
-  dgPause();
+  dgPause(); off.quietSince = 0;
   if(specTurn && normT(specTurn.text)===normT(t)){ const s=specTurn; specTurn=null; addMsg('user', t); $('liveLine').textContent='You: '+t; s.confirm(); return; }
   dgCancelEager();
   if(window.zenixOnSpeech) window.zenixOnSpeech(t);
@@ -1796,7 +1910,7 @@ function dgListen(){
   setOrb('listening'); $('modeLabel').textContent='Listening…'; if(Native.setOrbMode) Native.setOrbMode('listening');
   if(dg.active){ dgResume(); return; }
   dgOpen().then(() => { if(off.active && off.kind==='talk') dgResume(); })
-    .catch(e => { dgClose(); dg.failed=true; toast(e.message+' — using phone listening'); if(Native.startListeningOnline) Native.startListeningOnline(settings.offlineLang); });
+    .catch(e => { dgClose(); dg.failed=true; toast(e.message+' — using phone listening'); if(off.active && off.kind==='talk' && Native.startListeningOnline) Native.startListeningOnline(listenLang()); });
 }
 
 function renderDG(){
@@ -1852,7 +1966,7 @@ window.zenixEL = (id, b64, err) => {
     else if(warn && /quota|credit/i.test(err)) toast('ElevenLabs is out of credits, using the phone voice');
     else if(warn && /permission/i.test(err)) toast('Your ElevenLabs key needs the "Text to Speech" permission');
     else if(warn && /voice_not_found|not found/i.test(err)) toast('That voice isn\'t in your ElevenLabs library yet. Add it on elevenlabs.io first.');
-    else if(warn && /^40[13]/.test(err)) toast('ElevenLabs key not accepted. Check it in the Me tab.');
+    else if(warn && /^40[13]/.test(err)) toast('ElevenLabs key not accepted. Check it in Settings → Keys.');
     return w.reject(new Error(err));
   }
   const bin = atob(b64); const arr = new Uint8Array(bin.length);
@@ -1906,15 +2020,22 @@ renderEL();
 if(elKey() && Native && Native.elVoices) setTimeout(() => Native.elVoices(elKey()), 2500);
 
 /* ---------- Chat ---------- */
-function sendText(text){
+let typedChain = Promise.resolve();   // typed messages are answered one at a time, in order
+async function sendText(text){
   text=text.trim(); if(!text) return;
-  chatTyping = true; clearTimeout(chatTypingTimer); chatTypingTimer = setTimeout(()=>{ chatTyping=false; renderChat(); }, 45000);
+  chatTyping = true; clearTimeout(chatTypingTimer); chatTypingTimer = setTimeout(()=>{ chatTyping=false; renderChat(); }, 60000);
   addMsg('user', text); $('input').value=''; autoGrow(); updSend();
-  if((off.active && off.brain==='own') || (!off.active && !convo && !wantOffline() && settings.engine==='own')){
-    if(!off.active && !startOffline('chat','own')) return;
-    ownRespond(text, off.kind==='talk' || settings.chatVoice, off.kind==='talk' ? ()=>offListen() : null); return;
+  // a typed chat picks its brain fresh for every message (the setting or the internet may have changed)
+  const want = wantOffline() ? 'offline' : (settings.engine==='own' ? 'own' : 'eleven');
+  if(off.active && off.kind==='chat' && off.brain!==want) endOffline(true);
+  if(convo && session==='chat' && want!=='eleven') await endSession();
+  if((off.active && off.brain==='own') || (!off.active && !convo && want==='own')){
+    if(!off.active && !startOffline('chat','own')){ stopTyping(); return; }
+    const talk = off.kind==='talk';
+    typedChain = typedChain.then(() => ownRespond(text, talk || settings.chatVoice, talk ? ()=>offListen() : null)).catch(() => {});
+    return;
   }
-  if(off.active || (!convo && wantOffline())){ offlineChat(text); return; }
+  if(off.active || (!convo && want==='offline')){ offlineChat(text); return; }
   if(convo){ convo.sendUserMessage(text); return; }
   pendingText=text; startSession('chat');
 }
@@ -1925,7 +2046,12 @@ $('input').addEventListener('input', autoGrow);
 
 
 /* ---------- Tabs ---------- */
-document.querySelectorAll('nav button').forEach(b => b.onclick = () => {
+document.querySelectorAll('nav button').forEach(b => b.onclick = async () => {
+  // on the lock screen only the Talk screen is open to everyone; chats and settings need Jim's unlock
+  if(b.dataset.view!=='talk' && IS_APP && Native.isLocked && Native.isLocked()==='true'){
+    toast('Unlock the phone to open ' + (b.dataset.view==='chat' ? 'your chats' : 'Settings'));
+    if(!(await unlockFirst())) return;
+  }
   document.querySelectorAll('nav button').forEach(x=>x.classList.remove('active'));
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
   b.classList.add('active'); $('view-'+b.dataset.view).classList.add('active');
@@ -2150,59 +2276,105 @@ document.addEventListener('click', initVoiceViz, {once:true});
 
 /* ---------- "Hey Maya" wake word ---------- */
 if(settings.wake===undefined) settings.wake=false;
-let wakeGreeting = false;
+let wakeGreeting = false;   // true for a moment after "Hey Maya": the next voice chat greets with "Yes bro?" and ends sooner when quiet
 function wakeSt(){ try{ return JSON.parse(Native.wakeStatus()); }catch(e){ return {}; } }
 function wakePauseNow(){ if(settings.wake && Native && Native.wakePause){ Native.wakePause(); return new Promise(r=>setTimeout(r,350)); } return Promise.resolve(); }
+const inVoiceChat = () => (off.active && off.kind==='talk') || !!convo || connecting;
 function wakeResumeLater(){
-  if(Native.wakeChatEnded) setTimeout(()=>{ if(!off.active && !convo) Native.wakeChatEnded(); }, 1200);
-  if(settings.wake && Native && Native.wakeResume) setTimeout(()=>{ if(!off.active && !convo) Native.wakeResume(); renderWake(); }, 900);
+  if(Native.wakeChatEnded) setTimeout(()=>{ if(!inVoiceChat()) Native.wakeChatEnded(); }, 1200);
+  if(settings.wake && Native && Native.wakeResume) setTimeout(()=>{ if(!inVoiceChat()){ Native.wakeResume(); waitWakeReady(); } renderWake(); }, 900);
 }
 window.zenixWake = () => {
-  if(off.active || convo || connecting) return;
+  if(connecting || (convo && session==='talk') || (off.active && off.kind==='talk')) return;   // already talking; the listener comes back when that chat ends
   document.querySelector('nav button[data-view="talk"]').click();
   wakeGreeting = true;
-  $('talkBtn').click();
+  $('talkBtn').click();   // (this also closes a typed chat that was left open)
+  // nothing started (no key, no mic…): switch the listener back on and give the lock screen back
+  setTimeout(() => { if(!inVoiceChat()){ wakeGreeting = false; wakeResumeLater(); } }, 3000);
 };
 function renderWake(){
   if(!Native || !Native.wakeStatus){ $('wakeState').textContent='Android app only'; $('wakeBtn').style.display='none'; return; }
-  const st = wakeSt();
+  const st = wakeSt(); const diag = $('wakeDiag'), fix = $('wakeFix');
   $('wakeBtn').textContent = settings.wake ? 'Turn off' : 'Turn on';
-  if(!settings.wake){ $('wakeState').textContent='Off'; return; }
+  if(!settings.wake){ $('wakeState').textContent='Off'; diag.style.display='none'; fix.style.display='none'; return; }
   if(st.state==='downloading'){ $('wakeState').textContent=`Downloading… ${st.percent||0}%`; }
   else if(st.state==='unpacking'){ $('wakeState').textContent='Setting up…'; }
   else if(st.state==='failed'){ $('wakeState').textContent='Download failed. Turn off and on to retry.'; }
   else if(st.state==='ready'){ $('wakeState').textContent = st.listening ? 'On: say "Hey Maya" ✓' : (st.running ? 'On (paused while you chat)' : 'Starting…'); if(st.error && !st.listening) $('wakeState').textContent += ' · '+st.error; }
+  else $('wakeState').textContent = 'Getting ready…';
+  // what she last caught, so it can be tested: say "Hey Maya" and watch this line
+  if(st.state==='ready' && st.running){
+    const ago = typeof st.heardAgo==='number' ? st.heardAgo : -1;
+    diag.textContent = (st.heard && ago >= 0 && ago < 900) ? `Last heard: "${st.heard}" · ${ago < 60 ? ago + ' sec' : Math.round(ago/60) + ' min'} ago` : 'To test: say "Hey Maya". What she heard shows here.';
+    diag.style.display = 'block';
+  } else diag.style.display = 'none';
+  const needO = !!Native.hasOverlay && Native.hasOverlay()!=='true', needF = !!Native.canFullScreen && Native.canFullScreen()!=='true', needB = !!Native.batteryOk && Native.batteryOk()!=='true';
+  $('wfOverlay').style.display = needO ? 'flex' : 'none'; $('wfFull').style.display = needF ? 'flex' : 'none'; $('wfBatt').style.display = needB ? 'flex' : 'none';
+  fix.style.display = (needO || needF || needB) ? 'block' : 'none';
 }
+let wakeWaiting = false, wakeFetched = false;
 function waitWakeReady(){
-  if(!settings.wake) return;
-  const st = wakeSt(); renderWake();
-  if(st.state==='ready'){ if(!st.running) Native.wakeEnable('true'); setTimeout(renderWake, 1500); return; }
-  if(st.state==='failed') return;
-  setTimeout(waitWakeReady, 2000);
+  if(!settings.wake || wakeWaiting || !Native || !Native.wakeStatus) return;
+  wakeWaiting = true;
+  (function tick(){
+    if(!settings.wake){ wakeWaiting = false; return; }
+    const st = wakeSt(); renderWake();
+    if(st.state==='ready'){
+      wakeWaiting = false;
+      // Android only lets the listener start while Maya is on screen
+      if(!st.running && !document.hidden && !inVoiceChat()) Native.wakeEnable('true');
+      setTimeout(renderWake, 1500); return;
+    }
+    if(st.state==='failed'){ wakeWaiting = false; return; }
+    if(st.state!=='downloading' && st.state!=='unpacking' && !wakeFetched){ wakeFetched = true; Native.wakeDownload(); }   // e.g. after restoring a backup: fetch the listener again
+    setTimeout(tick, 2000);
+  })();
 }
 $('wakeBtn').onclick = () => {
   if(!Native || !Native.wakeStatus) return;
   settings.wake = !settings.wake; store.set('settings', settings);
   if(settings.wake){
     const st = wakeSt();
-    if(st.state!=='ready' && st.state!=='downloading' && st.state!=='unpacking'){ Native.wakeDownload(); toast('Downloading the "Hey Maya" listener (about 40 MB)…'); }
+    if(st.state!=='ready' && st.state!=='downloading' && st.state!=='unpacking'){ wakeFetched = true; Native.wakeDownload(); toast('Downloading the "Hey Maya" listener (about 40 MB)…'); }
     waitWakeReady();
     if(Native.hasOverlay && Native.hasOverlay()!=='true'){ toast('Also allow "Display over other apps" so Maya can pop up'); setTimeout(()=>Native.requestOverlay(), 1800); }
   } else Native.wakeEnable('false');
   setTimeout(renderWake, 500);
 };
-document.addEventListener('visibilitychange', () => { if(!document.hidden) renderWake(); });
+$('wfOverlayBtn').onclick = () => { if(Native.requestOverlay) Native.requestOverlay(); };
+$('wfFullBtn').onclick = () => { if(Native.openFullScreenSetting) Native.openFullScreenSetting(); };
+$('wfBattBtn').onclick = () => { if(Native.askBattery) Native.askBattery(); };
+document.addEventListener('visibilitychange', () => { if(!document.hidden){ renderWake(); waitWakeReady(); } });
 if(settings.wake && Native && Native.wakeStatus) setTimeout(waitWakeReady, 1200); else renderWake();
 
 /* ---------- app updates ---------- */
-window.zenixUpdateAvailable = (name, manual) => { $('updText').textContent = 'New Maya '+(name?('v'+name+' '):'')+'is ready'; $('updBar').style.display='flex'; $('updBtn').textContent='Update now'; if(manual){ $('verText').textContent = 'v'+name+' is ready, tap Update now at the top'; window.scrollTo({top:0, behavior:'smooth'}); } };
-window.zenixUpdateFailed = () => { toast('Update download failed. Try again on Wi-Fi.'); $('updBtn').textContent='Retry'; };
+let updState = 'idle', updAfterPerm = false;   // idle | downloading | ready
+window.zenixUpdateAvailable = (name, manual) => {
+  $('updBar').style.display='flex';
+  if(updState==='idle'){ $('updText').textContent = 'New Maya '+(name?('v'+name+' '):'')+'is ready'; $('updBtn').textContent='Update now'; }   // never reset a download that's running
+  if(manual){ $('verText').textContent = 'v'+name+' is ready, tap Update now at the top'; window.scrollTo({top:0, behavior:'smooth'}); }
+};
+window.zenixUpdateProgress = (pct, note) => {
+  updState = 'downloading'; $('updBar').style.display='flex';
+  $('updText').textContent = note || ('Downloading the new Maya… ' + pct + '%');
+  $('updBtn').textContent = note ? 'Waiting' : pct + '%';
+};
+window.zenixUpdateReady = () => { updState = 'ready'; $('updBar').style.display='flex'; $('updText').textContent = 'Update downloaded. Tap Install if the install screen is not showing.'; $('updBtn').textContent = 'Install'; };
+window.zenixUpdateFailed = (msg) => {
+  updState = 'idle'; $('updBar').style.display='flex';
+  $('updText').textContent = (msg || 'The update download failed.') + ' You can also use Settings → About → Download in browser.';
+  $('updBtn').textContent = 'Retry'; toast(msg || 'Update download failed. Try again.');
+};
 $('updBtn').onclick = () => {
   const r = Native && Native.startUpdate ? Native.startUpdate() : '';
-  if(r==='permission'){ toast('Allow "Install unknown apps" for Maya, then tap Update now again'); }
-  else if(r==='downloading'){ $('updBtn').textContent='Downloading…'; toast('Downloading the update, the install screen will pop up'); }
-  else toast('Could not start the update');
+  if(r==='permission'){ updAfterPerm = true; toast('Allow "Install unknown apps" for Maya, then come back'); }
+  else if(r==='downloading'){ if(updState!=='downloading'){ updState = 'downloading'; $('updBtn').textContent='0%'; $('updText').textContent='Downloading the new Maya…'; toast('Downloading the update. The install screen pops up when it is done.'); } else toast('Still downloading, one moment'); }
+  else if(r==='ready'){ updState = 'ready'; $('updBtn').textContent='Install'; }
+  else { toast('Could not start the update. Try "Download in browser" in Settings → About.'); }
 };
+$('updBrowser').onclick = () => { if(Native && Native.updateInBrowser){ Native.updateInBrowser(); toast('When the download finishes, open ZeniX.apk to install'); } };
+// back from the "Install unknown apps" screen: carry on with the update by itself
+document.addEventListener('visibilitychange', () => { if(!document.hidden && updAfterPerm){ updAfterPerm = false; if(Native && Native.canInstall && Native.canInstall()==='true') setTimeout(() => $('updBtn').click(), 500); } });
 if(Native && Native.checkUpdate){
   Native.checkUpdate();
   document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) Native.checkUpdate(); });
@@ -2211,7 +2383,7 @@ if(Native && Native.checkUpdate){
 }
 const myVersion = (Native && Native.appVersion) ? Native.appVersion() : '';
 $('verText').textContent = myVersion ? 'You have v'+myVersion : 'Web version · always up to date';
-if(!IS_APP){ $('updCheck').style.display='none'; }
+if(!IS_APP){ $('updCheck').style.display='none'; $('updAlt').style.display='none'; }
 window.zenixStartUpdate = () => { $('updBar').style.display='flex'; $('updBtn').click(); };
 window.zenixUpToDate = (name) => { $('verText').textContent = 'You have v'+(myVersion||name)+' · the newest ✓'; toast('Maya is up to date (v'+(myVersion||name)+')'); };
 window.zenixUpdateCheckFailed = () => { $('verText').textContent = 'You have v'+myVersion+' · could not check (internet?)'; };
@@ -2275,7 +2447,11 @@ document.querySelectorAll('.set-item').forEach(d => d.addEventListener('toggle',
 }));
 $('view-settings').addEventListener('click', () => setTimeout(renderMe, 80));
 $('view-settings').addEventListener('input', () => setTimeout(renderMe, 80));
-setInterval(() => { if(!document.hidden && $('view-settings').classList.contains('active')) renderMe(); }, 2000);
+setInterval(() => {
+  if(document.hidden || !$('view-settings').classList.contains('active')) return;
+  const w = document.querySelector('.set-item[data-sec="wake"]'); if(w && w.open) renderWake();   // live "last heard" line while testing
+  renderMe();
+}, 2000);
 renderMe();
 
 /* ---------- Auto-send (Maya taps Send after Jim says yes) ---------- */
@@ -2294,7 +2470,7 @@ renderAuto();
 window.zenixSendResult = (ok, msg) => { toast(msg); addMsg('sys', (ok ? '✅ ' : '⚠️ ') + msg); };
 
 /* ---------- Back up everything (keys, settings, memory, chats), locked with a PIN ---------- */
-const b64 = buf => btoa(String.fromCharCode(...new Uint8Array(buf)));
+const b64 = buf => { let t = ''; const a = new Uint8Array(buf); for(let i=0; i<a.length; i+=0x8000) t += String.fromCharCode.apply(null, a.subarray(i, i+0x8000)); return btoa(t); };
 const unb64 = t => Uint8Array.from(atob(t), c => c.charCodeAt(0));
 async function pinKey(pin, salt){
   const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(pin), 'PBKDF2', false, ['deriveKey']);

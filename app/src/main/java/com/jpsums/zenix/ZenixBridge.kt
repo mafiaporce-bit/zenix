@@ -27,11 +27,20 @@ class ZenixBridge(private val activity: MainActivity) {
     private fun fail(msg: String) = JSONObject().put("ok", false).put("message", msg).toString()
     private fun has(p: String) = activity.checkSelfPermission(p) == PackageManager.PERMISSION_GRANTED
 
-    private fun launch(intent: Intent): Boolean = try {
+    /** Opens another app's screen. Really reports false when nothing could open it (and never crashes Maya). */
+    private fun launch(intent: Intent): Boolean {
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        activity.runOnUiThread { activity.startActivity(intent) }
-        true
-    } catch (e: Exception) { false }
+        if (android.os.Looper.myLooper() == android.os.Looper.getMainLooper())
+            return try { activity.startActivity(intent); true } catch (e: Exception) { false }
+        val done = java.util.concurrent.CountDownLatch(1)
+        val failed = java.util.concurrent.atomic.AtomicBoolean(false)
+        activity.runOnUiThread {
+            try { activity.startActivity(intent) } catch (e: Exception) { failed.set(true) }
+            done.countDown()
+        }
+        try { done.await(3, java.util.concurrent.TimeUnit.SECONDS) } catch (_: Exception) { }
+        return !failed.get()
+    }
 
     // ---------- basics ----------
     @JavascriptInterface fun hasMicPermission(): String = has(Manifest.permission.RECORD_AUDIO).toString()
@@ -73,6 +82,10 @@ class ZenixBridge(private val activity: MainActivity) {
     @JavascriptInterface fun checkUpdateNow(): String { activity.updater.check(true); return ok("checking") }
     @JavascriptInterface fun startUpdate(): String = activity.updater.start()
     @JavascriptInterface fun appVersion(): String = activity.updater.currentName()
+    @JavascriptInterface fun canInstall(): String = try {
+        (Build.VERSION.SDK_INT < 26 || activity.packageManager.canRequestPackageInstalls()).toString()
+    } catch (_: Exception) { "true" }
+    @JavascriptInterface fun updateInBrowser(): String = if (activity.updater.openInBrowser()) ok("ok") else fail("Couldn't open the browser.")
 
     // ---------- offline brain ----------
     @JavascriptInterface fun offlineStatus(): String = activity.brain.status()
@@ -87,6 +100,16 @@ class ZenixBridge(private val activity: MainActivity) {
     // ---------- "Hey Maya" wake word ----------
     @JavascriptInterface fun wakeStatus(): String = WakeWordService.status(activity)
     @JavascriptInterface fun isLocked(): String = if (activity.isLocked()) "true" else "false"
+    /** Android 14+: is Maya allowed to open herself over the lock screen ("full screen notifications")? */
+    @JavascriptInterface fun canFullScreen(): String = try {
+        if (Build.VERSION.SDK_INT >= 34) activity.getSystemService(android.app.NotificationManager::class.java).canUseFullScreenIntent().toString() else "true"
+    } catch (_: Exception) { "true" }
+    @JavascriptInterface fun openFullScreenSetting(): String {
+        val pkg = Uri.parse("package:" + activity.packageName)
+        if (Build.VERSION.SDK_INT >= 34 && launch(Intent("android.settings.MANAGE_APP_USE_FULL_SCREEN_INTENT", pkg))) return ok("ok")
+        return if (launch(Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, pkg))) ok("ok") else fail("Couldn't open the setting.")
+    }
+    @JavascriptInterface fun hasLocation(): String = activity.hasLocation().toString()
     @JavascriptInterface fun askUnlock(): String { activity.askUnlock(); return ok("asking") }
     @JavascriptInterface fun wakeChatEnded(): String { activity.wakeChatEnded(); return ok("ok") }
     @JavascriptInterface fun wakeDownload(): String { WakeWordService.download(activity); return WakeWordService.status(activity) }
@@ -94,8 +117,19 @@ class ZenixBridge(private val activity: MainActivity) {
         if (on == "true") activity.wakeCommand(null) else activity.wakeCommand(WakeWordService.ACTION_OFF)
         return ok("ok")
     }
-    @JavascriptInterface fun wakePause(): String { if (WakeWordService.current != null) activity.wakeCommand(WakeWordService.ACTION_PAUSE); return ok("ok") }
-    @JavascriptInterface fun wakeResume(): String { if (WakeWordService.current != null) activity.wakeCommand(WakeWordService.ACTION_RESUME); return ok("ok") }
+    // Talk to the running listener directly (works even while Maya is behind another app or the lock screen)
+    @JavascriptInterface fun wakePause(): String { WakeWordService.current?.let { s -> activity.runOnUiThread { s.pause() } }; return ok("ok") }
+    @JavascriptInterface fun wakeResume(): String { WakeWordService.current?.let { s -> activity.runOnUiThread { s.resume() } }; return ok("ok") }
+    /** Is Maya free from Android's battery saving (so the listener isn't put to sleep)? */
+    @JavascriptInterface fun batteryOk(): String = try {
+        activity.getSystemService(android.os.PowerManager::class.java).isIgnoringBatteryOptimizations(activity.packageName).toString()
+    } catch (_: Exception) { "true" }
+    @JavascriptInterface fun askBattery(): String {
+        val pkg = Uri.parse("package:" + activity.packageName)
+        if (launch(Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, pkg))) return ok("ok")
+        if (launch(Intent(android.provider.Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))) return ok("ok")
+        return if (launch(Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, pkg))) ok("ok") else fail("Couldn't open battery settings.")
+    }
 
     // ---------- Deepgram ears (native) ----------
     @JavascriptInterface fun dgOpen(key: String, lang: String): String { activity.ears.open(key, lang); return ok("opening") }
@@ -342,10 +376,15 @@ class ZenixBridge(private val activity: MainActivity) {
         val pm = activity.packageManager
         val main = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
         val apps = pm.queryIntentActivities(main, 0)
-        val want = name.lowercase(Locale.ROOT).replace(" ", "").removeSuffix("app")
-        val match = apps.firstOrNull { it.loadLabel(pm).toString().lowercase(Locale.ROOT).replace(" ", "") == want }
-            ?: apps.firstOrNull { it.loadLabel(pm).toString().lowercase(Locale.ROOT).replace(" ", "").startsWith(want) }
-            ?: apps.firstOrNull { it.loadLabel(pm).toString().lowercase(Locale.ROOT).replace(" ", "").contains(want) }
+        // "the clock app" -> "clock" (but "WhatsApp" stays "whatsapp")
+        val want = name.lowercase(Locale.ROOT).trim().removePrefix("the ").removePrefix("my ")
+            .removeSuffix(" application").removeSuffix(" app").replace(" ", "")
+        if (want.isEmpty()) return fail("Which app should I open?")
+        val labels = apps.map { it to it.loadLabel(pm).toString().lowercase(Locale.ROOT).replace(" ", "") }
+        val match = (labels.firstOrNull { it.second == want }
+            ?: labels.firstOrNull { it.second.startsWith(want) }
+            ?: labels.firstOrNull { it.second.contains(want) }
+            ?: labels.firstOrNull { it.second.length >= 4 && want.contains(it.second) })?.first
             ?: return fail("I couldn't find an app called $name on this phone.")
         val launchIntent = pm.getLaunchIntentForPackage(match.activityInfo.packageName)
             ?: return fail("That app can't be opened directly.")
@@ -374,7 +413,7 @@ class ZenixBridge(private val activity: MainActivity) {
             val i = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, message).setPackage("com.whatsapp")
             val auto = SendHelperService.arm(activity, "whatsapp", contact, message, true)
             return if (launch(i)) ok(if (auto) "Sending it to the $contact group on WhatsApp now." else "WhatsApp is open with the message. Pick the $contact group and tap send.")
-            else fail("WhatsApp isn't installed.")
+            else { SendHelperService.disarm(); fail("WhatsApp isn't installed.") }
         }
         if (group && base != "messenger") return fail("Group texts only work on WhatsApp or Messenger.")
         when (base) {
@@ -382,16 +421,16 @@ class ZenixBridge(private val activity: MainActivity) {
                 val i = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, message).setPackage("com.facebook.orca")
                 val auto = SendHelperService.arm(activity, "messenger", contact, message, group)
                 return if (launch(i)) ok(if (auto) "Sending it to $contact on Messenger now." else "Messenger is open with the message ready. Pick $contact and tap send.")
-                else fail("Messenger isn't installed.")
+                else { SendHelperService.disarm(); fail("Messenger isn't installed.") }
             }
             "whatsapp" -> {
                 val c = findContact(contact) ?: return notFound(contact)
                 val url = "https://api.whatsapp.com/send?phone=${intlDigits(c.number)}&text=${Uri.encode(message)}"
                 val i = Intent(Intent.ACTION_VIEW, Uri.parse(url)).setPackage("com.whatsapp")
                 val auto = SendHelperService.arm(activity, "whatsapp", c.name, message)
-                return if (launch(i) ) ok(if (auto) "Sending it to ${c.name} on WhatsApp now." else "WhatsApp chat with ${c.name} is open with the message. Tap send.")
-                else if (launch(Intent(Intent.ACTION_VIEW, Uri.parse(url)))) ok(if (auto) "Sending it to ${c.name} on WhatsApp now." else "WhatsApp is open with the message. Tap send.")
-                else fail("WhatsApp isn't installed.")
+                return if (launch(i)) ok(if (auto) "Sending it to ${c.name} on WhatsApp now." else "WhatsApp chat with ${c.name} is open with the message. Tap send.")
+                else if (launch(Intent(Intent.ACTION_VIEW, Uri.parse(url)).setPackage("com.whatsapp.w4b"))) ok(if (auto) "Sending it to ${c.name} on WhatsApp now." else "WhatsApp is open with the message. Tap send.")
+                else { SendHelperService.disarm(); fail("WhatsApp isn't installed.") }
             }
             else -> {
                 val c = findContact(contact) ?: return notFound(contact)
@@ -405,7 +444,8 @@ class ZenixBridge(private val activity: MainActivity) {
                 }
                 val i = Intent(Intent.ACTION_SENDTO, Uri.parse("smsto:" + Uri.encode(c.number))).putExtra("sms_body", message)
                 val auto = SendHelperService.arm(activity, "sms", c.name, message)
-                return if (launch(i)) ok(if (auto) "Sending the text to ${c.name} now." else "Messages app is open with the text to ${c.name}. Tap send.") else fail("Couldn't open Messages.")
+                return if (launch(i)) ok(if (auto) "Sending the text to ${c.name} now." else "Messages app is open with the text to ${c.name}. Tap send.")
+                else { SendHelperService.disarm(); fail("Couldn't open Messages.") }
             }
         }
     }
@@ -483,9 +523,20 @@ class ZenixBridge(private val activity: MainActivity) {
         return ok(if (out.isEmpty()) "Nothing on the calendar for that time." else out.toString().trim())
     }
 
+    /** Reads "2026-11-20T15:00:00+04:00", "2026-11-20T15:00", "2026-11-20 15:00" or just "2026-11-20" (9 am). */
+    private fun parseWhen(iso: String): Long? {
+        val s = iso.trim()
+        try { return OffsetDateTime.parse(s).toInstant().toEpochMilli() } catch (_: Exception) { }
+        try { return java.time.ZonedDateTime.parse(s).toInstant().toEpochMilli() } catch (_: Exception) { }
+        val zone = java.time.ZoneId.systemDefault()
+        try { return java.time.LocalDateTime.parse(s.replace(' ', 'T')).atZone(zone).toInstant().toEpochMilli() } catch (_: Exception) { }
+        try { return java.time.LocalDate.parse(s).atTime(9, 0).atZone(zone).toInstant().toEpochMilli() } catch (_: Exception) { }
+        return null
+    }
+
     @JavascriptInterface
     fun addCalendarEvent(title: String, startIso: String, durationMinutes: String, location: String): String {
-        val startMs = try { OffsetDateTime.parse(startIso).toInstant().toEpochMilli() } catch (e: Exception) { return fail("I didn't understand the date.") }
+        val startMs = parseWhen(startIso) ?: return fail("I didn't understand the date. Use a form like 2026-11-20T15:00.")
         val endMs = startMs + (durationMinutes.toLongOrNull() ?: 60L) * 60_000
         if (has(Manifest.permission.WRITE_CALENDAR) && has(Manifest.permission.READ_CALENDAR)) {
             var calId = -1L

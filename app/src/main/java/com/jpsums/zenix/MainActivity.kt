@@ -26,6 +26,7 @@ class MainActivity : Activity() {
     lateinit var updater: Updater
     lateinit var ears: DeepgramEars
     private var pendingWebPermission: PermissionRequest? = null
+    private var pendingGeo: Pair<String, android.webkit.GeolocationPermissions.Callback>? = null
     private var pageReady = false
     private var pendingWake = false
     private var pendingUpdate = false
@@ -37,6 +38,7 @@ class MainActivity : Activity() {
         @Volatile var instance: java.lang.ref.WeakReference<MainActivity>? = null
         @Volatile var inForeground = false
         private const val PERM_REQUEST = 42
+        private const val PERM_GEO = 43
         private const val PICK_BACKUP = 77
         const val UPDATE_CHANNEL_ID = "zenix_updates"
         val ALL_PERMISSIONS: Array<String>
@@ -73,6 +75,7 @@ class MainActivity : Activity() {
             domStorageEnabled = true
             mediaPlaybackRequiresUserGesture = false
             cacheMode = WebSettings.LOAD_DEFAULT
+            setGeolocationEnabled(true)
         }
         brain = OfflineBrain(this)
         updater = Updater(this)
@@ -100,6 +103,20 @@ class MainActivity : Activity() {
                         }
                     } else {
                         request.deny()
+                    }
+                }
+            }
+
+            /** The map asked "where am I?": pass on Android's location permission (asking Jim the first time). */
+            override fun onGeolocationPermissionsShowPrompt(origin: String, callback: android.webkit.GeolocationPermissions.Callback) {
+                runOnUiThread {
+                    if (hasLocation()) callback.invoke(origin, true, false)
+                    else {
+                        pendingGeo?.let { (o, cb) -> try { cb.invoke(o, false, false) } catch (_: Exception) { } }
+                        pendingGeo = origin to callback
+                        try {
+                            requestPermissions(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION), PERM_GEO)
+                        } catch (_: Exception) { pendingGeo = null; callback.invoke(origin, false, false) }
                     }
                 }
             }
@@ -131,6 +148,10 @@ class MainActivity : Activity() {
         }
     }
 
+    fun hasLocation(): Boolean =
+        checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+        checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+
     fun isLocked(): Boolean = getSystemService(android.app.KeyguardManager::class.java).isKeyguardLocked
 
     /** Shows the fingerprint / face / PIN prompt; the page hears back via window.zenixUnlocked(ok). */
@@ -157,7 +178,14 @@ class MainActivity : Activity() {
     }
 
     /** "Hey Maya" was heard: start a voice chat. */
-    fun onWake() { runJs("window.zenixWake && window.zenixWake()") }
+    fun onWake() {
+        clearWakeAlert()
+        runJs("window.zenixWake && window.zenixWake()")
+    }
+
+    private fun clearWakeAlert() {
+        try { getSystemService(NotificationManager::class.java).cancel(WakeWordService.ALERT_ID) } catch (_: Exception) { }
+    }
 
     fun wakeCommand(action: String?) {
         val i = android.content.Intent(this, WakeWordService::class.java)
@@ -210,6 +238,7 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         inForeground = true
+        clearWakeAlert()
         VoiceService.current?.hideOrb()
     }
 
@@ -227,11 +256,17 @@ class MainActivity : Activity() {
         if (::brain.isInitialized) brain.shutdown()
         if (::ears.isInitialized) ears.close()
         stopService(android.content.Intent(this, VoiceService::class.java))
+        if (instance?.get() === this) { instance = null; inForeground = false }
         super.onDestroy()
     }
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == PERM_GEO) {
+            pendingGeo?.let { (origin, cb) -> try { cb.invoke(origin, hasLocation(), false) } catch (_: Exception) { } }
+            pendingGeo = null
+            return
+        }
         pendingWebPermission?.let { req ->
             if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
                 req.grant(arrayOf(PermissionRequest.RESOURCE_AUDIO_CAPTURE))
