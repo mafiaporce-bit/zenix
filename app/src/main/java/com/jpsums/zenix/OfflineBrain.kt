@@ -209,7 +209,7 @@ class OfflineBrain(private val activity: MainActivity) {
         val t = tts
         if (t == null || !ttsReady) { js("window.zenixOnSpeakDone && window.zenixOnSpeakDone()"); return }
         try {
-            val chosen = if (voiceName.isNotEmpty() && !lang.startsWith("fil")) t.voices?.firstOrNull { it.name == voiceName } else null
+            val chosen = if (voiceName.isNotEmpty() && lang.startsWith("en")) t.voices?.firstOrNull { it.name == voiceName } else null   // other languages (translator) use that language's own voice
             if (chosen != null) t.voice = chosen else t.language = Locale.forLanguageTag(lang)
             t.setSpeechRate(rate)
         } catch (_: Exception) {}

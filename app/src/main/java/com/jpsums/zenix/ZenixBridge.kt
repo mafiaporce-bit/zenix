@@ -130,6 +130,101 @@ class ZenixBridge(private val activity: MainActivity) {
     }
     @JavascriptInterface fun setCar(address: String, name: String): String { Driving.setCar(activity, address, name); return ok("ok") }
 
+    // ---------- phone controls ----------
+    @JavascriptInterface fun flashlight(on: String): String = try {
+        val cm = activity.getSystemService(android.hardware.camera2.CameraManager::class.java)
+        val CC = android.hardware.camera2.CameraCharacteristics.FLASH_INFO_AVAILABLE
+        val withFlash = cm.cameraIdList.filter { cm.getCameraCharacteristics(it).get(CC) == true }
+        val id = withFlash.firstOrNull { cm.getCameraCharacteristics(it).get(android.hardware.camera2.CameraCharacteristics.LENS_FACING) == android.hardware.camera2.CameraCharacteristics.LENS_FACING_BACK }
+            ?: withFlash.firstOrNull()
+        if (id == null) fail("This phone has no flashlight.")
+        else { cm.setTorchMode(id, on == "true"); ok(if (on == "true") "Flashlight is on." else "Flashlight is off.") }
+    } catch (e: Exception) { fail("The flashlight didn't respond (the camera may be in use).") }
+
+    @JavascriptInterface fun volume(action: String, value: String): String = try {
+        val am = activity.getSystemService(android.media.AudioManager::class.java)
+        val st = android.media.AudioManager.STREAM_MUSIC
+        val max = am.getStreamMaxVolume(st); val cur = am.getStreamVolume(st); val step = maxOf(1, max / 6)
+        val target = when (action) {
+            "up" -> cur + step; "down" -> cur - step; "mute" -> 0
+            else -> Math.round((value.toFloatOrNull() ?: 50f).coerceIn(0f, 100f) * max / 100f)
+        }.coerceIn(0, max)
+        am.setStreamVolume(st, target, android.media.AudioManager.FLAG_SHOW_UI)
+        ok("Volume is now ${target * 100 / max} percent.")
+    } catch (e: Exception) { fail("The volume didn't change.") }
+
+    @JavascriptInterface fun dnd(on: String): String = try {
+        val nm = activity.getSystemService(android.app.NotificationManager::class.java)
+        if (!nm.isNotificationPolicyAccessGranted) {
+            launch(Intent(android.provider.Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS))
+            fail("Maya needs Do Not Disturb access first. That setting is open now: allow Maya there, then ask again.")
+        } else {
+            nm.setInterruptionFilter(if (on == "true") android.app.NotificationManager.INTERRUPTION_FILTER_PRIORITY else android.app.NotificationManager.INTERRUPTION_FILTER_ALL)
+            ok(if (on == "true") "Do Not Disturb is on." else "Do Not Disturb is off.")
+        }
+    } catch (e: Exception) { fail("Do Not Disturb didn't change.") }
+
+    @JavascriptInterface fun setTimer(seconds: String, label: String): String {
+        val s = seconds.toIntOrNull()?.coerceIn(1, 86400) ?: return fail("How long should the timer be?")
+        val i = Intent(AlarmClock.ACTION_SET_TIMER).putExtra(AlarmClock.EXTRA_LENGTH, s)
+            .putExtra(AlarmClock.EXTRA_MESSAGE, label.ifBlank { "Maya timer" }).putExtra(AlarmClock.EXTRA_SKIP_UI, true)
+        val txt = if (s >= 3600) "${s / 3600} h ${s % 3600 / 60} min" else if (s >= 60) "${s / 60} min" + (if (s % 60 > 0) " ${s % 60} s" else "") else "$s seconds"
+        return if (launch(i)) ok("Timer started: $txt.") else fail("The Clock app didn't accept the timer.")
+    }
+
+    @JavascriptInterface fun battery(): String = try {
+        val bm = activity.getSystemService(android.os.BatteryManager::class.java)
+        ok("Battery is at ${bm.getIntProperty(android.os.BatteryManager.BATTERY_PROPERTY_CAPACITY)} percent" + (if (bm.isCharging) ", charging." else ", not charging."))
+    } catch (e: Exception) { fail("I couldn't read the battery.") }
+
+    @JavascriptInterface fun media(action: String): String = try {
+        val am = activity.getSystemService(android.media.AudioManager::class.java)
+        val code = when (action) {
+            "play" -> android.view.KeyEvent.KEYCODE_MEDIA_PLAY; "pause" -> android.view.KeyEvent.KEYCODE_MEDIA_PAUSE
+            "next" -> android.view.KeyEvent.KEYCODE_MEDIA_NEXT; "previous" -> android.view.KeyEvent.KEYCODE_MEDIA_PREVIOUS
+            else -> android.view.KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE
+        }
+        am.dispatchMediaKeyEvent(android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN, code))
+        am.dispatchMediaKeyEvent(android.view.KeyEvent(android.view.KeyEvent.ACTION_UP, code))
+        ok("Done: music $action.")
+    } catch (e: Exception) { fail("The music player didn't respond.") }
+
+    /** Starts Google Maps turn-by-turn navigation. */
+    @JavascriptInterface fun navigate(dest: String): String {
+        if (dest.isBlank()) return fail("Where to?")
+        if (launch(Intent(Intent.ACTION_VIEW, Uri.parse("google.navigation:q=" + Uri.encode(dest) + "&mode=d")).setPackage("com.google.android.apps.maps")))
+            return ok("Google Maps is starting navigation to $dest.")
+        return if (launch(Intent(Intent.ACTION_VIEW, Uri.parse("geo:0,0?q=" + Uri.encode(dest))))) ok("A maps app is open with $dest.") else fail("No maps app found.")
+    }
+
+    /** Are Jim's apps and sites up? Answers through window.zenixSites(id, json). */
+    @JavascriptInterface fun httpCheck(id: String, urlsJson: String): String {
+        kotlin.concurrent.thread {
+            val out = org.json.JSONArray()
+            try {
+                val urls = org.json.JSONArray(urlsJson)
+                val jobs = ArrayList<Thread>(); val res = arrayOfNulls<JSONObject>(urls.length())
+                for (i in 0 until urls.length()) {
+                    val u = urls.optString(i)
+                    jobs.add(kotlin.concurrent.thread {
+                        val o = JSONObject().put("url", u); val t0 = System.currentTimeMillis()
+                        try {
+                            val c = java.net.URL(u).openConnection() as java.net.HttpURLConnection
+                            c.connectTimeout = 8000; c.readTimeout = 8000; c.instanceFollowRedirects = true
+                            c.setRequestProperty("User-Agent", "Mozilla/5.0 (Maya site check)")
+                            o.put("code", c.responseCode); c.disconnect()
+                        } catch (e: Exception) { o.put("code", 0).put("error", e.javaClass.simpleName) }
+                        res[i] = o.put("ms", System.currentTimeMillis() - t0)
+                    })
+                }
+                for (j in jobs) j.join(12000)
+                for (r in res) if (r != null) out.put(r)
+            } catch (_: Exception) { }
+            activity.runJs("window.zenixSites && window.zenixSites(${JSONObject.quote(id)}, ${JSONObject.quote(out.toString())})")
+        }
+        return ok("checking")
+    }
+
     // ---------- offline brain ----------
     @JavascriptInterface fun offlineStatus(): String = activity.brain.status()
     @JavascriptInterface fun offlineDownload(): String = activity.brain.download()

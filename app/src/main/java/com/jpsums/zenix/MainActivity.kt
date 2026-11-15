@@ -96,17 +96,16 @@ class MainActivity : Activity() {
             }
         }
         webView.webChromeClient = object : WebChromeClient() {
+            /** The page wants the microphone (voice chat) or the camera ("what's this?"). */
             override fun onPermissionRequest(request: PermissionRequest) {
                 runOnUiThread {
-                    if (request.resources.contains(PermissionRequest.RESOURCE_AUDIO_CAPTURE)) {
-                        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
-                            request.grant(arrayOf(PermissionRequest.RESOURCE_AUDIO_CAPTURE))
-                        } else {
-                            pendingWebPermission = request
-                            requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), PERM_REQUEST)
-                        }
-                    } else {
-                        request.deny()
+                    val missing = webNeeds(request).filter { checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED }
+                    if (webNeeds(request).isEmpty()) request.deny()
+                    else if (missing.isEmpty()) answerWeb(request)
+                    else {
+                        pendingWebPermission?.let { try { it.deny() } catch (_: Exception) { } }
+                        pendingWebPermission = request
+                        requestPermissions(missing.toTypedArray(), PERM_REQUEST)
                     }
                 }
             }
@@ -157,6 +156,22 @@ class MainActivity : Activity() {
                 if (on) window.addFlags(f) else window.clearFlags(f)
             }
         }
+    }
+
+    /** Android permissions behind what the page asked for. */
+    private fun webNeeds(request: PermissionRequest): List<String> {
+        val out = ArrayList<String>()
+        if (request.resources.contains(PermissionRequest.RESOURCE_AUDIO_CAPTURE)) out.add(Manifest.permission.RECORD_AUDIO)
+        if (request.resources.contains(PermissionRequest.RESOURCE_VIDEO_CAPTURE)) out.add(Manifest.permission.CAMERA)
+        return out
+    }
+
+    /** Gives the page the parts Jim has allowed (or says no). */
+    private fun answerWeb(request: PermissionRequest) {
+        val ok = ArrayList<String>()
+        if (request.resources.contains(PermissionRequest.RESOURCE_AUDIO_CAPTURE) && checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) ok.add(PermissionRequest.RESOURCE_AUDIO_CAPTURE)
+        if (request.resources.contains(PermissionRequest.RESOURCE_VIDEO_CAPTURE) && checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) ok.add(PermissionRequest.RESOURCE_VIDEO_CAPTURE)
+        try { if (ok.isEmpty()) request.deny() else request.grant(ok.toTypedArray()) } catch (_: Exception) { }
     }
 
     fun hasLocation(): Boolean =
@@ -287,14 +302,7 @@ class MainActivity : Activity() {
             pendingGeo = null
             return
         }
-        pendingWebPermission?.let { req ->
-            if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
-                req.grant(arrayOf(PermissionRequest.RESOURCE_AUDIO_CAPTURE))
-            } else {
-                req.deny()
-            }
-            pendingWebPermission = null
-        }
+        pendingWebPermission?.let { req -> pendingWebPermission = null; answerWeb(req) }
     }
 
     private fun createNotificationChannel() {

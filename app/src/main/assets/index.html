@@ -60,6 +60,16 @@ body{background:radial-gradient(120% 80% at 50% 35%,#12102A 0%,#06050C 60%)}
 @keyframes zg{0%,100%{opacity:.7}50%{opacity:1}}
 .mode-label{font-size:13px;font-weight:600;color:var(--accent);min-height:18px;letter-spacing:.3px}
 .live-line{min-height:44px;max-width:340px;font-size:15px;opacity:.9}
+body.tr-on .live-line{font-size:22px;line-height:1.35;opacity:1;max-width:370px;font-weight:500}
+.cam{position:fixed;inset:0;z-index:60;background:#000;display:none;flex-direction:column}
+.cam.on{display:flex}
+.cam video{flex:1;min-height:0;width:100%;object-fit:cover}
+.cam-top{position:absolute;top:0;left:0;right:0;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:calc(14px + env(safe-area-inset-top)) 16px 26px;background:linear-gradient(rgba(0,0,0,.7),rgba(0,0,0,0));color:#fff;font-size:15px}
+.cam-top button{width:44px;height:44px;border-radius:50%;background:rgba(0,0,0,.55);color:#fff;font-size:18px;flex-shrink:0}
+.cam-shot{position:absolute;bottom:calc(36px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);width:74px;height:74px;border-radius:50%;background:#fff;border:5px solid var(--accent)}
+.help-g{margin:14px 0 4px;font-size:13px;font-weight:600;color:var(--accent)}
+.help-g:first-child{margin-top:0}
+.help-l{font-size:13.5px;color:var(--muted);line-height:1.55;margin:0}
 .action{min-height:22px;font-size:12.5px;color:var(--muted)}
 
 .controls{display:flex;gap:14px;justify-content:center;align-items:center;padding:6px 0 14px}
@@ -386,6 +396,7 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
             <div class="toggle-row" id="wfFull"><div><b>Full-screen alerts</b><small>Lets Maya open over the lock screen</small></div><button class="btn-line" id="wfFullBtn">Allow</button></div>
             <div class="toggle-row" id="wfBatt"><div><b>Battery: unrestricted</b><small>Stops the phone putting Maya to sleep</small></div><button class="btn-line" id="wfBattBtn">Allow</button></div>
           </div>
+          <div class="toggle-row"><div><b>Private on lock screen</b><small>While the phone is locked, Maya keeps what she remembers about you to herself</small></div><button class="toggle" id="lockPrivToggle" aria-label="Private on lock screen"></button></div>
           <p class="hint" style="margin:12px 0 0">After restarting the phone, open Maya once so she starts listening again.</p>
         </div>
       </details>
@@ -481,6 +492,30 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
       </details>
     </div>
 
+    <p class="set-label">Work &amp; business</p>
+    <div class="set-list">
+      <details class="set-item" data-sec="shifts">
+        <summary><span class="ico green"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="3"/><path d="M3 9h18M8 2v4M16 2v4M8 14h3M8 17h6"/></svg></span><span class="set-t"><b>Shifts &amp; overtime</b><span id="sumShifts"></span></span><svg class="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></summary>
+        <div class="set-body">
+          <p class="hint">Say <b>"log my shift today, 7 to 7 at Khalifa, 2 hours overtime"</b> or <b>"how much overtime this month?"</b></p>
+          <p class="status-line" style="margin-top:0" id="shiftSum"></p>
+          <div id="shiftList"></div>
+          <p class="sub-label">Add a shift</p>
+          <div class="inline" style="margin-top:0"><input type="date" class="field" id="shDate" aria-label="Date"><input type="number" class="field" id="shOt" placeholder="Overtime h" min="0" step="0.5" inputmode="decimal" style="flex:0 0 118px"></div>
+          <div class="inline"><input type="time" class="field" id="shStart" value="07:00" aria-label="Start"><input type="time" class="field" id="shEnd" value="19:00" aria-label="End"><button class="btn-line" id="shAdd">Add</button></div>
+        </div>
+      </details>
+      <details class="set-item" data-sec="sites">
+        <summary><span class="ico blue"><svg viewBox="0 0 24 24"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg></span><span class="set-t"><b>My apps &amp; sites</b><span id="sumSites"></span></span><svg class="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></summary>
+        <div class="set-body">
+          <p class="hint">Maya checks that your apps and websites are up. Ask <b>"are my apps okay?"</b>, or add it to your morning brief.</p>
+          <div id="siteList"></div>
+          <div class="inline"><input type="text" class="field" id="siteName" placeholder="Name" maxlength="40" style="flex:0 0 112px"><input type="url" class="field" id="siteUrl" placeholder="https://…" autocomplete="off"><button class="btn-line" id="siteAdd">Add</button></div>
+          <div class="toggle-row"><span class="status-line" style="margin:0" id="siteState"></span><button class="btn-line" id="siteCheck">Check now</button></div>
+        </div>
+      </details>
+    </div>
+
     <p class="set-label">Keys &amp; accounts</p>
     <div class="set-list">
       <details class="set-item" data-sec="kclaude">
@@ -519,6 +554,10 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
 
     <p class="set-label">App</p>
     <div class="set-list">
+      <details class="set-item" data-sec="help">
+        <summary><span class="ico pink"><svg viewBox="0 0 24 24"><path d="M12 3l1.8 4.7L18.5 9l-4.7 1.8L12 15.5l-1.8-4.7L5.5 9l4.7-1.3L12 3z"/></svg></span><span class="set-t"><b>What Maya can do</b><span>Things you can say</span></span><svg class="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></summary>
+        <div class="set-body" id="helpBox"></div>
+      </details>
       <details class="set-item" data-sec="perm">
         <summary><span class="ico green"><svg viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6l8-3z"/><path d="M9 12l2 2 4-4"/></svg></span><span class="set-t"><b>Phone permissions</b><span>Calls, contacts, calendar, notifications</span></span><svg class="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></summary>
         <div class="set-body">
@@ -554,6 +593,7 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
   <button data-view="settings"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>Settings</button>
 </nav>
 <footer>Copyright © 2026 Zenix_dev@company. All rights reserved. Developed by JPSums</footer>
+<div class="cam" id="camBox"><video id="camVideo" playsinline muted></video><div class="cam-top"><span>Point at it. Taking the picture in <b id="camCount">3</b></span><button id="camX" aria-label="Close camera">✕</button></div><button class="cam-shot" id="camShot" aria-label="Take the picture now"></button></div>
 <div class="toast" id="toast"></div>
 
 <script type="module">
@@ -786,6 +826,15 @@ function webFallback(url){ try{ window.open(url, '_blank'); return {ok:true, mes
 function showAction(t){ $('actionLine').textContent = t; addMsg('sys', t); }
 const reply = r => (r && r.message) ? r.message : JSON.stringify(r);
 
+/* UAE emergency lines: these can always be called, even with the phone locked */
+function emergencyNumber(c){
+  const t = String(c||'').toLowerCase().replace(/^(an?|the)\s+/, '').trim();
+  if(/^(998|ambulance)$/.test(t)) return '998';
+  if(/^(999|police|emergency|emergency services)$/.test(t)) return '999';
+  if(/^(997|civil defen[cs]e|fire|fire department|fire brigade)$/.test(t)) return '997';
+  if(/^(112|911)$/.test(t)) return '112';
+  return '';
+}
 const clientTools = {
   set_alarm: async ({hour, minute, label}) => {
     showAction(`⏰ Alarm ${String(hour).padStart(2,'0')}:${String(minute).padStart(2,'0')}`);
@@ -800,6 +849,8 @@ const clientTools = {
     return reply(callNative('openApp', app_name) || {ok:false, message:'Opening apps only works in the Android app.'});
   },
   make_call: async ({contact}) => {
+    const sos = emergencyNumber(contact);
+    if(sos){ showAction('🚨 Calling ' + sos); return reply(callNative('makeCall', sos) || webFallback('tel:' + sos)); }
     showAction(`📞 Calling ${contact}`);
     return reply(callNative('makeCall', contact) || webFallback('tel:'+contact.replace(/[^\d+]/g,'')));
   },
@@ -1196,9 +1247,198 @@ window.zenixDriving = (on) => {
   addMsg('sys', on ? '🚗 Driving mode on' : '🚗 Driving mode off');
   if(on && !inVoiceChat() && Native.speak) Native.speak('Driving mode on. I will read your messages to you.', 'en-US');
 };
+/* ---------- Agent skills, part 2: phone controls, camera, translator, shifts, site checks ---------- */
+const NA = {ok:false, message:'That only works in the Android app.'};
+clientTools.phone_control = async ({action, value}) => {
+  const a = String(action||'').toLowerCase();
+  if(a==='flashlight_on' || a==='flashlight_off'){ showAction(a==='flashlight_on' ? '🔦 Flashlight on' : '🔦 Flashlight off'); return reply(callNative('flashlight', a==='flashlight_on') || NA); }
+  if(a==='volume_set' || a==='volume_up' || a==='volume_down' || a==='mute'){ showAction('🔊 Volume'); return reply(callNative('volume', a==='volume_up' ? 'up' : a==='volume_down' ? 'down' : a==='mute' ? 'mute' : 'set', value==null ? '' : value) || NA); }
+  if(a==='dnd_on' || a==='dnd_off'){ showAction(a==='dnd_on' ? '🌙 Do Not Disturb on' : '🌙 Do Not Disturb off'); return reply(callNative('dnd', a==='dnd_on') || NA); }
+  if(a==='battery') return reply(callNative('battery') || NA);
+  if(/^music_(play|pause|next|previous)$/.test(a)){ showAction('🎵 Music ' + a.slice(6)); return reply(callNative('media', a.slice(6)) || NA); }
+  return 'Unknown action. Use flashlight_on, flashlight_off, volume_set, volume_up, volume_down, mute, dnd_on, dnd_off, battery, music_play, music_pause, music_next or music_previous.';
+};
+clientTools.set_timer = async ({minutes, seconds, label}) => {
+  const total = Math.round((parseFloat(minutes) || 0) * 60 + (parseFloat(seconds) || 0));
+  if(total < 1) return 'How long should the timer be?';
+  showAction('⏱️ Timer ' + (total >= 60 ? Math.round(total/60) + ' min' : total + ' s'));
+  return reply(callNative('setTimer', total, label || '') || NA);
+};
+clientTools.navigate = async ({to}) => {
+  showAction('🧭 Navigate to ' + to);
+  return reply(callNative('navigate', to || '') || webFallback('https://www.google.com/maps/dir/?api=1&travelmode=driving&destination=' + encodeURIComponent(to || '')));
+};
+clientTools.where_am_i = async () => {
+  showAction('📍 Finding where you are');
+  let g; try{ g = await myLocation(); }catch(e){ return "I can't see his location (Location is off or not allowed for Maya)."; }
+  let place = '';
+  try{ const r = await fetchT(`https://photon.komoot.io/reverse?lat=${g.lat}&lon=${g.lon}`, 7000); const pr = (((await r.json()).features || [])[0] || {}).properties || {};
+    place = [pr.name, pr.street, pr.district || pr.locality, pr.city || pr.county, pr.state, pr.country].filter(Boolean).filter((v, i, a) => a.indexOf(v)===i).join(', '); }catch(e){}
+  const pos = `${g.lat.toFixed(5)}, ${g.lon.toFixed(5)}`;
+  return place ? `He is at or near: ${place} (${pos}). Say it naturally in one sentence.` : `His position is ${pos}, but the place name could not be looked up.`;
+};
+
+/* One quick question to the brain outside the chat (used for the camera and the translator) */
+async function brainOnce(system, text, max, image){
+  const ctl = new AbortController(); const timer = setTimeout(() => ctl.abort(), 30000);
+  try{
+    const useClaude = !!getKey() && (settings.provider!=='openrouter' || !orKey());
+    if(useClaude){
+      const content = image ? [{type:'image', source:{type:'base64', media_type:'image/jpeg', data:image}}, {type:'text', text}] : text;
+      const r = await fetch('https://api.anthropic.com/v1/messages', {method:'POST', signal:ctl.signal,
+        headers:{'content-type':'application/json', 'x-api-key':getKey(), 'anthropic-version':'2023-06-01', 'anthropic-dangerous-direct-browser-access':'true'},
+        body: JSON.stringify({model:settings.model, max_tokens:max || 400, system, messages:[{role:'user', content}]})});
+      const j = await r.json(); if(!r.ok) throw new Error((j.error && j.error.message) || ('Claude answered ' + r.status));
+      const u = j.usage || {}, pz = PRICES[settings.model] || PRICES['claude-haiku-5-5'];
+      usage.inTok += u.input_tokens || 0; usage.outTok += u.output_tokens || 0; usage.cost += ((u.input_tokens||0)*pz[0] + (u.output_tokens||0)*pz[1]) / 1e6; store.set('usage', usage);
+      return (j.content || []).filter(c => c.type==='text').map(c => c.text).join('').trim();
+    }
+    if(!orKey()) throw new Error('add a Claude or OpenRouter key first');
+    let model = settings.orModel || 'x-ai/grok-4.3';
+    if(image && (orNoTools[model] || /:free$/.test(model))) model = 'x-ai/grok-4.3';   // the free model can't see pictures
+    const content = image ? [{type:'text', text}, {type:'image_url', image_url:{url:'data:image/jpeg;base64,' + image}}] : text;
+    const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {method:'POST', signal:ctl.signal,
+      headers:{'content-type':'application/json', 'authorization':'Bearer ' + orKey(), 'HTTP-Referer':'https://github.com/mafiaporce-bit/zenix', 'X-Title':'Maya'},
+      body: JSON.stringify({model, max_tokens:max || 400, messages:[{role:'system', content:system}, {role:'user', content}]})});
+    const j = await r.json(); if(!r.ok) throw new Error((j.error && j.error.message) || ('the open brain answered ' + r.status));
+    if(j.usage && typeof j.usage.cost==='number'){ usage.cost += j.usage.cost; store.set('usage', usage); }
+    const msg = j.choices && j.choices[0] && j.choices[0].message;
+    return String((msg && msg.content) || '').trim();
+  }catch(e){ if(e.name==='AbortError') throw new Error('it took too long'); throw e; }
+  finally{ clearTimeout(timer); }
+}
+
+/* Camera: "what's this?", "read this for me" */
+function snap(){
+  return new Promise(async (res, rej) => {
+    let stream; try{ stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}, width:{ideal:1280}, height:{ideal:720}}, audio:false}); }catch(e){ return rej(e); }
+    const box = $('camBox'), v = $('camVideo'), cnt = $('camCount');
+    v.srcObject = stream; box.classList.add('on');
+    let done = false, left = 3, timer = 0;
+    const finish = (take) => {
+      if(done) return; done = true; clearInterval(timer);
+      let data = null;
+      try{ if(take && v.videoWidth){ const k = Math.min(1, 1024 / Math.max(v.videoWidth, v.videoHeight)); const c = document.createElement('canvas'); c.width = Math.round(v.videoWidth*k); c.height = Math.round(v.videoHeight*k); c.getContext('2d').drawImage(v, 0, 0, c.width, c.height); data = c.toDataURL('image/jpeg', 0.82).split(',')[1]; } }catch(e){}
+      try{ stream.getTracks().forEach(t => t.stop()); }catch(e){}
+      v.srcObject = null; box.classList.remove('on'); res(data);
+    };
+    $('camShot').onclick = () => finish(true); $('camX').onclick = () => finish(false);
+    try{ await v.play(); }catch(e){}
+    cnt.textContent = left;
+    timer = setInterval(() => { left--; cnt.textContent = left > 0 ? left : ''; if(left <= 0) finish(true); }, 1000);
+  });
+}
+const VISION_SYS = 'You are the eyes of Maya, a voice assistant for Jim, an ambulance medic in the UAE. Look at the photo and answer his question. Read any text exactly, and translate Arabic or other languages into English. Be factual and short (under 90 words), with no markdown. For a medicine, label, bill, sign or form, pull out the key details. If the picture is too dark or blurry to tell, say so.';
+clientTools.look = async ({question}) => {
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return 'The camera is not available here.';
+  if(!getKey() && !orKey()) return 'The camera needs a Claude or OpenRouter key first.';
+  if(document.hidden) return 'Maya has to be on the screen to use the camera. Tell Jim to open Maya and ask again.';
+  showAction('📷 Looking…');
+  let shot; try{ shot = await snap(); }catch(e){ return 'Camera problem: ' + (e && e.name==='NotAllowedError' ? 'the camera is not allowed for Maya yet. He can allow it when the phone asks, then ask again' : ((e && e.message) || 'it did not open')) + '.'; }
+  if(!shot) return 'He closed the camera before a picture was taken.';
+  try{ const a = await brainOnce(VISION_SYS, 'His question: ' + (question || 'What is this?'), 500, shot); return 'What the camera shows: ' + (a || 'nothing clear') + '\n(Tell Jim this in your own words, short.)'; }
+  catch(e){ return 'The picture was taken but could not be read: ' + e.message + '.'; }
+};
+
+/* Translator mode: Maya interprets between Jim (English) and another person, taking turns */
+const TR_LANGS = [['arabic','Arabic','ar-AE','ar'], ['hindi','Hindi','hi-IN','hi-IN'], ['urdu','Urdu','ur-PK','ur-PK'], ['tagalog|filipino','Tagalog','fil-PH','fil-PH'], ['malayalam','Malayalam','ml-IN','ml-IN'],
+  ['bengali|bangla','Bengali','bn-BD','bn-IN'], ['nepali','Nepali','ne-NP','ne-NP'], ['pashto','Pashto','ps-AF','ps'], ['farsi|persian','Farsi','fa-IR','fa'], ['tamil','Tamil','ta-IN','ta-IN'], ['sinhala','Sinhala','si-LK','si-LK'],
+  ['russian','Russian','ru-RU','ru-RU'], ['chinese|mandarin','Chinese','zh-CN','zh-CN'], ['french','French','fr-FR','fr-FR'], ['spanish','Spanish','es-ES','es-ES']];
+const tr = { on:false, turn:'me', name:'Arabic', stt:'ar-AE', tts:'ar', miss:0 };
+function trStop(){ tr.on = false; tr.turn = 'me'; tr.miss = 0; document.body.classList.remove('tr-on'); }
+function trMiss(){ if(tr.on && tr.turn==='them' && ++tr.miss >= 2){ tr.turn = 'me'; tr.miss = 0; } }   // they stayed silent: back to Jim
+clientTools.translator_mode = async ({language, on}) => {
+  if(on===false || on==='false'){ trStop(); return 'Translator mode is off.'; }
+  if(!(off.active && off.kind==='talk' && off.brain==='own')) return 'Translator mode works inside a voice chat with the Claude or Open brain. Tell Jim to tap Talk (or say Hey Maya) and ask again.';
+  const want = String(language||'').toLowerCase();
+  const L = TR_LANGS.find(x => new RegExp(x[0]).test(want));
+  if(!L) return 'Languages you can interpret: ' + TR_LANGS.map(x => x[1]).join(', ') + '. Ask Jim which one.';
+  Object.assign(tr, {on:true, turn:'me', miss:0, name:L[1], stt:L[2], tts:L[3]});
+  document.body.classList.add('tr-on'); dgClose(); off.fromWake = false;
+  showAction('🌐 Translator: English ↔ ' + L[1]);
+  return `Translator mode is on for ${L[1]}. Tell Jim in ONE short sentence that he speaks English and you will say it in ${L[1]}, then the other person answers and you say it in English, and that "stop translating" ends it. Say nothing more.`;
+};
+async function trHandle(t){
+  off.quietSince = 0;
+  if(tr.turn==='me' && /\b(stop|end|exit|quit|turn off)\b.*\b(translat\w*|interpret\w*)|\b(translat\w*|interpret\w*)( mode)? off\b/i.test(t)){
+    trStop(); speech.onIdle = () => offListen(); speakEnqueue('Translator off, bro.'); return;
+  }
+  const toThem = tr.turn==='me', target = toThem ? tr.name : 'English';
+  setOrb('thinking'); $('modeLabel').textContent = 'Translating…'; off.thinking = true;
+  let said = '';
+  try{ said = await brainOnce(`You are a live interpreter between an ambulance medic who speaks English and a person who speaks ${tr.name}. Translate what is said into ${target}. Output only the translation, in natural, simple spoken ${target}: no notes, no quotation marks, no romanised spelling. If it is already in ${target}, repeat it cleanly.`, t, 400); }catch(e){ said = ''; }
+  off.thinking = false;
+  if(!off.active || !tr.on) return;
+  if(!said){ speech.onIdle = () => offListen(); speakEnqueue("Sorry bro, I couldn't translate that. Say it again."); return; }
+  addMsg('ai', said); $('liveLine').textContent = said;
+  tr.turn = toThem ? 'them' : 'me'; tr.miss = 0;
+  if(toThem){
+    setOrb('speaking'); $('modeLabel').textContent = 'Saying it in ' + tr.name; if(Native.setOrbMode) Native.setOrbMode('speaking');
+    await nativeSay(said, tr.tts);
+    if(off.active) offListen();
+  } else { speech.onIdle = () => offListen(); speakEnqueue(said); }
+}
+
+/* Shifts and overtime */
+let shifts = store.get('shifts', []);
+const todayISO = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); };
+function hoursBetween(a, b){
+  const mins = x => { const m = /^(\d{1,2}):(\d{2})/.exec(String(x||'')); return m ? (+m[1])*60 + (+m[2]) : null; };
+  const st = mins(a), en = mins(b); if(st===null || en===null) return 0;
+  let d = en - st; if(d <= 0) d += 1440;   // a night shift ends the next day
+  return Math.round(d / 6) / 10;
+}
+function shiftSummary(month){
+  const m = /^\d{4}-\d{2}$/.test(month||'') ? month : todayISO().slice(0, 7);
+  const l = shifts.filter(x => String(x.date).startsWith(m)).sort((a, b) => a.date.localeCompare(b.date));
+  const sum = k => Math.round(l.reduce((a, x) => a + (x[k] || 0), 0) * 10) / 10;
+  return {m, l, hrs:sum('hours'), ot:sum('ot'), name:new Date(m + '-01T12:00:00').toLocaleDateString([], {month:'long', year:'numeric'})};
+}
+clientTools.shift_log = async ({action, date, start, end, overtime_hours, station, note, month}) => {
+  if(action==='summary'){
+    const q = shiftSummary(month);
+    return q.l.length ? `${q.name}: ${q.l.length} shift${q.l.length > 1 ? 's' : ''}, ${q.hrs} hours worked, ${q.ot} hours overtime. ` + q.l.slice(-12).map(x => `${x.date} ${x.start || ''}-${x.end || ''}${x.station ? ' ' + x.station : ''}${x.ot ? ' OT ' + x.ot + 'h' : ''}`).join('; ') : `No shifts are logged for ${q.name}.`;
+  }
+  const d = /^\d{4}-\d{2}-\d{2}$/.test(date||'') ? date : todayISO();
+  if(action==='remove'){ const n0 = shifts.length; shifts = shifts.filter(x => x.date!==d); store.set('shifts', shifts); renderShifts(); return n0!==shifts.length ? `Removed the shift on ${d}.` : `No shift was logged on ${d}.`; }
+  const ot = Math.max(0, parseFloat(overtime_hours) || 0);
+  const e = {date:d, start:String(start||''), end:String(end||''), hours:hoursBetween(start, end), ot, station:String(station||'').slice(0, 40), note:String(note||'').slice(0, 120)};
+  shifts = shifts.filter(x => x.date!==d).concat([e]).sort((a, b) => a.date.localeCompare(b.date)).slice(-800);
+  store.set('shifts', shifts); renderShifts(); showAction('🗓️ Shift logged: ' + d);
+  const q = shiftSummary(d.slice(0, 7));
+  return `Logged ${d}${e.hours ? ', ' + e.hours + ' hours' : ''}${ot ? ', ' + ot + ' hours overtime' : ''}. ${q.name} so far: ${q.l.length} shifts, ${q.hrs} hours, ${q.ot} hours overtime.`;
+};
+
+/* Are his apps and websites up? */
+let sites = store.get('sites', []);
+const siteWait = {}; let siteSeq = 0;
+window.zenixSites = (id, json) => { const w = siteWait[id]; delete siteWait[id]; if(w){ let r = []; try{ r = JSON.parse(json) || []; }catch(e){} w(r); } };
+function checkSitesNow(){
+  const urls = sites.map(x => x.url); if(!urls.length) return Promise.resolve([]);
+  if(Native.httpCheck) return new Promise(res => { const id = 's' + (++siteSeq); siteWait[id] = res; Native.httpCheck(id, JSON.stringify(urls)); setTimeout(() => { if(siteWait[id]){ delete siteWait[id]; res([]); } }, 16000); });
+  return Promise.all(urls.map(async u => { const t0 = performance.now(); const c = new AbortController(); const t = setTimeout(() => c.abort(), 8000);
+    try{ await fetch(u, {mode:'no-cors', signal:c.signal}); return {url:u, code:200, ms:Math.round(performance.now() - t0)}; }catch(e){ return {url:u, code:0, ms:Math.round(performance.now() - t0)}; }finally{ clearTimeout(t); } }));
+}
+const siteLine = (x, r) => !r ? `${x.name}: no answer` : (r.code >= 200 && r.code < 400) ? `${x.name}: up (${(r.ms/1000).toFixed(1)} s)` : r.code ? `${x.name}: PROBLEM, error ${r.code}` : `${x.name}: DOWN, not reachable`;
+clientTools.check_sites = async ({action, name, url}) => {
+  if(action==='add'){
+    let u = String(url||'').trim(); if(!u) return 'What is the web address?';
+    if(!/^https?:\/\//i.test(u)) u = 'https://' + u;
+    const nm = (String(name||'').trim() || u.replace(/^https?:\/\//i, '').split('/')[0]).slice(0, 40);
+    sites = sites.filter(x => x.url!==u).concat([{name:nm, url:u}]).slice(-30); store.set('sites', sites); renderSites();
+    return `Added ${nm} to the watch list (${sites.length} in total).`;
+  }
+  if(action==='remove'){ const k = String(name || url || '').toLowerCase().trim(); const n0 = sites.length; if(k) sites = sites.filter(x => !(x.name.toLowerCase().includes(k) || x.url.toLowerCase().includes(k))); store.set('sites', sites); renderSites(); return n0!==sites.length ? 'Removed from the watch list.' : 'I could not find that one on the watch list.'; }
+  if(!sites.length) return 'No apps or sites are on the watch list yet. He can add them in Settings under My apps & sites, or tell you a name and address.';
+  showAction('🩺 Checking your apps');
+  const res = await checkSitesNow();
+  const lines = sites.map(x => siteLine(x, res.find(r => r.url===x.url)));
+  const bad = lines.filter(l => /PROBLEM|DOWN|no answer/.test(l));
+  return (bad.length ? `${bad.length} of ${sites.length} need attention. ` : `All ${sites.length} are up. `) + lines.join('; ');
+};
 window.MayaTools = clientTools;
 /* On the lock screen, private actions need Jim's fingerprint / face first */
-const PRIVATE_TOOLS = ['make_call','send_message','read_messages','open_call_history','check_calendar','add_calendar_event','compose_email','open_app','open_website','web_search','read_notifications','reply_notification','list_read','list_remove'];
+const PRIVATE_TOOLS = ['navigate','make_call','send_message','read_messages','open_call_history','check_calendar','add_calendar_event','compose_email','open_app','open_website','web_search','read_notifications','reply_notification','list_read','list_remove'];
 const READ_ONLY = ['check_calendar','read_notifications','list_read'];                                   // a routine Jim set up himself may read these while locked
 const DRIVE_OK = ['check_calendar','read_notifications','list_read','list_remove','reply_notification','make_call'];   // hands-free while driving
 let unlockWait = null;
@@ -1209,7 +1449,7 @@ function unlockFirst(){
 PRIVATE_TOOLS.forEach(name => {
   const run = clientTools[name]; if(!run) return;
   clientTools[name] = async (args) => {
-    if(Native.isLocked && Native.isLocked()==='true' && !(DRIVE_OK.includes(name) && drivingOn()) && !(READ_ONLY.includes(name) && off.trusted)){
+    if(Native.isLocked && Native.isLocked()==='true' && !(DRIVE_OK.includes(name) && drivingOn()) && !(READ_ONLY.includes(name) && off.trusted) && !(name==='make_call' && emergencyNumber(args && args.contact))){
       if(off.trusted) return 'The phone is locked, so this part was skipped. Carry on with the rest, and mention he can unlock and ask again.';   // a routine speaking by itself: don't wait at a prompt nobody sees
       showAction('🔒 Unlock to continue');
       const ok = await unlockFirst();
@@ -1218,6 +1458,10 @@ PRIVATE_TOOLS.forEach(name => {
     return run(args);
   };
 });
+
+/* "Private on lock screen": while locked, what she remembers about Jim stays hidden (not while driving or in his own routines) */
+const lockPrivate = () => !!settings.lockPrivate && IS_APP && !!Native.isLocked && Native.isLocked()==='true' && !drivingOn() && !off.trusted;
+{ const run = clientTools.recall; clientTools.recall = async (a) => lockPrivate() ? 'His saved memories are hidden while the phone is locked. Tell him to unlock the phone first.' : run(a); }
 
 /* ---------- Offline mode (on-phone brain) ---------- */
 if(!settings.mode) settings.mode='auto';
@@ -1305,12 +1549,18 @@ function offListen(){
   setOrb('listening'); $('modeLabel').textContent = off.brain==='own' ? 'Listening…' : 'Listening… (offline)';
   if(Native.setOrbMode) Native.setOrbMode('listening');
   if(!off.quietSince) off.quietSince = Date.now();
+  if(tr.on){   // translator: the phone listens in whichever language is due
+    $('modeLabel').textContent = tr.turn==='me' ? 'Your turn · English' : 'Their turn · ' + tr.name + ' (tap the ring to skip)';
+    const lang = tr.turn==='me' ? listenLang() : tr.stt;
+    if(Native.startListeningOnline) Native.startListeningOnline(lang); else Native.startListening(lang);
+    return;
+  }
   if(off.brain==='own' && useDGEars()){ dgListen(); return; }
   if(off.brain==='own' && Native.startListeningOnline) Native.startListeningOnline(listenLang());
   else Native.startListening(listenLang());
 }
 let srErrs = 0;
-window.zenixOnListening = () => { srErrs = 0; if(off.active && off.kind==='talk') $('modeLabel').textContent = off.brain==='own' ? 'Listening…' : 'Listening… (offline)'; };
+window.zenixOnListening = () => { srErrs = 0; if(off.active && off.kind==='talk' && !tr.on) $('modeLabel').textContent = off.brain==='own' ? 'Listening…' : 'Listening… (offline)'; };
 let partialTimer=null;
 const HANGING = /\b(and|or|but|so|because|cause|at|to|the|a|an|for|with|from|of|in|on|into|about|around|like|um+|uh+|uhm|er|ah|my|your|his|her|is|are|was|if|when|then|that|this|can|could|would|will|maybe|also|plus|please|ng|sa|na|yung|ang|mga|kasi|tapos|pero|para|si|ni|kay)$/i;
 function endWait(t){ const w=(t||'').trim().toLowerCase().replace(/[.,!?…]+$/,''); return HANGING.test(w) ? 2300 : 1150; }
@@ -1323,19 +1573,21 @@ window.zenixOnPartial = (t) => {
 window.zenixOnSpeech = async (t) => {
   clearTimeout(partialTimer);
   if(!off.active || off.kind!=='talk') return;
-  if(!t){ offListen(); return; }
+  if(!t){ trMiss(); offListen(); return; }
   srErrs = 0; off.quietSince = 0; off.trusted = false;   // Jim is talking now: the normal lock-screen rules apply again
   addMsg('user', t); $('liveLine').textContent='You: '+t;
-  if(isStopWord(t)){
+  if(tr.on && tr.turn==='them'){ trHandle(t); return; }
+  if(isStopWord(t)){ trStop();
     if(off.brain==='own'){ speech.onIdle=()=>endOffline(); speakEnqueue('Okay bro, talk later!'); return; }
     offlineSay('Okay bro, talk later!', true); off.endAfterSpeak=true; return; }
+  if(tr.on){ trHandle(t); return; }
   if(off.brain==='own'){ ownRespond(t, true, ()=>offListen()); return; }
   const reply = await offlineHandle(t);
   if(off.active) offlineSay(reply, true);
 };
 window.zenixOnSpeechError = (code) => {
   if(!off.active || off.kind!=='talk') return;
-  if(code===6 || code===7){ srErrs = 0; setTimeout(offListen, 350); return; }   // nothing was said: keep listening
+  if(code===6 || code===7){ srErrs = 0; trMiss(); setTimeout(offListen, 350); return; }   // nothing was said: keep listening
   srErrs++;
   // this phone has no ears for that language: carry on in US English
   if((code===12 || code===13) && !off.langFallback && settings.offlineLang!=='en-US'){ off.langFallback = 'en-US'; setTimeout(offListen, 300); return; }
@@ -1383,7 +1635,7 @@ function endOffline(quiet){
   off.active=false; off.kind=null; off.quietSince=0; off.thinking=false; off.trusted=false; off.intro=null;
   clearTimeout(partialTimer);
   try{ Native.stopListening(); Native.stopSpeaking(); }catch(e){}
-  stopSpeech(); dgClose();
+  stopSpeech(); dgClose(); trStop();
   if(Native.keepAwake) Native.keepAwake('false');
   setStatus('off'); resetTalkUI(); if(wasTalk && !quiet) addMsg('sys','Voice chat ended');
   wakeResumeLater();
@@ -1458,7 +1710,15 @@ const TOOL_DEFS = [
   {name:'driving_mode', description:'Turn driving mode on or off (new messages read aloud, hands-free replies and calls).', input_schema:{type:'object', properties:{on:{type:'boolean'}}, required:['on']}},
   {name:'list_add', description:"Add items to one of his lists: 'shopping', 'to-do', 'notes', 'shift log', 'follow-ups', or any name he uses.", input_schema:{type:'object', properties:{list:{type:'string'}, items:{type:'array', items:{type:'string'}}}, required:['list','items']}},
   {name:'list_read', description:'Read one list, or all his lists when no name is given.', input_schema:{type:'object', properties:{list:{type:'string'}}}},
-  {name:'list_remove', description:"Remove one item from a list (done or bought), or item 'all' to clear the list.", input_schema:{type:'object', properties:{list:{type:'string'}, item:{type:'string'}}, required:['list','item']}}
+  {name:'list_remove', description:"Remove one item from a list (done or bought), or item 'all' to clear the list.", input_schema:{type:'object', properties:{list:{type:'string'}, item:{type:'string'}}, required:['list','item']}},
+  {name:'phone_control', description:'Control the phone: flashlight, media volume, Do Not Disturb, battery level, music playback.', input_schema:{type:'object', properties:{action:{type:'string', enum:['flashlight_on','flashlight_off','volume_set','volume_up','volume_down','mute','dnd_on','dnd_off','battery','music_play','music_pause','music_next','music_previous']}, value:{type:'integer', description:'For volume_set: 0-100'}}, required:['action']}},
+  {name:'set_timer', description:"Start a countdown timer in the phone's Clock app.", input_schema:{type:'object', properties:{minutes:{type:'number'}, seconds:{type:'number'}, label:{type:'string'}}}},
+  {name:'navigate', description:'Start Google Maps turn-by-turn driving directions to a place (when he says navigate, take me to, start directions). For just seeing a route or the travel time, use show_route instead.', input_schema:{type:'object', properties:{to:{type:'string'}}, required:['to']}},
+  {name:'where_am_i', description:"Find where he is right now (street, area, city) from the phone's location.", input_schema:{type:'object', properties:{}}},
+  {name:'look', description:"Take a photo with the phone's camera and see it. Use when he asks 'what is this', 'read this', 'what does this say', 'check this label / bill / sign / medicine', or about anything in front of him.", input_schema:{type:'object', properties:{question:{type:'string', description:'What he wants to know about what the camera sees'}}, required:['question']}},
+  {name:'translator_mode', description:'Become a live interpreter between him and someone who speaks another language (a patient, for example): he speaks English, you say it in their language, they answer, you say it in English.', input_schema:{type:'object', properties:{language:{type:'string', description:'Arabic, Hindi, Urdu, Tagalog, Malayalam, Bengali, Nepali…'}, on:{type:'boolean'}}, required:['language']}},
+  {name:'shift_log', description:"Keep his work shifts and overtime. add = log a shift (date defaults to today, times as 24-hour HH:MM); summary = totals for a month; remove = delete a day's shift.", input_schema:{type:'object', properties:{action:{type:'string', enum:['add','summary','remove']}, date:{type:'string', description:'YYYY-MM-DD'}, start:{type:'string'}, end:{type:'string'}, overtime_hours:{type:'number'}, station:{type:'string'}, note:{type:'string'}, month:{type:'string', description:'YYYY-MM, for summary'}}, required:['action']}},
+  {name:'check_sites', description:"Check whether his apps and websites are up (check), or add / remove one on the watch list.", input_schema:{type:'object', properties:{action:{type:'string', enum:['check','add','remove']}, name:{type:'string'}, url:{type:'string'}}, required:['action']}}
 ];
 const WEB_SEARCH = {type:'web_search_20250305', name:'web_search', max_uses:3,
   user_location:{type:'approximate', city:'Abu Dhabi', country:'AE', timezone:'Asia/Dubai'}};
@@ -1470,7 +1730,7 @@ function ownSystem(){
   const noTools = settings.provider==='openrouter' && !!orNoTools[settings.orModel || 'x-ai/grok-4.3'];
   const dynamic = `Right now it is ${now} (Dubai).`
     + (noTools ? `\n\nThis brain can only talk: it has no phone tools and no web search. If he asks for a phone action (alarm, call, message, map, opening an app) or something you'd need to look up, tell him in one short line that this brain can't, and that Grok or Claude in Settings can.` : '')
-    + (ownMsgs.length <= 1 ? `\n\nRecent chat from before (context only):\n${recentChatText()}` : '');
+    + (ownMsgs.length <= 1 && !lockPrivate() ? `\n\nRecent chat from before (context only):\n${recentChatText()}` : '');
   return [`You are Maya, ${name} Porce's personal AI assistant. You are female. ${name} is a Filipino medic in EMS under Civil Defence in the UAE, and builds and sells apps as JPSums. You live in an app on his Samsung phone and can control it.
 
 Personality: funny, witty and playful, his best buddy who's also super capable. Crack jokes, tease him, talk openly about sex and adult stuff, banter, puns, cheeky humour — but get the job done first. Calm and serious when it matters. He calls you "bro"; match his energy.
@@ -1481,7 +1741,7 @@ Be open: he's an adult and can ask anything. Answer directly and fully on any to
 
 Your words are spoken aloud: everyday replies are short and snappy, usually one or two sentences, no markdown, lists or emojis. Go longer when he asks or the question needs it (recipes, instructions, explanations). Say numbers and times naturally. Be honest; never make up facts.
 
-You are his agent, not just a chatbot. add_routine makes you do things by yourself at a set time (morning brief, "every Friday remind me…", "tomorrow at 5 tell me when to leave": for that last kind, the routine's prompt should say to use show_route from here and tell him when to leave). read_notifications shows his new messages: for "who messaged me" or "what did I miss", sum them up by person, most important first, in a few sentences. To answer one, read your reply back, wait for his yes, then use reply_notification. list_add, list_read and list_remove keep his shopping list, to-do list, notes, shift log and client follow-ups; when a follow-up has a date, also add a one-time routine for it. A message in [square brackets] that starts with Routine or Driving mode comes from the app, not from him: do what it says and speak the result.
+You are his agent, not just a chatbot. add_routine makes you do things by yourself at a set time (morning brief, "every Friday remind me…", "tomorrow at 5 tell me when to leave": for that last kind, the routine's prompt should say to use show_route from here and tell him when to leave). read_notifications shows his new messages: for "who messaged me" or "what did I miss", sum them up by person, most important first, in a few sentences. To answer one, read your reply back, wait for his yes, then use reply_notification. list_add, list_read and list_remove keep his shopping list, to-do list, notes, shift log and client follow-ups; when a follow-up has a date, also add a one-time routine for it. phone_control does the flashlight, volume, Do Not Disturb, battery and music; set_timer starts a timer; navigate starts Google Maps directions; where_am_i tells him where he is. look takes a photo so you can see or read what's in front of him. translator_mode makes you a live interpreter for a patient or anyone. shift_log keeps his shifts and overtime, and check_sites checks that his apps and websites are up. Emergency numbers in the UAE: ambulance 998, police 999, civil defence 997. A message in [square brackets] that starts with Routine or Driving mode comes from the app, not from him: do what it says and speak the result.
 
 Use your phone tools instead of just talking about them. Maps: show_map and show_route open a map right inside this app (never send him to another app for that); after show_route, say the time and distance in one short sentence. Before sending any message, always read back who it's going to and the exact words, and only call send_message after he clearly says yes. If a tool reports an error, tell him simply what to allow.
 
@@ -1493,7 +1753,7 @@ Speed matters: this is a live voice chat, so start your answer straight away. Ne
 Learning ${name}: quietly call remember whenever he mentions something worth knowing later — always say your reply first, then call remember at the end. Use recall when he mentions someone or something you don't see below, before saying you don't know. Use what you know naturally.
 
 What you know about ${name} (most recent):
-${memoryText()}`, dynamic];
+${lockPrivate() ? "(Hidden: the phone is locked. If he asks about personal things you'd need this for, say he has to unlock the phone first.)" : memoryText()}`, dynamic];
 }
 
 let fastMode = store.get('fastmode', true);
@@ -1866,7 +2126,8 @@ $('orbWrap').addEventListener('click', () => {
   if(off.active && (speech.playing || speech.q.length)){
     const after = speech.onIdle; stopSpeech(); toast('Okay, I\'m listening');
     if(off.kind==='talk') offListen(); else if(after) after();
-  } else if(off.active && off.kind==='talk' && off.brain){ offListen(); }
+  } else if(off.active && off.kind==='talk' && tr.on && !off.thinking){ tr.turn = tr.turn==='me' ? 'them' : 'me'; tr.miss = 0; try{ Native.stopListening(); }catch(e){} setTimeout(offListen, 250); }   // translator: tap to pass the turn
+  else if(off.active && off.kind==='talk' && off.brain){ offListen(); }
 });
 
 /* ---------- Me tab: brain settings ---------- */
@@ -2689,7 +2950,51 @@ function renderLists(){
 }
 $('listAddBtn').onclick = () => { const v = $('listItem').value.trim(); if(!v) return; clientTools.list_add({list: $('listName').value || 'shopping', items:[v]}); $('listItem').value = ''; };
 $('listItem').addEventListener('keydown', e => { if(e.key==='Enter'){ e.preventDefault(); $('listAddBtn').click(); } });
-function renderAgent(){ renderRoutines(); renderNotif(); renderDrive(); renderLists(); }
+function renderShifts(){
+  const q = shiftSummary(''); const box = $('shiftList'); if(!box) return; box.innerHTML = '';
+  $('shiftSum').textContent = q.l.length ? `${q.name}: ${q.l.length} shift${q.l.length > 1 ? 's' : ''} · ${q.hrs} h worked · ${q.ot} h overtime` : `Nothing logged for ${q.name} yet.`;
+  $('sumShifts').textContent = q.l.length ? `${q.l.length} this month · ${q.ot} h overtime` : 'Nothing logged yet';
+  q.l.slice().reverse().forEach(x => {
+    const row = document.createElement('div'); row.className = 'mem';
+    const t = document.createElement('span'); t.textContent = `${new Date(x.date + 'T12:00:00').toLocaleDateString([], {weekday:'short', day:'numeric', month:'short'})} · ${x.start || '?'}–${x.end || '?'}${x.hours ? ' · ' + x.hours + ' h' : ''}${x.ot ? ' · OT ' + x.ot + ' h' : ''}${x.station ? ' · ' + x.station : ''}`;
+    const b1 = document.createElement('button'); b1.textContent = '✕'; b1.setAttribute('aria-label', 'Remove shift');
+    b1.onclick = () => { shifts = shifts.filter(y => y.date!==x.date); store.set('shifts', shifts); renderShifts(); };
+    row.append(t, b1); box.appendChild(row);
+  });
+  if(!$('shDate').value) $('shDate').value = todayISO();
+}
+$('shAdd').onclick = async () => { const r = await clientTools.shift_log({action:'add', date:$('shDate').value, start:$('shStart').value, end:$('shEnd').value, overtime_hours:$('shOt').value}); $('shOt').value = ''; toast(r.split('. ')[0]); };
+function renderSites(results){
+  const box = $('siteList'); if(!box) return; box.innerHTML = '';
+  $('sumSites').textContent = sites.length ? `${sites.length} watched` : 'None yet';
+  $('siteCheck').style.display = sites.length ? '' : 'none';
+  sites.forEach(x => {
+    const row = document.createElement('div'); row.className = 'mem';
+    const t = document.createElement('span'); const r = results && results.find(y => y.url===x.url);
+    const b0 = document.createElement('b'); b0.textContent = x.name; b0.style.display = 'block';
+    const sm = document.createElement('small'); sm.style.color = results ? ((r && r.code >= 200 && r.code < 400) ? 'var(--ok)' : 'var(--danger)') : 'var(--muted)';
+    sm.textContent = results ? siteLine(x, r).slice(x.name.length + 2) : x.url.replace(/^https?:\/\//i, '');
+    t.append(b0, sm);
+    const b1 = document.createElement('button'); b1.textContent = '✕'; b1.setAttribute('aria-label', 'Remove');
+    b1.onclick = () => { sites = sites.filter(y => y.url!==x.url); store.set('sites', sites); renderSites(); };
+    row.append(t, b1); box.appendChild(row);
+  });
+}
+$('siteAdd').onclick = async () => { const u = $('siteUrl').value.trim(); if(!u){ toast('Type the web address first'); return; } toast(await clientTools.check_sites({action:'add', name:$('siteName').value, url:u})); $('siteUrl').value = ''; $('siteName').value = ''; };
+$('siteCheck').onclick = async () => { $('siteState').textContent = 'Checking…'; const res = await checkSitesNow(); renderSites(res); const bad = sites.filter(x => { const r = res.find(y => y.url===x.url); return !(r && r.code >= 200 && r.code < 400); }).length; $('siteState').textContent = bad ? `${bad} need${bad > 1 ? '' : 's'} attention` : 'All up ✓'; };
+const lockTog = $('lockPrivToggle'); lockTog.classList.toggle('on', !!settings.lockPrivate);
+lockTog.onclick = () => { settings.lockPrivate = !settings.lockPrivate; store.set('settings', settings); lockTog.classList.toggle('on', settings.lockPrivate); toast(settings.lockPrivate ? 'While locked, Maya keeps your memories to herself' : 'Maya knows you on the lock screen too'); };
+const HELP = [
+  ['On her own', '"Every weekday at 6, give me my morning brief" · "Every Friday at 8 PM remind me to pay the bills" · "Tomorrow at 5, tell me when to leave for the station"'],
+  ['Messages', '"Who messaged me?" · "What did I miss?" · "Tell Jen I\'ll be home by 9" · "Turn on driving mode"'],
+  ['Lists and notes', '"Add milk to my shopping list" · "What\'s on my to-do list?" · "Note that the AC guy comes Friday"'],
+  ['Phone', '"Flashlight on" · "Volume to 30" · "Do not disturb" · "Timer for 10 minutes" · "Next song" · "Battery?" · "Navigate to Dubai Mall" · "Where am I?"'],
+  ['Camera', '"What\'s this?" · "Read this for me" · "What does this sign say?" · "Check this medicine label"'],
+  ['Work', '"Translator mode, Arabic" · "Log my shift today 7 to 7, 2 hours overtime" · "How much overtime this month?" · "Are my apps okay?"'],
+  ['Emergency (works while locked)', '"Call ambulance" (998) · "Call police" (999) · "Call civil defence" (997)']
+];
+(() => { const box = $('helpBox'); HELP.forEach(([g, l]) => { const h = document.createElement('p'); h.className = 'help-g'; h.textContent = g; const t = document.createElement('p'); t.className = 'help-l'; t.textContent = l; box.append(h, t); }); })();
+function renderAgent(){ renderRoutines(); renderNotif(); renderDrive(); renderLists(); renderShifts(); renderSites(); }
 document.addEventListener('visibilitychange', () => { if(!document.hidden) renderAgent(); });
 renderAgent();
 
