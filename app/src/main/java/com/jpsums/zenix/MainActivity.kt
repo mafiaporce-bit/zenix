@@ -30,6 +30,9 @@ class MainActivity : Activity() {
     private var pageReady = false
     private var pendingWake = false
     private var pendingUpdate = false
+    private var pendingRoutine: String? = null
+    private var lastRoutine = ""
+    private var lastRoutineAt = 0L
     private var overLock = false
 
     companion object {
@@ -89,6 +92,7 @@ class MainActivity : Activity() {
                 pageReady = true
                 if (pendingWake) { pendingWake = false; view.postDelayed({ onWake() }, 900) }
                 if (pendingUpdate) { pendingUpdate = false; view.postDelayed({ runJs("window.zenixStartUpdate && window.zenixStartUpdate()") }, 1200) }
+                pendingRoutine?.let { r -> pendingRoutine = null; view.postDelayed({ runRoutine(r) }, 1100) }
             }
         }
         webView.webChromeClient = object : WebChromeClient() {
@@ -124,6 +128,8 @@ class MainActivity : Activity() {
 
         if (intent?.getBooleanExtra("wake", false) == true) { pendingWake = true; showOverLock(true) }
         if (intent?.getBooleanExtra("update", false) == true) pendingUpdate = true
+        intent?.getStringExtra("routine")?.let { pendingRoutine = it; intent.removeExtra("routine"); if (isLocked()) showOverLock(true) }
+        Routines.scheduleAll(this)
         webView.loadUrl("https://appassets.androidplatform.net/assets/index.html")
         requestAllPermissions()
     }
@@ -133,6 +139,11 @@ class MainActivity : Activity() {
         setIntent(intent)
         if (intent.getBooleanExtra("wake", false)) { showOverLock(true); if (pageReady) onWake() else pendingWake = true }
         if (intent.getBooleanExtra("update", false)) { if (pageReady) runJs("window.zenixStartUpdate && window.zenixStartUpdate()") else pendingUpdate = true }
+        intent.getStringExtra("routine")?.let { r ->
+            intent.removeExtra("routine")
+            if (isLocked()) showOverLock(true)
+            if (pageReady) runRoutine(r) else pendingRoutine = r
+        }
     }
 
     /** Lets Maya appear (and wake the screen) on top of the lock screen after "Hey Maya", without unlocking. */
@@ -181,6 +192,15 @@ class MainActivity : Activity() {
     fun onWake() {
         clearWakeAlert()
         runJs("window.zenixWake && window.zenixWake()")
+    }
+
+    /** A routine's time has come (morning brief, a timed reminder…): Maya carries it out and says it aloud. */
+    fun runRoutine(json: String) {
+        val now = System.currentTimeMillis()
+        if (json == lastRoutine && now - lastRoutineAt < 20_000) return   // the alert and the direct opening can both arrive
+        lastRoutine = json; lastRoutineAt = now
+        if (!pageReady) { pendingRoutine = json; return }
+        runJs("window.zenixRoutine && window.zenixRoutine(${org.json.JSONObject.quote(json)})")
     }
 
     private fun clearWakeAlert() {

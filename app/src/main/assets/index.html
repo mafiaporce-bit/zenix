@@ -405,6 +405,34 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
           <div class="toggle-row" style="margin-top:0"><span></span><button class="btn-line" id="autoInfo">Allow restricted settings</button></div>
         </div>
       </details>
+      <details class="set-item" data-sec="routines">
+        <summary><span class="ico amber"><svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2M9 2h6"/></svg></span><span class="set-t"><b>Routines</b><span id="sumRoutines"></span></span><svg class="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></summary>
+        <div class="set-body">
+          <p class="hint">Things Maya does by herself at a set time and says out loud. Just tell her: <b>"every weekday at 6, give me my morning brief"</b>, <b>"every Friday at 8 PM remind me to pay the bills"</b> or <b>"tomorrow at 5, tell me when to leave for the station"</b>.</p>
+          <div id="routineList"></div>
+          <p class="sub-label">Morning brief</p>
+          <div class="inline" style="margin-top:0"><input type="time" class="field" id="briefTime" value="06:00"><button class="btn-line" id="briefAdd">Add daily brief</button></div>
+          <p class="hint" style="margin:8px 0 0">Weather, today's calendar, your to-do list, missed messages and birthdays, in a few sentences. Needs the Claude or Open brain.</p>
+        </div>
+      </details>
+      <details class="set-item" data-sec="notif">
+        <summary><span class="ico pink"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 01-3.4 0"/></svg></span><span class="set-t"><b>Message reading</b><span id="sumNotif"></span></span><svg class="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></summary>
+        <div class="set-body">
+          <p class="hint">Lets Maya see your message notifications (WhatsApp, Messenger, texts, email). Ask <b>"who messaged me?"</b> or <b>"what did I miss?"</b>, and reply by voice. She always reads your reply back and waits for your yes.</p>
+          <div class="toggle-row"><span class="status-line" style="margin:0" id="notifState">Off</span><button class="btn-line" id="notifBtn">Turn on</button></div>
+          <p class="hint" style="margin:12px 0 0">Turn on: tap <b>Turn on</b> → <b>Maya message reader</b> → <b>Allow</b>. If it's greyed out, first tap <b>Allow restricted settings</b> in the Auto-send section above.</p>
+        </div>
+      </details>
+      <details class="set-item" data-sec="drive">
+        <summary><span class="ico blue"><svg viewBox="0 0 24 24"><path d="M5 17h14M6 17v2M18 17v2M4 13l2-6h12l2 6v4H4v-4z"/><circle cx="8" cy="14" r="1"/><circle cx="16" cy="14" r="1"/></svg></span><span class="set-t"><b>Driving mode</b><span id="sumDrive"></span></span><svg class="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></summary>
+        <div class="set-body">
+          <p class="hint">While it's on, Maya reads new messages aloud, and you can reply or call by voice with the phone still locked. It switches on by itself when the phone connects to your car's Bluetooth. Needs Message reading, and Maya left open in the background.</p>
+          <div class="toggle-row"><span class="status-line" style="margin:0" id="driveState">Off</span><button class="btn-line" id="driveBtn">Turn on now</button></div>
+          <p class="sub-label">Your car</p>
+          <div class="toggle-row" style="margin-top:0"><span class="status-line" style="margin:0" id="carState">Not chosen yet</span><button class="btn-line" id="carBtn">Choose car</button></div>
+          <div class="voices" id="carList" style="grid-template-columns:repeat(2,minmax(0,1fr))"></div>
+        </div>
+      </details>
       <details class="set-item" data-sec="offline">
         <summary><span class="ico blue"><svg viewBox="0 0 24 24"><path d="M2 2l20 20M17.5 18H7a5 5 0 01-1.6-9.7M9.4 5.4A6 6 0 0118 10h.5a3.5 3.5 0 012 6.4"/></svg></span><span class="set-t"><b>Offline mode</b><span id="sumOffline"></span></span><svg class="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></summary>
         <div class="set-body">
@@ -428,6 +456,14 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
           <button class="btn-line" id="memMore" style="display:none;width:100%;margin-top:6px">Show more</button>
           <div class="inline"><input type="text" class="field" id="memInput" placeholder="Add something for her to remember" maxlength="200"><button class="btn-line" id="memAdd">Add</button></div>
           <div class="inline"><button class="btn-line" id="memExport" style="flex:1">Back up</button><button class="btn-line" id="memImport" style="flex:1">Restore</button></div>
+        </div>
+      </details>
+      <details class="set-item" data-sec="lists">
+        <summary><span class="ico blue"><svg viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/></svg></span><span class="set-t"><b>Lists &amp; notes</b><span id="sumLists"></span></span><svg class="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></summary>
+        <div class="set-body">
+          <p class="hint">Say <b>"add milk to my shopping list"</b>, <b>"note that the AC guy comes Friday"</b> or <b>"what's on my to-do list?"</b></p>
+          <div id="listsBox"></div>
+          <div class="inline"><input type="text" class="field" id="listName" placeholder="List" value="shopping" maxlength="30" style="flex:0 0 112px"><input type="text" class="field" id="listItem" placeholder="Add an item" maxlength="200"><button class="btn-line" id="listAddBtn">Add</button></div>
         </div>
       </details>
       <details class="set-item" data-sec="hist">
@@ -1051,9 +1087,120 @@ clientTools.show_route = async ({from, to}) => {
   }catch(e){ if(!MapView.map || MapView.empty) MapView.close(); return 'Route problem: ' + e.message + '.'; }
 };
 clientTools.close_map = async () => { MapView.close(); return 'Map closed.'; };
+/* ---------- Agent skills, part 1: routines, message reading, driving mode, lists ---------- */
+const BRIEF_PROMPT = "Give Jim his morning brief in about five short sentences: a warm greeting with today's day and date; today's weather in Abu Dhabi (web_search); what's on his calendar today (check_calendar); what's still on his to-do list (list_read); any new messages he missed (read_notifications); and any birthday or important date from what you know about him that is today or in the next two days. Skip any part that has nothing to report. End by asking if he needs anything.";
+const DAY_NUM = {sun:1, mon:2, tue:3, wed:4, thu:5, fri:6, sat:7};
+function daysDigits(d){
+  const t = String(d||'').toLowerCase().trim();
+  if(!t || /daily|every ?day|everyday|^all$/.test(t)) return '';
+  if(/weekday/.test(t)) return '23456';
+  if(/weekend/.test(t)) return '71';
+  let out = ''; (t.match(/sun|mon|tue|wed|thu|fri|sat/g) || []).forEach(k => { const d1 = String(DAY_NUM[k]); if(!out.includes(d1)) out += d1; });
+  return out;
+}
+const daysText = d => !d ? 'every day' : d==='23456' ? 'weekdays' : (d==='71' || d==='17') ? 'weekends' : d.split('').map(x => ['','Sun','Mon','Tue','Wed','Thu','Fri','Sat'][+x]).join(', ');
+const hhmm = (h, m) => { const d = new Date(); d.setHours(h, m, 0, 0); return d.toLocaleTimeString([], {hour:'numeric', minute:'2-digit'}); };
+function routineList(){ try{ return JSON.parse(Native.routineList()) || []; }catch(e){ return []; } }
+clientTools.add_routine = async ({title, prompt, hour, minute, days, date}) => {
+  if(!Native.routineAdd) return 'Routines only work in the Android app.';
+  showAction('⏰ Routine: ' + (title || ''));
+  const r = callNative('routineAdd', title || '', prompt || title || '', hour, minute || 0, date ? '' : daysDigits(days), date || '');
+  renderRoutines(); return reply(r);
+};
+clientTools.routines = async ({action, id}) => {
+  if(!Native.routineList) return 'Routines only work in the Android app.';
+  if(action==='delete'){ const r = callNative('routineDelete', id); renderRoutines(); return reply(r); }
+  const l = routineList(); if(!l.length) return 'No routines yet.';
+  return l.map(r => `id ${r.id}: "${r.title}" at ${hhmm(r.hour, r.minute)}, ${r.date ? 'once on ' + r.date : daysText(r.days)} (next: ${r.next})`).join('\n');
+};
+clientTools.read_notifications = async ({app, contact, minutes}) => {
+  if(!Native.readNotifications) return 'Reading messages only works in the Android app.';
+  showAction('📨 Checking your messages');
+  return reply(callNative('readNotifications', app || '', contact || '', minutes || 0, 'true'));
+};
+clientTools.reply_notification = async ({contact, message, app}) => {
+  if(!Native.replyNotification) return 'Replying only works in the Android app.';
+  showAction(`💬 Reply to ${contact}`);
+  return reply(callNative('replyNotification', contact || '', app || '', message || ''));
+};
+let driveCache = {t:0, on:false};
+function drivingOn(){
+  if(!Native.drivingStatus) return false;
+  const now = Date.now();
+  if(now - driveCache.t > 3000){ try{ driveCache = {t:now, on:!!JSON.parse(Native.drivingStatus()).on}; }catch(e){ driveCache = {t:now, on:false}; } }
+  return driveCache.on;
+}
+clientTools.driving_mode = async ({on}) => {
+  if(!Native.setDriving) return 'Driving mode only works in the Android app.';
+  const v = on===true || on==='true'; Native.setDriving(v ? 'true' : 'false'); driveCache.t = 0; renderDrive();
+  return v ? 'Driving mode is on: new messages are read aloud and he can reply or call by voice.' : 'Driving mode is off.';
+};
+let lists = store.get('lists', {});
+const LIST_ALIAS = [[/^(shop|grocer|buy|market)/, 'shopping'], [/^(to.?do|tasks?|things to do)/, 'to-do'], [/^(notes?|memo)/, 'notes'], [/^(shift ?log|duty log)/, 'shift log'], [/^(follow.?ups?|clients?)/, 'follow-ups']];
+const listKey = name => { const t = String(name||'').toLowerCase().replace(/\b(my|the|list)\b/g, ' ').replace(/\s+/g, ' ').trim() || 'notes'; const a = LIST_ALIAS.find(x => x[0].test(t)); return a ? a[1] : t.slice(0, 30); };
+function saveLists(){ store.set('lists', lists); renderLists(); }
+clientTools.list_add = async ({list, items}) => {
+  const k = listKey(list); const arr = (Array.isArray(items) ? items : [items]).map(x => String(x||'').trim()).filter(Boolean);
+  if(!arr.length) return 'Nothing to add.';
+  lists[k] = lists[k] || [];
+  arr.forEach(t => { if(!lists[k].some(i => i.t.toLowerCase()===t.toLowerCase())) lists[k].push({t, ts:Date.now()}); });
+  saveLists(); showAction(`📝 ${k}: ${arr.join(', ')}`.slice(0, 90));
+  return `Added to the ${k} list. It now has ${lists[k].length} item${lists[k].length > 1 ? 's' : ''}.`;
+};
+clientTools.list_read = async ({list}) => {
+  const names = Object.keys(lists).filter(k => lists[k].length);
+  if(!list) return names.length ? names.map(k => `${k} (${lists[k].length}): ${lists[k].map(i => i.t).join('; ')}`).join('\n').slice(0, 2500) : 'All his lists are empty.';
+  const k = listKey(list); const l = lists[k] || [];
+  return l.length ? `${k} list: ` + l.map(i => i.t).join('; ') : `The ${k} list is empty.` + (names.length ? ' Lists with items: ' + names.join(', ') + '.' : '');
+};
+clientTools.list_remove = async ({list, item}) => {
+  const k = listKey(list); const l = lists[k] || [];
+  if(!l.length) return `The ${k} list is already empty.`;
+  if(!item || /^(all|everything|clear)$/i.test(String(item).trim())){ delete lists[k]; saveLists(); return `Cleared the ${k} list.`; }
+  const want = String(item).toLowerCase().trim();
+  let j = l.findIndex(x => x.t.toLowerCase()===want);
+  if(j < 0) j = l.findIndex(x => x.t.toLowerCase().includes(want) || want.includes(x.t.toLowerCase()));
+  if(j < 0) return `"${item}" isn't on the ${k} list. It has: ` + l.map(x => x.t).join('; ');
+  const gone = l.splice(j, 1)[0]; if(!l.length) delete lists[k]; saveLists();
+  return `Removed "${gone.t}" from the ${k} list.`;
+};
+
+/* A routine's time has come (from the phone's alarm): Maya carries it out and says it aloud */
+window.zenixRoutine = (txt) => {
+  let r; try{ r = JSON.parse(txt); }catch(e){ return; }
+  const title = r.title || 'Routine';
+  addMsg('sys', '⏰ ' + title); renderRoutines();
+  if(inVoiceChat()){ toast('⏰ ' + title); return; }            // already talking: the notification stays for later
+  if(!brainKey()){ toast('⏰ ' + title); if(Native.speak) Native.speak(title, 'en-US'); return; }
+  if(off.active) endOffline(true);
+  document.querySelector('nav button[data-view="talk"]').click();
+  wakeGreeting = true; off.trusted = true;
+  off.intro = {ask: `[Routine "${title}": it is time. Do this now and tell Jim the result out loud, short and natural. ${r.prompt || title}]`};
+  if(!startOffline('talk', 'own')){ off.intro = null; off.trusted = false; wakeGreeting = false; }
+};
+/* Driving mode: a new message arrived, so she reads it out and offers to reply */
+window.zenixIncoming = (app, who, group, text) => {
+  const from = `${who}${group ? ' in ' + group : ''} on ${app}`;
+  addMsg('sys', `💬 ${from}: ${text}`);
+  if(inVoiceChat()){ toast('💬 New message from ' + who); return; }
+  const say = `Message from ${from}. ${text}`;
+  if(!brainKey()){ if(Native.speak) Native.speak(say, 'en-US'); return; }
+  if(off.active) endOffline(true);
+  ownMsgs.push({role:'user', content:`[Driving mode: a new ${app} message just arrived from ${who}${group ? ' in the group "' + group + '"' : ''}: "${text}". You are reading it aloud to Jim.]`});
+  ownMsgs.push({role:'assistant', content: say + ' Want to reply?'});
+  wakeGreeting = true; off.intro = {say: say + ' ... Want to reply?'};
+  if(!startOffline('talk', 'own')){ off.intro = null; wakeGreeting = false; }
+};
+window.zenixDriving = (on) => {
+  driveCache.t = 0; renderDrive();
+  addMsg('sys', on ? '🚗 Driving mode on' : '🚗 Driving mode off');
+  if(on && !inVoiceChat() && Native.speak) Native.speak('Driving mode on. I will read your messages to you.', 'en-US');
+};
 window.MayaTools = clientTools;
 /* On the lock screen, private actions need Jim's fingerprint / face first */
-const PRIVATE_TOOLS = ['make_call','send_message','read_messages','open_call_history','check_calendar','add_calendar_event','compose_email','open_app','open_website','web_search'];
+const PRIVATE_TOOLS = ['make_call','send_message','read_messages','open_call_history','check_calendar','add_calendar_event','compose_email','open_app','open_website','web_search','read_notifications','reply_notification','list_read','list_remove'];
+const READ_ONLY = ['check_calendar','read_notifications','list_read'];                                   // a routine Jim set up himself may read these while locked
+const DRIVE_OK = ['check_calendar','read_notifications','list_read','list_remove','reply_notification','make_call'];   // hands-free while driving
 let unlockWait = null;
 window.zenixUnlocked = (ok) => { const w = unlockWait; unlockWait = null; if(w) w(!!ok); };
 function unlockFirst(){
@@ -1062,7 +1209,8 @@ function unlockFirst(){
 PRIVATE_TOOLS.forEach(name => {
   const run = clientTools[name]; if(!run) return;
   clientTools[name] = async (args) => {
-    if(Native.isLocked && Native.isLocked()==='true'){
+    if(Native.isLocked && Native.isLocked()==='true' && !(DRIVE_OK.includes(name) && drivingOn()) && !(READ_ONLY.includes(name) && off.trusted)){
+      if(off.trusted) return 'The phone is locked, so this part was skipped. Carry on with the rest, and mention he can unlock and ask again.';   // a routine speaking by itself: don't wait at a prompt nobody sees
       showAction('🔒 Unlock to continue');
       const ok = await unlockFirst();
       if(!ok) return 'The phone is still locked, so this was not done. Tell Jim in one short sentence to unlock with his fingerprint or face and ask again.';
@@ -1176,7 +1324,7 @@ window.zenixOnSpeech = async (t) => {
   clearTimeout(partialTimer);
   if(!off.active || off.kind!=='talk') return;
   if(!t){ offListen(); return; }
-  srErrs = 0; off.quietSince = 0;
+  srErrs = 0; off.quietSince = 0; off.trusted = false;   // Jim is talking now: the normal lock-screen rules apply again
   addMsg('user', t); $('liveLine').textContent='You: '+t;
   if(isStopWord(t)){
     if(off.brain==='own'){ speech.onIdle=()=>endOffline(); speakEnqueue('Okay bro, talk later!'); return; }
@@ -1221,8 +1369,10 @@ function startOffline(kind, brain='offline'){
     if(Native.keepAwake) Native.keepAwake('true');
     if(brain==='own'){
       if(settings.voice!=='phone' && !/^(dg|el):/.test(settings.voice)) loadKokoro().catch(()=>{});
-      speech.onIdle = () => offListen();
-      speakEnqueue(wakeGreeting ? 'Yes bro?' : `Hey ${settings.name||'Jim'}! What's up?`); wakeGreeting = false;
+      const intro = off.intro; off.intro = null;
+      if(intro && intro.ask) ownRespond(intro.ask, true, () => offListen());   // a routine: she does it and says the result
+      else { speech.onIdle = () => offListen(); speakEnqueue(intro && intro.say ? intro.say : (wakeGreeting ? 'Yes bro?' : `Hey ${settings.name||'Jim'}! What's up?`)); }
+      wakeGreeting = false;
     } else { wakeGreeting = false; offlineSay(`Hey ${settings.name||'Jim'}, offline Maya here. What's up?`, true); }
   }
   return true;
@@ -1230,7 +1380,7 @@ function startOffline(kind, brain='offline'){
 function endOffline(quiet){
   if(!off.active) return;
   const wasTalk = off.kind==='talk';
-  off.active=false; off.kind=null; off.quietSince=0; off.thinking=false;
+  off.active=false; off.kind=null; off.quietSince=0; off.thinking=false; off.trusted=false; off.intro=null;
   clearTimeout(partialTimer);
   try{ Native.stopListening(); Native.stopSpeaking(); }catch(e){}
   stopSpeech(); dgClose();
@@ -1300,7 +1450,15 @@ const TOOL_DEFS = [
   {name:'recall', description:"Search everything you've saved about Jim and past chats. Use before saying you don't know something about him.", input_schema:{type:'object', properties:{query:{type:'string'}}, required:['query']}},
   {name:'show_map', description:"Show a place on the map INSIDE this app (city, area, landmark, address). Use for 'open/show the map of X', 'where is X'.", input_schema:{type:'object', properties:{place:{type:'string', description:"e.g. 'Abu Dhabi', 'Dubai Mall', 'Al Wahda Mall Abu Dhabi'"}}, required:['place']}},
   {name:'show_route', description:"Draw the driving route on the map INSIDE this app and get distance and travel time. Use for 'how long/how far from A to B', 'route to X'. Use 'here' as from when he means his current location.", input_schema:{type:'object', properties:{from:{type:'string'}, to:{type:'string'}}, required:['from','to']}},
-  {name:'close_map', description:'Close the map.', input_schema:{type:'object', properties:{}}}
+  {name:'close_map', description:'Close the map.', input_schema:{type:'object', properties:{}}},
+  {name:'add_routine', description:"Make yourself do something by yourself at a set time and say it aloud: a morning brief, 'every Friday at 8 PM remind me to pay the bills', 'tomorrow at 5 tell me when to leave for work'. prompt = a clear instruction to your future self (which tools to use and what to tell him). For a one-time thing give date; otherwise it repeats on days.", input_schema:{type:'object', properties:{title:{type:'string', description:'Short name'}, prompt:{type:'string'}, hour:{type:'integer', description:'0-23, Dubai time'}, minute:{type:'integer'}, days:{type:'string', description:"'daily', 'weekdays', 'weekends' or days like 'mon,wed,fri'"}, date:{type:'string', description:'YYYY-MM-DD, only for a one-time routine'}}, required:['title','prompt','hour','minute']}},
+  {name:'routines', description:'List his routines, or delete one by id (list first to find the id).', input_schema:{type:'object', properties:{action:{type:'string', enum:['list','delete']}, id:{type:'integer'}}, required:['action']}},
+  {name:'read_notifications', description:"Read his message notifications (WhatsApp, Messenger, texts, Telegram, email). With no filters it returns what's new since he last asked. Use for 'who messaged me', 'what did I miss', 'what did Jen say'.", input_schema:{type:'object', properties:{contact:{type:'string', description:'Only from this person or group'}, app:{type:'string'}, minutes:{type:'integer', description:'Look back this many minutes instead'}}}},
+  {name:'reply_notification', description:'Answer a message straight from its notification (no app opens). ALWAYS read the reply back to Jim and wait for a clear yes first. If it fails, use send_message.', input_schema:{type:'object', properties:{contact:{type:'string'}, message:{type:'string'}, app:{type:'string'}}, required:['contact','message']}},
+  {name:'driving_mode', description:'Turn driving mode on or off (new messages read aloud, hands-free replies and calls).', input_schema:{type:'object', properties:{on:{type:'boolean'}}, required:['on']}},
+  {name:'list_add', description:"Add items to one of his lists: 'shopping', 'to-do', 'notes', 'shift log', 'follow-ups', or any name he uses.", input_schema:{type:'object', properties:{list:{type:'string'}, items:{type:'array', items:{type:'string'}}}, required:['list','items']}},
+  {name:'list_read', description:'Read one list, or all his lists when no name is given.', input_schema:{type:'object', properties:{list:{type:'string'}}}},
+  {name:'list_remove', description:"Remove one item from a list (done or bought), or item 'all' to clear the list.", input_schema:{type:'object', properties:{list:{type:'string'}, item:{type:'string'}}, required:['list','item']}}
 ];
 const WEB_SEARCH = {type:'web_search_20250305', name:'web_search', max_uses:3,
   user_location:{type:'approximate', city:'Abu Dhabi', country:'AE', timezone:'Asia/Dubai'}};
@@ -1322,6 +1480,8 @@ Language: English by default. If he speaks Tagalog or Taglish, reply in natural 
 Be open: he's an adult and can ask anything. Answer directly and fully on any topic (life, relationships, sex, money, health, religion, politics, adult jokes), give honest opinions, no lectures, no disclaimers. Only skip something that would truly put someone in danger, in one line. He's a medic: talk clinical detail like a colleague.
 
 Your words are spoken aloud: everyday replies are short and snappy, usually one or two sentences, no markdown, lists or emojis. Go longer when he asks or the question needs it (recipes, instructions, explanations). Say numbers and times naturally. Be honest; never make up facts.
+
+You are his agent, not just a chatbot. add_routine makes you do things by yourself at a set time (morning brief, "every Friday remind me…", "tomorrow at 5 tell me when to leave": for that last kind, the routine's prompt should say to use show_route from here and tell him when to leave). read_notifications shows his new messages: for "who messaged me" or "what did I miss", sum them up by person, most important first, in a few sentences. To answer one, read your reply back, wait for his yes, then use reply_notification. list_add, list_read and list_remove keep his shopping list, to-do list, notes, shift log and client follow-ups; when a follow-up has a date, also add a one-time routine for it. A message in [square brackets] that starts with Routine or Driving mode comes from the app, not from him: do what it says and speak the result.
 
 Use your phone tools instead of just talking about them. Maps: show_map and show_route open a map right inside this app (never send him to another app for that); after show_route, say the time and distance in one short sentence. Before sending any message, always read back who it's going to and the exact words, and only call send_message after he clearly says yes. If a tool reports an error, tell him simply what to allow.
 
@@ -1879,7 +2039,7 @@ const isStopWord = t => /^(?:(?:ok(?:ay)?|alright|all right|sige)[\s,.!]+)?(?:st
 function startSpeculative(t){
   const snap = JSON.stringify(ownMsgs);
   const ctl = new AbortController(); let go; const confirmed = new Promise(r => go = r); let cancelled = false;
-  speech.hold = true;
+  speech.hold = true; off.trusted = false;
   ownRespond(t, true, () => offListen(), {signal:ctl.signal, confirmed, quiet:true, isCancelled:() => cancelled});
   return {
     text: t,
@@ -2450,9 +2610,88 @@ $('view-settings').addEventListener('input', () => setTimeout(renderMe, 80));
 setInterval(() => {
   if(document.hidden || !$('view-settings').classList.contains('active')) return;
   const w = document.querySelector('.set-item[data-sec="wake"]'); if(w && w.open) renderWake();   // live "last heard" line while testing
+  const dr = document.querySelector('.set-item[data-sec="drive"]'); if(dr && dr.open) renderDrive();
   renderMe();
 }, 2000);
 renderMe();
+
+/* ---------- Routines, message reading, driving mode, lists (Settings) ---------- */
+function renderRoutines(){
+  const box = $('routineList'); if(!box) return;
+  if(!Native.routineList){ box.innerHTML = '<p class="muted">Routines work in the Android app.</p>'; $('briefAdd').style.display = 'none'; $('briefTime').style.display = 'none'; $('sumRoutines').textContent = 'Android app only'; return; }
+  const l = routineList(); box.innerHTML = '';
+  $('sumRoutines').textContent = l.length ? l.length + ' set' : 'None yet';
+  l.forEach(r => {
+    const row = document.createElement('div'); row.className = 'mem';
+    const t = document.createElement('span'); const b1 = document.createElement('b'); b1.textContent = r.title; b1.style.display = 'block';
+    const sm = document.createElement('small'); sm.style.color = 'var(--muted)'; sm.textContent = `${hhmm(r.hour, r.minute)} · ${r.date ? 'once on ' + r.date : daysText(r.days)} · next ${r.next}`;
+    t.append(b1, sm);
+    const x = document.createElement('button'); x.textContent = '✕'; x.setAttribute('aria-label', 'Remove routine');
+    x.onclick = () => { Native.routineDelete(String(r.id)); renderRoutines(); };
+    row.append(t, x); box.appendChild(row);
+  });
+  const brief = l.find(r => r.title==='Morning brief');
+  $('briefAdd').textContent = brief ? 'Change time' : 'Add daily brief';
+  if(brief && document.activeElement !== $('briefTime')) $('briefTime').value = String(brief.hour).padStart(2,'0') + ':' + String(brief.minute).padStart(2,'0');
+}
+$('briefAdd').onclick = () => {
+  if(!Native.routineAdd) return;
+  const m = /^(\d{1,2}):(\d{2})/.exec($('briefTime').value || ''); if(!m){ toast('Pick a time first'); return; }
+  routineList().filter(r => r.title==='Morning brief').forEach(r => Native.routineDelete(String(r.id)));
+  const r = callNative('routineAdd', 'Morning brief', BRIEF_PROMPT, m[1], m[2], '', '');
+  toast(r && r.ok ? 'Morning brief set for ' + hhmm(+m[1], +m[2]) + ' every day' : ((r && r.message) || 'Could not save it'));
+  renderRoutines();
+};
+function renderNotif(){
+  if(!Native.notifOn){ $('notifState').textContent = 'Android app only'; $('notifBtn').style.display = 'none'; $('sumNotif').textContent = 'Android app only'; return; }
+  const on = Native.notifOn()==='true';
+  $('notifState').textContent = on ? 'On ✓ ask "who messaged me?"' : 'Off';
+  $('notifBtn').textContent = on ? 'Settings' : 'Turn on';
+  $('sumNotif').textContent = on ? 'On' : 'Off';
+}
+$('notifBtn').onclick = () => { if(Native.openNotifAccess){ Native.openNotifAccess(); toast('Maya message reader → Allow'); } };
+function renderDrive(){
+  if(!Native.drivingStatus){ $('driveState').textContent = 'Android app only'; $('driveBtn').style.display = 'none'; $('carBtn').style.display = 'none'; $('sumDrive').textContent = 'Android app only'; return; }
+  let st = {}; try{ st = JSON.parse(Native.drivingStatus()); }catch(e){}
+  $('driveState').textContent = st.on ? 'On now ✓' : 'Off';
+  $('driveBtn').textContent = st.on ? 'Turn off' : 'Turn on now';
+  $('carState').textContent = st.hasCar ? (st.car || 'Car chosen') + ' ✓' : 'Not chosen yet';
+  $('carBtn').textContent = st.hasCar ? 'Change' : 'Choose car';
+  $('sumDrive').textContent = st.on ? 'On now' : (st.hasCar ? 'Starts with ' + (st.car || 'your car') : 'Off');
+}
+$('driveBtn').onclick = () => { if(!Native.setDriving) return; const on = drivingOn(); Native.setDriving(on ? 'false' : 'true'); driveCache.t = 0; renderDrive(); };
+function showCars(){
+  const box = $('carList'); box.innerHTML = '';
+  let r = {}; try{ r = JSON.parse(Native.btDevices()); }catch(e){}
+  if(r.need){ toast('Allow "Nearby devices" for Maya, then tap Choose car again'); return; }
+  const l = r.list || [];
+  if(!l.length){ box.innerHTML = '<p class="muted" style="grid-column:1/-1">No paired Bluetooth devices found. Pair the phone with your car first.</p>'; return; }
+  l.forEach(d => { const b = document.createElement('button'); b.textContent = d.name;
+    b.onclick = () => { Native.setCar(d.address, d.name); box.innerHTML = ''; toast('Driving mode will start with ' + d.name); renderDrive(); }; box.appendChild(b); });
+}
+$('carBtn').onclick = () => { if(Native.btDevices) showCars(); };
+function renderLists(){
+  const box = $('listsBox'); if(!box) return; box.innerHTML = '';
+  const names = Object.keys(lists).filter(k => lists[k] && lists[k].length);
+  const total = names.reduce((a, k) => a + lists[k].length, 0);
+  $('sumLists').textContent = total ? `${total} item${total > 1 ? 's' : ''} in ${names.length} list${names.length > 1 ? 's' : ''}` : 'Empty';
+  if(!names.length){ box.innerHTML = '<p class="muted">Nothing yet.</p>'; return; }
+  names.forEach(k => {
+    const h = document.createElement('p'); h.className = 'sub-label'; h.textContent = k.charAt(0).toUpperCase() + k.slice(1); box.appendChild(h);
+    lists[k].forEach((it, i) => {
+      const row = document.createElement('div'); row.className = 'mem';
+      const t = document.createElement('span'); t.textContent = it.t;
+      const x = document.createElement('button'); x.textContent = '✓'; x.style.color = 'var(--ok)'; x.setAttribute('aria-label', 'Done');
+      x.onclick = () => { lists[k].splice(i, 1); if(!lists[k].length) delete lists[k]; saveLists(); };
+      row.append(t, x); box.appendChild(row);
+    });
+  });
+}
+$('listAddBtn').onclick = () => { const v = $('listItem').value.trim(); if(!v) return; clientTools.list_add({list: $('listName').value || 'shopping', items:[v]}); $('listItem').value = ''; };
+$('listItem').addEventListener('keydown', e => { if(e.key==='Enter'){ e.preventDefault(); $('listAddBtn').click(); } });
+function renderAgent(){ renderRoutines(); renderNotif(); renderDrive(); renderLists(); }
+document.addEventListener('visibilitychange', () => { if(!document.hidden) renderAgent(); });
+renderAgent();
 
 /* ---------- Auto-send (Maya taps Send after Jim says yes) ---------- */
 const autoOn = () => !!(Native.autoSendOn && Native.autoSendOn()==='true');

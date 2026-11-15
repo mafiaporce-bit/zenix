@@ -258,6 +258,13 @@ class WakeWordService : Service() {
         val i = Intent(this, MainActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
             .putExtra("wake", true)
+        // Driving with another app in front (the map): she answers by voice without covering it
+        val open = MainActivity.instance?.get()
+        if (open != null && !asleep && !locked && !MainActivity.inForeground && Driving.isOn(this)) {
+            open.onWake()
+            main.postDelayed({ if (current === this && paused && VoiceService.current == null) resume() }, 15000)
+            return
+        }
         try { startActivity(i) } catch (_: Exception) { }
         // Screen off, locked, or no "Display over other apps": Android may ignore the line above,
         // so also raise a silent full-screen alert, the same way an incoming call opens its screen.

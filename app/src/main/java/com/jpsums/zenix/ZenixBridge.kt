@@ -87,6 +87,49 @@ class ZenixBridge(private val activity: MainActivity) {
     } catch (_: Exception) { "true" }
     @JavascriptInterface fun updateInBrowser(): String = if (activity.updater.openInBrowser()) ok("ok") else fail("Couldn't open the browser.")
 
+    // ---------- routines (things Maya does by herself at a set time) ----------
+    @JavascriptInterface fun routineAdd(title: String, prompt: String, hour: String, minute: String, days: String, date: String): String {
+        val h = hour.toIntOrNull(); val m = minute.toIntOrNull() ?: 0
+        if (h == null || h !in 0..23 || m !in 0..59) return fail("I didn't get the time for that.")
+        if (prompt.isBlank()) return fail("What should I do at that time?")
+        if (date.isNotBlank() && !Regex("\\d{4}-\\d{2}-\\d{2}").matches(date.trim())) return fail("Give the date as 2026-11-20.")
+        val r = Routines.add(activity, title.ifBlank { "Maya routine" }.take(60), prompt.take(1200), h, m, days, date)
+        if (Routines.nextTime(r) == 0L) { Routines.delete(activity, r.optInt("id")); return fail("That time has already passed.") }
+        return ok("Saved (id ${r.optInt("id")}). It runs next on ${Routines.nextText(r)}.")
+    }
+    @JavascriptInterface fun routineList(): String {
+        val arr = Routines.all(activity); val out = org.json.JSONArray()
+        for (i in 0 until arr.length()) { val r = arr.optJSONObject(i) ?: continue; out.put(JSONObject(r.toString()).put("next", Routines.nextText(r))) }
+        return out.toString()
+    }
+    @JavascriptInterface fun routineDelete(id: String): String =
+        if (Routines.delete(activity, id.toIntOrNull() ?: -1)) ok("Routine removed.") else fail("I couldn't find that routine.")
+
+    // ---------- message notifications ----------
+    @JavascriptInterface fun notifOn(): String = NotifService.isOn(activity).toString()
+    @JavascriptInterface fun openNotifAccess(): String =
+        if (launch(Intent(android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))) ok("ok") else fail("Couldn't open the setting.")
+    @JavascriptInterface fun readNotifications(app: String, who: String, minutes: String, onlyNew: String): String =
+        NotifService.recent(activity, app.trim(), who.trim(), minutes.toIntOrNull() ?: 0, onlyNew != "false")
+    @JavascriptInterface fun replyNotification(who: String, app: String, text: String): String = NotifService.reply(activity, who.trim(), app.trim(), text.trim())
+
+    // ---------- driving mode ----------
+    private fun hasBt() = Build.VERSION.SDK_INT < 31 || has(Manifest.permission.BLUETOOTH_CONNECT)
+    @JavascriptInterface fun drivingStatus(): String = JSONObject().put("on", Driving.isOn(activity)).put("car", Driving.carName(activity))
+        .put("hasCar", Driving.carAddress(activity).isNotEmpty()).put("perm", hasBt()).toString()
+    @JavascriptInterface fun setDriving(on: String): String { Driving.set(activity, on == "true", true); return ok("ok") }
+    /** Paired Bluetooth devices, so Jim can point at his car. Asks for the permission the first time. */
+    @JavascriptInterface fun btDevices(): String {
+        if (!hasBt()) { activity.runOnUiThread { try { activity.requestPermissions(arrayOf(Manifest.permission.BLUETOOTH_CONNECT), 44) } catch (_: Exception) { } }; return "{\"need\":true}" }
+        val out = org.json.JSONArray()
+        try {
+            val ad = activity.getSystemService(android.bluetooth.BluetoothManager::class.java)?.adapter
+            ad?.bondedDevices?.forEach { d -> out.put(JSONObject().put("name", d.name ?: d.address).put("address", d.address)) }
+        } catch (_: SecurityException) { return "{\"need\":true}" } catch (_: Exception) { }
+        return JSONObject().put("list", out).toString()
+    }
+    @JavascriptInterface fun setCar(address: String, name: String): String { Driving.setCar(activity, address, name); return ok("ok") }
+
     // ---------- offline brain ----------
     @JavascriptInterface fun offlineStatus(): String = activity.brain.status()
     @JavascriptInterface fun offlineDownload(): String = activity.brain.download()
