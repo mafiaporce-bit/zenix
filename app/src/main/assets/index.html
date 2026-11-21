@@ -426,6 +426,9 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
           <p class="sub-label">Morning brief</p>
           <div class="inline" style="margin-top:0"><input type="time" class="field" id="briefTime" value="06:00"><button class="btn-line" id="briefAdd">Add daily brief</button></div>
           <p class="hint" style="margin:8px 0 0">Weather, today's calendar, your to-do list, missed messages and birthdays, in a few sentences. Needs the Claude or Open brain.</p>
+          <p class="sub-label">Alarm sound</p>
+          <div class="toggle-row" style="margin-top:0"><div><b>Ring like an alarm</b><small>Reminders and routines ring loudly (even on silent) with Stop and Snooze</small></div><button class="toggle" id="ringToggle" aria-label="Ring like an alarm"></button></div>
+          <div class="toggle-row"><div style="min-width:0"><b>Sound</b><small id="ringSound">Phone's alarm sound</small></div><div style="display:flex;gap:8px"><button class="btn-line" id="ringTest">Test</button><button class="btn-line" id="ringPick">Change</button></div></div>
         </div>
       </details>
       <details class="set-item" data-sec="notif">
@@ -842,7 +845,7 @@ const clientTools = {
     return reply(callNative('setAlarm', hour, minute, label||'Maya alarm') || {ok:false, message:'Alarms only work in the Android app.'});
   },
   set_reminder: async ({text, minutes_from_now}) => {
-    showAction(`🔔 Reminder in ${minutes_from_now} min: ${text}`);
+    showAction(`⏰ Reminder in ${minutes_from_now} min: ${text}`);
     return reply(callNative('setReminder', text, minutes_from_now) || {ok:false, message:'Reminders only work in the Android app.'});
   },
   open_app: async ({app_name}) => {
@@ -2995,7 +2998,17 @@ const HELP = [
   ['Emergency (works while locked)', '"Call ambulance" (998) · "Call police" (999) · "Call civil defence" (997)']
 ];
 (() => { const box = $('helpBox'); HELP.forEach(([g, l]) => { const h = document.createElement('p'); h.className = 'help-g'; h.textContent = g; const t = document.createElement('p'); t.className = 'help-l'; t.textContent = l; box.append(h, t); }); })();
-function renderAgent(){ renderRoutines(); renderNotif(); renderDrive(); renderLists(); renderShifts(); renderSites(); }
+function renderRing(){
+  if(!Native.ringStatus){ $('ringToggle').parentElement.style.display = 'none'; $('ringPick').closest('.toggle-row').style.display = 'none'; return; }
+  let st = {}; try{ st = JSON.parse(Native.ringStatus()); }catch(e){}
+  $('ringToggle').classList.toggle('on', !!st.on); $('ringSound').textContent = st.sound || 'Alarm sound';
+}
+window.renderRing = renderRing;
+$('ringToggle').onclick = () => { if(!Native.setRing) return; const on = !$('ringToggle').classList.contains('on'); Native.setRing(on ? 'true' : 'false'); renderRing(); toast(on ? 'Reminders will ring like an alarm' : 'Reminders will be normal notifications'); };
+$('ringPick').onclick = () => { if(Native.pickRingSound) Native.pickRingSound(); };
+$('ringTest').onclick = () => { if(Native.testRing){ Native.testRing(); } };
+window.zenixRingDone = (title, how) => { addMsg('sys', (how==='snooze' ? '😴 Snoozed 10 min: ' : how==='missed' ? '⏰ Missed: ' : '⏰ ') + title); };
+function renderAgent(){ renderRing(); renderRoutines(); renderNotif(); renderDrive(); renderLists(); renderShifts(); renderSites(); }
 document.addEventListener('visibilitychange', () => { if(!document.hidden) renderAgent(); });
 renderAgent();
 

@@ -110,8 +110,11 @@ object Routines {
     }
 
     /** Its time has come: a notification always, and Maya says it out loud when she can. */
-    fun fire(c: Context, r: JSONObject) {
+    fun fire(c: Context, r: JSONObject, ring: Boolean = true) {
         val id = r.optInt("id"); val json = r.toString()
+        if (ring && AlarmRinger.isOn(c)) {   // rings like an alarm; Stop then lets Maya carry it out
+            AlarmRinger.start(c, r.optString("title", "Maya"), "Tap Stop and Maya will tell you", json); return
+        }
         val open = Intent(c, MainActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
             .putExtra("routine", json)

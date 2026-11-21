@@ -130,6 +130,12 @@ class ZenixBridge(private val activity: MainActivity) {
     }
     @JavascriptInterface fun setCar(address: String, name: String): String { Driving.setCar(activity, address, name); return ok("ok") }
 
+    // ---------- alarm sound for reminders and routines ----------
+    @JavascriptInterface fun ringStatus(): String = JSONObject().put("on", AlarmRinger.isOn(activity)).put("sound", AlarmRinger.soundName(activity)).toString()
+    @JavascriptInterface fun setRing(on: String): String { AlarmRinger.setOn(activity, on == "true"); return ok("ok") }
+    @JavascriptInterface fun pickRingSound(): String { activity.runOnUiThread { activity.pickRingSound() }; return ok("ok") }
+    @JavascriptInterface fun testRing(): String { AlarmRinger.start(activity, "Test reminder", "This is how Maya's reminders will ring", null); return ok("Ringing now.") }
+
     // ---------- phone controls ----------
     @JavascriptInterface fun flashlight(on: String): String = try {
         val cm = activity.getSystemService(android.hardware.camera2.CameraManager::class.java)

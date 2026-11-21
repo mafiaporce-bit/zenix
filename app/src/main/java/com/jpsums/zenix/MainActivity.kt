@@ -43,6 +43,7 @@ class MainActivity : Activity() {
         private const val PERM_REQUEST = 42
         private const val PERM_GEO = 43
         private const val PICK_BACKUP = 77
+        private const val PICK_RING = 78
         const val UPDATE_CHANNEL_ID = "zenix_updates"
         val ALL_PERMISSIONS: Array<String>
             get() {
@@ -237,6 +238,16 @@ class MainActivity : Activity() {
     @Deprecated("Deprecated in Java")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: android.content.Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == PICK_RING) {
+            if (resultCode == RESULT_OK) {
+                @Suppress("DEPRECATION")
+                val uri = data?.getParcelableExtra<android.net.Uri>(android.media.RingtoneManager.EXTRA_RINGTONE_PICKED_URI)
+                val isDefault = uri == null || uri == android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_ALARM)
+                AlarmRinger.setSound(this, if (isDefault) null else uri)
+                runJs("window.renderRing && window.renderRing()")
+            }
+            return
+        }
         if (requestCode != PICK_BACKUP || resultCode != RESULT_OK) return
         val uri = data?.data ?: return
         kotlin.concurrent.thread {
@@ -245,6 +256,17 @@ class MainActivity : Activity() {
                 runJs("window.zenixBackupPicked && window.zenixBackupPicked(${org.json.JSONObject.quote(text)})")
             } catch (e: Exception) { runJs("window.zenixBackupPicked && window.zenixBackupPicked('')") }
         }
+    }
+
+    /** Android's own list of alarm sounds. */
+    fun pickRingSound() {
+        val i = android.content.Intent(android.media.RingtoneManager.ACTION_RINGTONE_PICKER)
+            .putExtra(android.media.RingtoneManager.EXTRA_RINGTONE_TYPE, android.media.RingtoneManager.TYPE_ALARM)
+            .putExtra(android.media.RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, true)
+            .putExtra(android.media.RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, false)
+            .putExtra(android.media.RingtoneManager.EXTRA_RINGTONE_TITLE, "Maya alarm sound")
+            .putExtra(android.media.RingtoneManager.EXTRA_RINGTONE_EXISTING_URI, AlarmRinger.sound(this))
+        try { startActivityForResult(i, PICK_RING) } catch (_: Exception) { runJs("window.toast && toast('No sound picker found on this phone')") }
     }
 
     fun requestAllPermissions() {

@@ -23,6 +23,9 @@
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <!-- "what's this?" camera, and Do Not Disturb by voice -->
     <uses-permission android:name="android.permission.CAMERA" />
+    <!-- reminders that ring like an alarm -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
     <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
@@ -70,6 +73,21 @@
         </activity>
 
         <receiver android:name=".ReminderReceiver" android:exported="false" />
+
+        <service
+            android:name=".AlarmRinger"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback" />
+
+        <activity
+            android:name=".RingActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:launchMode="singleTop"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:taskAffinity="com.jpsums.zenix.ring"
+            android:theme="@style/ZenixTheme" />
 
         <receiver android:name=".RoutineReceiver" android:exported="true">
             <intent-filter>
