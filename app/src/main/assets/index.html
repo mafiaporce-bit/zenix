@@ -915,6 +915,7 @@ const agentTalk = { lastActive:0, userSpoke:false, speaking:false, fromWake:fals
 async function startSession(kind){
   if(convo || connecting) return;
   connecting=true; session=kind; setStatus('busy');   // set before any waiting, so two taps can't start two chats
+  awaySince = 0;
   if(kind==='talk'){ $('modeLabel').textContent='Connecting to Maya…'; $('talkLabel').textContent='Connecting…'; }
   agentTalk.fromWake = kind==='talk' && wakeGreeting; wakeGreeting = false;
   let dropped = false;
@@ -980,19 +981,45 @@ async function endSession(){
   if(Native && Native.keepAwake) Native.keepAwake('false');
   wakeResumeLater();
 }
-/* A voice chat nobody is talking in ends by itself: saves credits, and gives the screen back after "Hey Maya" */
+/* A voice chat nobody is talking in ends by itself: saves credits, and gives the screen back after "Hey Maya".
+   The quiet clock only runs while Jim is on Maya's Talk screen; in Settings, Chat or another app it waits (with a longer safety limit). */
+const onTalkScreen = () => !document.hidden && (document.body.dataset.view || 'talk')==='talk';
+const talkBusy = () => speech.playing || speech.q.length || speech.streamOpen || speech.hold || off.thinking;
+let awaySince = 0;
+function endedNote(why){ $('modeLabel').textContent = why + ' Tap Talk to start again.'; }
 setInterval(() => {
   const now = Date.now();
+  const away = !onTalkScreen();
+  if(!away) awaySince = 0; else if(!awaySince) awaySince = now;
   if(convo && session==='talk' && !connecting){
     if(agentTalk.speaking || !agentTalk.lastActive) return;
-    if(now - agentTalk.lastActive > (agentTalk.fromWake ? 40000 : 150000)){ addMsg('sys', 'Voice chat ended (it went quiet)'); endSession(); }
+    if(away){ agentTalk.lastActive = Math.max(agentTalk.lastActive, now); if(now - awaySince > (agentTalk.fromWake ? 120000 : 600000)){ addMsg('sys', 'Voice chat ended (you were away)'); endSession().then(() => endedNote('The chat ended while you were away.')); } return; }
+    if(now - agentTalk.lastActive > (agentTalk.fromWake ? 40000 : 150000)){ addMsg('sys', 'Voice chat ended (it went quiet)'); endSession().then(() => endedNote('The chat ended because it was quiet.')); }
     return;
   }
   if(off.active && off.kind==='talk'){
-    if(speech.playing || speech.q.length || speech.streamOpen || speech.hold || off.thinking || !off.quietSince) return;
-    if(now - off.quietSince > (off.fromWake ? 30000 : 120000)){ endOffline(true); addMsg('sys', 'Voice chat ended (it went quiet)'); }
+    if(talkBusy()){ if(away) awaySince = now; return; }
+    // ears that died silently (it happens behind other apps): start them again
+    const dgOn = typeof dg!=='undefined' && dg.active;
+    if(!dgOn && off.brain==='own' && !nativeSpeakResolve && off.earsAt && now - off.earsAt > 15000){ off.earsAt = now; try{ Native.stopListening(); }catch(e){} offListen(); }
+    if(!off.quietSince) return;
+    if(away){
+      off.quietSince = now;   // the quiet clock waits while he's elsewhere
+      if(now - awaySince > (off.fromWake ? 120000 : 600000)){ endOffline(true); addMsg('sys', 'Voice chat ended (you were away)'); endedNote('The chat ended while you were away.'); }
+      return;
+    }
+    if(now - off.quietSince > (off.fromWake ? 30000 : 120000)){ endOffline(true); addMsg('sys', 'Voice chat ended (it went quiet)'); endedNote('The chat ended because it was quiet.'); }
   }
 }, 3000);
+/* Back on Maya's Talk screen: make sure she is really listening again */
+function backToTalk(){
+  if(!(off.active && off.kind==='talk') || talkBusy()) return;
+  srErrs = 0; off.quietSince = Date.now();
+  if(typeof dg!=='undefined' && dg.active && !dg.paused) return;   // Deepgram ears are already streaming
+  try{ Native.stopListening(); }catch(e){}
+  setTimeout(offListen, 250);
+}
+document.addEventListener('visibilitychange', () => { if(!document.hidden) setTimeout(backToTalk, 400); });
 function resetTalkUI(){
   $('talkBtn').classList.remove('end'); $('talkLabel').textContent='Talk to Maya';
   $('muteBtn').disabled=true; $('volBtn').disabled=true;
@@ -1553,6 +1580,7 @@ function offListen(){
   setOrb('listening'); $('modeLabel').textContent = off.brain==='own' ? 'Listening…' : 'Listening… (offline)';
   if(Native.setOrbMode) Native.setOrbMode('listening');
   if(!off.quietSince) off.quietSince = Date.now();
+  off.earsAt = Date.now();
   if(tr.on){   // translator: the phone listens in whichever language is due
     $('modeLabel').textContent = tr.turn==='me' ? 'Your turn · English' : 'Their turn · ' + tr.name + ' (tap the ring to skip)';
     const lang = tr.turn==='me' ? listenLang() : tr.stt;
@@ -1564,12 +1592,13 @@ function offListen(){
   else Native.startListening(listenLang());
 }
 let srErrs = 0;
-window.zenixOnListening = () => { srErrs = 0; if(off.active && off.kind==='talk' && !tr.on) $('modeLabel').textContent = off.brain==='own' ? 'Listening…' : 'Listening… (offline)'; };
+window.zenixOnListening = () => { srErrs = 0; off.earsAt = Date.now(); if(off.active && off.kind==='talk' && !tr.on) $('modeLabel').textContent = off.brain==='own' ? 'Listening…' : 'Listening… (offline)'; };
 let partialTimer=null;
 const HANGING = /\b(and|or|but|so|because|cause|at|to|the|a|an|for|with|from|of|in|on|into|about|around|like|um+|uh+|uhm|er|ah|my|your|his|her|is|are|was|if|when|then|that|this|can|could|would|will|maybe|also|plus|please|ng|sa|na|yung|ang|mga|kasi|tapos|pero|para|si|ni|kay)$/i;
 function endWait(t){ const w=(t||'').trim().toLowerCase().replace(/[.,!?…]+$/,''); return HANGING.test(w) ? 2300 : 1150; }
 window.zenixOnPartial = (t) => {
   if(!(off.active && off.kind==='talk')) return;
+  off.earsAt = Date.now();
   $('liveLine').textContent='You: '+t;
   clearTimeout(partialTimer);
   if(t && t.trim()){ off.quietSince = Date.now(); partialTimer = setTimeout(()=>{ if(Native.finishListening) Native.finishListening(); }, endWait(t)); }
@@ -1591,15 +1620,17 @@ window.zenixOnSpeech = async (t) => {
 };
 window.zenixOnSpeechError = (code) => {
   if(!off.active || off.kind!=='talk') return;
+  off.earsAt = Date.now();
   if(code===6 || code===7){ srErrs = 0; trMiss(); setTimeout(offListen, 350); return; }   // nothing was said: keep listening
   srErrs++;
   // this phone has no ears for that language: carry on in US English
   if((code===12 || code===13) && !off.langFallback && settings.offlineLang!=='en-US'){ off.langFallback = 'en-US'; setTimeout(offListen, 300); return; }
   // busy mic or a network blip: try again, a little slower each time, then give up instead of looping forever
-  if((code===8 || code===5 || code===3 || code===2 || code===1) && srErrs <= 6){ setTimeout(offListen, Math.min(2500, 350*srErrs)); return; }
+  // (behind another app these errors are normal, so there she just keeps trying)
+  if((code===8 || code===5 || code===3 || code===2 || code===1) && (srErrs <= 12 || document.hidden)){ setTimeout(offListen, Math.min(3000, 350*srErrs)); return; }
   toast(code===-3 ? 'Voice chat on a computer needs Chrome or Edge' : code===9 ? 'Allow the microphone for Maya, then tap Talk again' : code===-1 ? 'Offline listening is not available on this phone'
     : (code===1 || code===2) ? 'Listening needs the internet. Check your connection.' : code===3 ? 'Another app is using the microphone.' : 'Mic problem ('+code+'). Tap Talk again.');
-  endOffline();
+  endOffline(); endedNote('The microphone stopped.');
 };
 window.zenixOnSpeakDone = () => {
   if(nativeSpeakResolve){ const r=nativeSpeakResolve; nativeSpeakResolve=null; r(); return; }
@@ -1613,7 +1644,7 @@ function startOffline(kind, brain='offline'){
   const goMe = () => document.querySelector('nav button[data-view="settings"]').click();
   if(brain==='offline' && !offlineReady()){ toast('Download the offline brain first (Settings → Offline mode)'); goMe(); return false; }
   if(brain==='own' && !brainKey()){ toast(settings.provider==='openrouter' ? 'Add your OpenRouter key in Settings first' : 'Add your Claude key in Settings first'); goMe(); return false; }
-  off.active=true; off.kind=kind; off.brain=brain; off.endAfterSpeak=false; off.quietSince=0; off.langFallback=''; srErrs=0; if(typeof dg!=='undefined') dg.failed=false;
+  off.active=true; off.kind=kind; off.brain=brain; off.endAfterSpeak=false; off.quietSince=0; awaySince=0; off.langFallback=''; srErrs=0; if(typeof dg!=='undefined') dg.failed=false;
   if(brain==='own'){ $('dot').className='dot on'; $('statusText').textContent='Online'; }
   else { $('dot').className='dot busy'; $('statusText').textContent='Offline'; }
   if(kind==='talk') addMsg('sys', brain==='own' ? 'Voice chat started' : 'Offline voice chat started');
@@ -2066,7 +2097,7 @@ function speakEnqueue(text){
 async function pumpSpeech(){
   if(speech.playing || speech.hold) return;
   const item = speech.q.shift();
-  if(!item){ if(!speech.streamOpen){ const f=speech.onIdle; speech.onIdle=null; if(f) f(); else idleLook(); } return; }
+  if(!item){ if(!speech.streamOpen){ const f=speech.onIdle; speech.onIdle=null; if(f) f(); else if(off.active && off.kind==='talk' && !off.thinking && !off.endAfterSpeak) offListen(); else idleLook(); } return; }
   if(typeof dg!=='undefined' && dg.active && !dg.paused) dgPause();
   if(turnStart){ const d=(performance.now()-turnStart)/1000; const b = turnTok ? (turnTok-turnStart)/1000 : 0; turnStart=0; turnTok=0;
     const parts = [];
@@ -2482,6 +2513,7 @@ document.querySelectorAll('nav button').forEach(b => b.onclick = async () => {
   b.classList.add('active'); $('view-'+b.dataset.view).classList.add('active');
   setTitle(b.dataset.view);
   if(b.dataset.view==='chat') renderChat();
+  if(b.dataset.view==='talk') backToTalk();
 });
 function setTitle(v){ document.body.dataset.view = v; $('pageTitle').textContent = {talk:'', chat:'Chat', settings:'Settings'}[v] || ''; $('newChatBtn').style.display = v==='chat' ? 'flex' : 'none'; }
 $('newChatBtn').onclick = () => {
