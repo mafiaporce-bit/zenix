@@ -184,6 +184,42 @@ body.map-open .welcome h2{font-size:18px;margin-bottom:12px}
 .set-avatar{width:52px;height:52px;border-radius:16px;display:grid;place-items:center;background:linear-gradient(135deg,var(--accent),var(--accent2));font:700 22px 'Space Grotesk',sans-serif;color:#fff;flex-shrink:0;box-shadow:0 8px 24px rgba(178,102,255,.35)}
 .set-head h2{margin:0;font:600 18px 'Space Grotesk',sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .set-head p{margin:3px 0 0;color:var(--muted);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.setup{margin:4px 0 6px;padding:14px 14px 6px;background:var(--surface);border:1px solid var(--line);border-radius:18px}
+.setup-h{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px}
+.setup-h b{font:600 16px 'Space Grotesk',sans-serif}
+.setup-h span{font-size:12.5px;color:var(--muted)}
+.setup-bar{height:6px;border-radius:99px;background:var(--surface2);overflow:hidden;margin:4px 0 8px}
+.setup-bar i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:99px;transition:width .3s}
+.setup-row{display:flex;align-items:center;gap:12px;min-height:50px;border-top:1px solid var(--line)}
+.setup-row:first-of-type{border-top:0}
+.setup-row .tick{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-size:13px;flex-shrink:0;border:1.5px solid var(--line);color:transparent}
+.setup-row.ok .tick{background:var(--ok);border-color:var(--ok);color:#fff}
+.setup-row div{flex:1;min-width:0}
+.setup-row b{display:block;font-size:14px;font-weight:600}
+.setup-row small{display:block;font-size:12px;color:var(--muted)}
+.setup-row button{height:36px;padding:0 14px;border-radius:10px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;font-weight:600;font-size:13px;flex-shrink:0}
+.setup-row.ok button{display:none}
+.more-btn{width:100%;margin-top:18px;height:52px;border-radius:16px;background:var(--surface);border:1px solid var(--line);font-weight:600;font-size:14.5px;display:flex;align-items:center;justify-content:center;gap:8px;color:var(--text)}
+.more-btn svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2;transition:transform .2s}
+.more-btn.open svg{transform:rotate(180deg)}
+#moreSettings[hidden]{display:none}
+.chips{display:flex;gap:8px;overflow-x:auto;padding:2px 0 8px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chips button{flex-shrink:0;height:34px;padding:0 13px;border-radius:999px;background:var(--surface);border:1px solid var(--line);font-size:13px;color:var(--text);white-space:nowrap}
+.chips button:active{background:var(--surface2)}
+.wiz{position:fixed;inset:0;z-index:70;background:rgba(6,5,12,.96);display:flex;flex-direction:column;justify-content:center;padding:24px 22px calc(env(safe-area-inset-bottom) + 24px)}
+.wiz[hidden]{display:none}
+.wiz-in{max-width:440px;width:100%;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+.wiz-step{font-size:12px;font-weight:600;letter-spacing:1px;color:var(--accent);text-transform:uppercase}
+.wiz h2{margin:0;font:600 26px/1.2 'Space Grotesk',sans-serif}
+.wiz p{margin:0;color:var(--muted);font-size:14.5px;line-height:1.5}
+.wiz .go{height:54px;border-radius:16px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;font-weight:600;font-size:16px}
+.wiz .skip{height:44px;color:var(--muted);font-size:14px}
+.wiz .opt{display:flex;flex-direction:column;gap:8px}
+.wiz .opt button{min-height:56px;padding:10px 14px;border-radius:14px;background:var(--surface);border:1px solid var(--line);text-align:left;color:var(--text)}
+.wiz .opt button b{display:block;font-size:15px}
+.wiz .opt button span{display:block;font-size:12.5px;color:var(--muted)}
+.wiz .opt button.sel{border-color:var(--accent);background:rgba(178,102,255,.12)}
 .set-label{margin:20px 6px 8px;font-size:11.5px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted)}
 .set-list{background:var(--surface);border:1px solid var(--line);border-radius:18px;overflow:hidden}
 .set-item{border-top:1px solid var(--line)}
@@ -296,6 +332,7 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
   <section class="view" id="view-chat">
     <div class="chat" id="chat"></div>
     <div class="composer">
+      <div class="chips" id="chips"></div>
       <div class="composer-box">
         <textarea id="input" rows="1" placeholder="Message Maya"></textarea>
         <button class="send" id="sendBtn" aria-label="Send">
@@ -311,6 +348,17 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
       <div style="flex:1;min-width:0"><h2 id="setName">Jim</h2><p id="setSub">Maya settings</p></div>
     </div>
 
+    <div class="setup" id="setupCard">
+      <div class="setup-h"><b>Set up Maya</b><span id="setupCount"></span></div>
+      <div class="setup-bar"><i id="setupBar"></i></div>
+      <div id="setupRows"></div>
+    </div>
+
+    <p class="set-label">Everyday</p>
+    <div class="set-list" id="everyList"></div>
+
+    <button class="more-btn" id="moreBtn">More settings <svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>
+    <div id="moreSettings" hidden>
     <p class="set-label">Assistant</p>
     <div class="set-list">
       <details class="set-item" data-sec="brain">
@@ -589,6 +637,7 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
       </details>
     </div>
     <div style="height:12px"></div>
+    </div>
   </section>
 </main>
 
@@ -598,6 +647,7 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
   <button data-view="settings" aria-label="Settings"><svg class="i" viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg><span>Settings</span></button>
 </nav>
 <div class="cam" id="camBox"><video id="camVideo" playsinline muted></video><div class="cam-top"><span>Point at it. Taking the picture in <b id="camCount">3</b></span><button id="camX" aria-label="Close camera">✕</button></div><button class="cam-shot" id="camShot" aria-label="Take the picture now"></button></div>
+<div class="wiz" id="wiz" hidden><div class="wiz-in" id="wizIn"></div></div>
 <div class="toast" id="toast"></div>
 
 <script type="module">
@@ -3043,6 +3093,102 @@ window.zenixRingDone = (title, how) => { addMsg('sys', (how==='snooze' ? '😴 S
 function renderAgent(){ renderRing(); renderRoutines(); renderNotif(); renderDrive(); renderLists(); renderShifts(); renderSites(); }
 document.addEventListener('visibilitychange', () => { if(!document.hidden) renderAgent(); });
 renderAgent();
+
+
+/* ---------- Easier Maya: setup checklist, everyday settings, chat chips, welcome guide ---------- */
+const EVERYDAY = ['brain','voice','wake','routines','lists'];
+(() => {
+  const list = $('everyList');
+  EVERYDAY.forEach(k => { const d = document.querySelector('.set-item[data-sec="' + k + '"]'); if(d) list.appendChild(d); });
+  // drop groups left empty
+  document.querySelectorAll('#moreSettings .set-list').forEach(l => { if(!l.querySelector('.set-item')){ const lab = l.previousElementSibling; l.remove(); if(lab && lab.classList.contains('set-label')) lab.remove(); } });
+  $('moreBtn').onclick = () => { const m = $('moreSettings'); m.hidden = !m.hidden; $('moreBtn').classList.toggle('open', !m.hidden); $('moreBtn').firstChild.textContent = m.hidden ? 'More settings ' : 'Fewer settings '; };
+})();
+/* open a settings section (showing More settings if it lives there) */
+function openSec(k){
+  document.querySelector('nav button[data-view="settings"]').click();
+  const d = document.querySelector('.set-item[data-sec="' + k + '"]'); if(!d) return;
+  if(d.closest('#moreSettings') && $('moreSettings').hidden) $('moreBtn').click();
+  setTimeout(() => { d.open = true; d.scrollIntoView({block:'start', behavior:'smooth'}); }, 80);
+}
+const yes = f => { try{ return Native[f] && Native[f]()==='true'; }catch(e){ return false; } };
+function setupItems(){
+  if(!IS_APP) return [];
+  const brainOk = settings.engine==='eleven' || !!brainKey();
+  let wakeOk = false; if(settings.wake){ const st = wakeSt(); wakeOk = st.state==='ready' && !!st.running; }
+  return [
+    {k:'key', t:'Brain key', d: brainOk ? 'Maya can think' : 'Paste your Claude or OpenRouter key', ok: brainOk, fix: () => openSec(settings.provider==='openrouter' ? 'kor' : 'kclaude')},
+    {k:'mic', t:'Microphone & phone', d:'Talk, calls, contacts, calendar', ok: yes('hasMicPermission'), fix: () => Native.requestPermissions && Native.requestPermissions()},
+    {k:'wake', t:'"Hey Maya"', d: wakeOk ? 'Listening for her name' : 'Talk hands-free, even screen off', ok: wakeOk, fix: () => { if(!settings.wake) $('wakeBtn').click(); openSec('wake'); }},
+    {k:'overlay', t:'Show over other apps', d:'Lets her pop up anywhere', ok: !Native.hasOverlay || yes('hasOverlay'), fix: () => Native.requestOverlay()},
+    {k:'full', t:'Lock-screen alerts', d:'Wake and ring over the lock screen', ok: !Native.canFullScreen || yes('canFullScreen'), fix: () => Native.openFullScreenSetting()},
+    {k:'batt', t:'Battery unrestricted', d:'Stops the phone putting her to sleep', ok: !Native.batteryOk || yes('batteryOk'), fix: () => Native.askBattery()},
+    {k:'notif', t:'Read my messages', d:'"Who messaged me?" and replies', ok: !Native.notifOn || yes('notifOn'), fix: () => { Native.openNotifAccess(); toast('Maya message reader → Allow'); }}
+  ];
+}
+function renderSetup(){
+  const items = setupItems(); const card = $('setupCard');
+  if(!items.length){ card.hidden = true; return; }
+  const done = items.filter(i => i.ok).length;
+  card.hidden = done === items.length && !!store.get('setupSeenDone', false);
+  if(done === items.length) store.set('setupSeenDone', true); else store.set('setupSeenDone', false);
+  $('setupCount').textContent = done === items.length ? 'All set ✓' : `${done} of ${items.length} done`;
+  $('setupBar').style.width = Math.round(done / items.length * 100) + '%';
+  const box = $('setupRows'); box.innerHTML = '';
+  items.forEach(i => {
+    const r = document.createElement('div'); r.className = 'setup-row' + (i.ok ? ' ok' : '');
+    r.innerHTML = '<span class="tick">✓</span><div><b></b><small></small></div><button>Fix</button>';
+    r.querySelector('b').textContent = i.t; r.querySelector('small').textContent = i.d;
+    r.querySelector('button').onclick = i.fix; box.appendChild(r);
+  });
+}
+document.addEventListener('visibilitychange', () => { if(!document.hidden) setTimeout(renderSetup, 500); });
+setInterval(() => { if(!document.hidden && $('view-settings').classList.contains('active')) renderSetup(); }, 2500);
+renderSetup();
+
+/* Tap-to-try chips above the chat box */
+const CHIPS = ['Who messaged me?', "What's this?", 'Set an alarm for 6 AM', 'Add milk to my shopping list', 'Remind me in 30 minutes to call home', "What's on my calendar today?", 'How much overtime this month?', 'Translator mode, Arabic', 'Are my apps okay?', 'Where am I?'];
+(() => { const box = $('chips'); CHIPS.forEach(t => { const b = document.createElement('button'); b.textContent = t; b.onclick = () => sendText(t); box.appendChild(b); }); })();
+$('input').addEventListener('input', () => { $('chips').style.display = $('input').value.trim() ? 'none' : 'flex'; });
+
+/* First-time welcome guide: key → voice → "Hey Maya" */
+function wizard(step){
+  const w = $('wiz'), box = $('wizIn'); w.hidden = false;
+  const close = () => { w.hidden = true; store.set('welcomed', true); renderSetup(); renderMe(); };
+  if(step === 1){
+    box.innerHTML = `<div class="wiz-step">Step 1 of 3</div><h2>Give Maya her brain</h2>
+      <p>Paste your Claude key (starts with sk-ant-) or OpenRouter key (starts with sk-or-). It stays on this phone only.</p>
+      <input type="password" class="field" id="wizKey" placeholder="Paste your key here" autocomplete="off">
+      <button class="go" id="wizNext">Next</button><button class="skip" id="wizSkip">I'll do it later</button>`;
+    $('wizNext').onclick = () => {
+      const v = $('wizKey').value.trim();
+      if(/^sk-ant-/.test(v)){ store.set('apikey', v); settings.engine = 'own'; setBrain('claude'); }
+      else if(/^sk-or-/.test(v)){ store.set('orkey', v); settings.engine = 'own'; setBrain('openrouter'); }
+      else if(v){ toast('That key doesn\'t look right. Claude keys start with sk-ant-, OpenRouter keys with sk-or-'); return; }
+      store.set('settings', settings); wizard(2);
+    };
+    $('wizSkip').onclick = () => wizard(2);
+  } else if(step === 2){
+    const hasEl = !!elKey();
+    box.innerHTML = `<div class="wiz-step">Step 2 of 3</div><h2>Pick her voice</h2><p>You can change it any time in Settings.</p>
+      <div class="opt" id="wizVoices">
+        <button data-v="phone"><b>Google voice</b><span>Free and instant</span></button>
+        <button data-v="af_heart"><b>Natural voice</b><span>Free, runs on the phone</span></button>
+        ${hasEl ? '<button data-v="el:' + EL_NATASHA + '"><b>Natasha (ElevenLabs)</b><span>Most human, uses credits</span></button>' : ''}
+      </div><button class="go" id="wizNext">Next</button>`;
+    const mark = () => box.querySelectorAll('[data-v]').forEach(b => b.classList.toggle('sel', b.dataset.v === settings.voice));
+    box.querySelectorAll('[data-v]').forEach(b => b.onclick = () => { settings.voice = b.dataset.v; store.set('settings', settings); renderBrain(); mark(); stopSpeech(); speakEnqueue(`Hi ${settings.name||'Jim'}, I'm Maya.`); });
+    mark(); $('wizNext').onclick = () => wizard(3);
+  } else {
+    box.innerHTML = `<div class="wiz-step">Step 3 of 3</div><h2>Turn on "Hey Maya"?</h2>
+      <p>Say "Hey Maya" to talk hands-free, even from other apps or with the screen off. It listens on the phone only.</p>
+      <button class="go" id="wizWake">Turn on "Hey Maya"</button><button class="skip" id="wizDone">Not now</button>`;
+    $('wizWake').onclick = () => { if(!settings.wake && Native.wakeStatus) $('wakeBtn').click(); close(); toast('All set! Settings shows anything still left to allow.'); };
+    $('wizDone').onclick = close;
+  }
+}
+if(IS_APP && !store.get('welcomed', false) && !getKey() && !orKey() && settings.engine !== 'eleven') setTimeout(() => wizard(1), 600);
+else store.set('welcomed', true);
 
 /* ---------- Auto-send (Maya taps Send after Jim says yes) ---------- */
 const autoOn = () => !!(Native.autoSendOn && Native.autoSendOn()==='true');
