@@ -1101,7 +1101,7 @@ async function endSession(){
 /* A voice chat nobody is talking in ends by itself: saves credits, and gives the screen back after "Hey Zenix".
    The quiet clock only runs while Jim is on Zenix's Talk screen; in Settings, Chat or another app it waits (with a longer safety limit). */
 const onTalkScreen = () => !document.hidden && (document.body.dataset.view || 'talk')==='talk';
-const talkBusy = () => speech.playing || speech.q.length || speech.streamOpen || speech.hold || off.thinking;
+const talkBusy = () => speech.playing || speech.q.length || speech.streamOpen || speech.hold || off.thinking || !!off.sayingNative || !!nativeSpeakResolve || !!speech.paused || !!off.pausedText;
 let awaySince = 0;
 function endedNote(why){ $('modeLabel').textContent = why + ' Tap Talk to start again.'; }
 setInterval(() => {
@@ -1150,6 +1150,7 @@ window.zenixEnd = () => { if(off.active) endOffline(); else endSession(); }; // 
 $('talkBtn').onclick = async () => {
   if(off.active){ const wasChat = off.kind==='chat'; endOffline(wasChat); if(!wasChat) return; }
   if(convo && session==='talk') return endSession();
+  if(settings.mode==='auto' && offlineReady() && navigator.onLine && Native.online && Native.online()==='false' && Date.now() - netProbe.okAt > 60000) await probeNet();
   if(wantOffline()){ if(convo) await endSession(); startOffline('talk'); return; }
   if(settings.engine==='own'){ if(convo) await endSession(); startOffline('talk','own'); return; }
   if(convo && session==='chat') await endSession();
@@ -1990,12 +1991,32 @@ const listenLang = () => off.langFallback || settings.offlineLang;
 function idleLook(){ if((off.active && off.kind==='talk') || convo || connecting) return; setOrb('idle'); $('modeLabel').textContent=''; }
 function offlineReady(){ if(!Native || !Native.offlineStatus) return false; try{ return JSON.parse(Native.offlineStatus()).state==='ready'; }catch(e){ return false; } }
 /* no working internet right now (the phone tells us; "Wi-Fi on but no internet" counts as down) */
-function netDown(){ if(!navigator.onLine) return true; try{ return !!(Native.online && Native.online()==='false'); }catch(e){ return false; } }
+/* The phone's own "internet works" flag can be wrong on some networks, so a "down" answer is double-checked
+   with a real quick request before Zenix goes offline. */
+const netProbe = { okAt: 0, failAt: 0, busy: null };
+function probeNet(){
+  if(netProbe.busy) return netProbe.busy;
+  const c = new AbortController(); const t = setTimeout(() => c.abort(), 2500);
+  const host = settings.provider==='openrouter' ? 'https://openrouter.ai/api/v1/models' : 'https://api.anthropic.com/v1/models';
+  netProbe.busy = fetch(host, {method:'HEAD', mode:'no-cors', cache:'no-store', signal:c.signal})
+    .then(() => { netProbe.okAt = Date.now(); return true; }, () => { netProbe.failAt = Date.now(); return false; })
+    .finally(() => { clearTimeout(t); netProbe.busy = null; });
+  return netProbe.busy;
+}
+function netDown(){
+  if(!navigator.onLine) return true;
+  let phoneSaysDown = false; try{ phoneSaysDown = !!(Native.online && Native.online()==='false'); }catch(e){}
+  if(!phoneSaysDown) return false;
+  if(Date.now() - netProbe.okAt < 60000) return false;     // a real request just worked: the internet is fine
+  if(Date.now() - netProbe.failAt < 20000) return true;    // a real request just failed too
+  probeNet(); return false;                                  // not sure yet: stay online, the check runs in the background
+}
 function wantOffline(){ return settings.mode==='offline' || (settings.mode==='auto' && netDown() && offlineReady()); }
 /* the internet dropped in the middle of an online voice chat: the offline brain takes over without ending the chat */
 function switchOffline(){
   if(!(off.active && off.kind==='talk' && off.brain==='own') || tr.on) return false;
-  if(settings.mode!=='auto' || !offlineReady() || !netDown()) return false;
+  if(settings.mode!=='auto' || !offlineReady()) return false;
+  if(!netDown()){ probeNet().then(ok => { if(!ok) switchOffline(); }); return false; }
   stopSpeech(); try{ dgClose(); }catch(e){} try{ Native.stopListening(); }catch(e){}
   off.brain = 'offline'; off.thinking = false; off.langFallback = ''; srErrs = 0;
   $('dot').className = 'dot busy'; $('statusText').textContent = 'Offline';
