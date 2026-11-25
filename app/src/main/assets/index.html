@@ -61,6 +61,21 @@ body{background:radial-gradient(120% 80% at 50% 35%,#12102A 0%,#06050C 60%)}
 .mode-label{font-size:13px;font-weight:600;color:var(--accent);min-height:18px;letter-spacing:.3px}
 .live-line{min-height:44px;max-width:340px;font-size:15px;opacity:.9}
 body.tr-on .live-line{font-size:22px;line-height:1.35;opacity:1;max-width:370px;font-weight:500}
+.km{margin:0 0 14px;padding:14px;border:1px solid var(--line);border-radius:16px;background:linear-gradient(135deg,rgba(178,102,255,.1),rgba(255,63,210,.04))}
+.km-g{margin:6px 0 2px;font-size:11.5px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--accent)}
+.km-q{margin:0;font:600 17px/1.35 'Space Grotesk',sans-serif}
+.km textarea{resize:none;min-height:48px;font:15px/1.4 Inter,sans-serif;padding:10px 12px}
+.km-mic{width:48px;height:48px;border-radius:50%;flex-shrink:0;display:grid;place-items:center;background:var(--surface2);border:1px solid var(--line);color:var(--text)}
+.km-mic svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round}
+.km-mic.on{background:var(--danger);border-color:var(--danger);color:#fff;animation:pulseMic 1.2s infinite}
+@keyframes pulseMic{50%{box-shadow:0 0 0 8px rgba(229,72,77,.18)}}
+.km-btns{display:flex;gap:8px;margin-top:10px}
+.km-btns .btn-line{flex:1}
+.km-save{flex:1.4;height:44px;border-radius:12px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;font-weight:600}
+.cl-item{padding:12px;border:1px solid var(--line);border-radius:14px;margin-bottom:8px;background:var(--surface2)}
+.cl-item p{margin:0 0 8px;font-size:13px;color:var(--muted)}
+.cl-item button{display:block;width:100%;text-align:left;padding:10px 12px;margin-top:6px;border-radius:10px;border:1px solid var(--line);background:var(--surface);font-size:14px;color:var(--text);line-height:1.35}
+.cl-item button.keep{text-align:center;color:var(--muted);font-size:13px}
 .cam{position:fixed;inset:0;z-index:60;background:#000;display:none;flex-direction:column}
 .cam.on{display:flex}
 .cam video{flex:1;min-height:0;width:100%;object-fit:cover}
@@ -517,7 +532,18 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
       <details class="set-item" data-sec="mem">
         <summary><span class="ico pink"><svg viewBox="0 0 24 24"><path d="M12 21s-7-4.4-9.3-9A5 5 0 0112 6.6 5 5 0 0121.3 12C19 16.6 12 21 12 21z"/></svg></span><span class="set-t"><b>What Maya remembers</b><span id="sumMem"></span></span><svg class="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></summary>
         <div class="set-body">
+          <div class="km" id="kmCard">
+            <div class="setup-h"><b>Help Maya know you</b><span id="kmCount"></span></div>
+            <div class="setup-bar"><i id="kmBar"></i></div>
+            <p class="km-g" id="kmGroup"></p>
+            <p class="km-q" id="kmQ"></p>
+            <div class="inline" style="margin-top:6px"><textarea class="field" id="kmA" rows="2" placeholder="Type your answer, or tap the mic"></textarea><button class="km-mic" id="kmMic" aria-label="Answer by voice"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button></div>
+            <div class="km-btns"><button class="btn-line" id="kmBack">Back</button><button class="btn-line" id="kmSkip">Skip</button><button class="km-save" id="kmSave">Save</button></div>
+            <button class="btn-line" id="kmVoice" style="width:100%;margin-top:8px">🎙️ Ask me by voice instead</button>
+          </div>
           <p class="hint" id="memCount"></p>
+          <button class="btn-line" id="memClean" style="width:100%;margin-bottom:8px">🧹 Clean up memories</button>
+          <div id="cleanBox"></div>
           <input type="text" class="field" id="memSearch" placeholder="Search her memory">
           <div id="memList" style="margin-top:6px"></div>
           <button class="btn-line" id="memMore" style="display:none;width:100%;margin-top:6px">Show more</button>
@@ -1885,6 +1911,7 @@ let partialTimer=null;
 const HANGING = /\b(and|or|but|so|because|cause|at|to|the|a|an|for|with|from|of|in|on|into|about|around|like|um+|uh+|uhm|er|ah|my|your|his|her|is|are|was|if|when|then|that|this|can|could|would|will|maybe|also|plus|please|ng|sa|na|yung|ang|mga|kasi|tapos|pero|para|si|ni|kay)$/i;
 function endWait(t){ const w=(t||'').trim().toLowerCase().replace(/[.,!?…]+$/,''); return HANGING.test(w) ? 2300 : 1150; }
 window.zenixOnPartial = (t) => {
+  if(dict.on){ dict.partial(t); return; }
   if(!(off.active && off.kind==='talk')) return;
   off.earsAt = Date.now();
   $('liveLine').textContent='You: '+t;
@@ -1892,6 +1919,7 @@ window.zenixOnPartial = (t) => {
   if(t && t.trim()){ off.quietSince = Date.now(); partialTimer = setTimeout(()=>{ if(Native.finishListening) Native.finishListening(); }, endWait(t)); }
 };
 window.zenixOnSpeech = async (t) => {
+  if(dict.on){ dict.done(t); return; }
   clearTimeout(partialTimer);
   if(!off.active || off.kind!=='talk') return;
   if(!t){ trMiss(); offListen(); return; }
@@ -1907,6 +1935,7 @@ window.zenixOnSpeech = async (t) => {
   if(off.active) offlineSay(reply, true);
 };
 window.zenixOnSpeechError = (code) => {
+  if(dict.on){ dict.done(''); return; }
   if(!off.active || off.kind!=='talk') return;
   off.earsAt = Date.now();
   if(code===6 || code===7){ srErrs = 0; trMiss(); setTimeout(offListen, 350); return; }   // nothing was said: keep listening
@@ -3355,7 +3384,7 @@ renderAgent();
 
 
 /* ---------- Easier Maya: setup checklist, everyday settings, chat chips, welcome guide ---------- */
-const EVERYDAY = ['brain','voice','wake','routines','lists'];
+const EVERYDAY = ['brain','voice','wake','mem','routines','lists'];
 (() => {
   const list = $('everyList');
   EVERYDAY.forEach(k => { const d = document.querySelector('.set-item[data-sec="' + k + '"]'); if(d) list.appendChild(d); });
@@ -3448,6 +3477,142 @@ function wizard(step){
 }
 if(IS_APP && !store.get('welcomed', false) && !getKey() && !orKey() && settings.engine !== 'eleven') setTimeout(() => wizard(1), 600);
 else store.set('welcomed', true);
+
+
+/* ---------- Dictation: a mic button that types into a box ---------- */
+const dict = { on:false, el:null, base:'', btn:null,
+  start(el, btn){
+    if(inVoiceChat()){ toast('End the voice chat first, then use the mic here'); return; }
+    if(!Native.startListeningOnline && !Native.startListening){ toast('Voice typing needs the Android app'); return; }
+    this.on = true; this.el = el; this.btn = btn; this.base = el.value.trim(); btn.classList.add('on');
+    (Native.startListeningOnline || Native.startListening).call(Native, listenLang());
+    clearTimeout(this.t); this.t = setTimeout(() => this.stop(), 30000);
+  },
+  partial(t){ if(this.el) this.el.value = (this.base ? this.base + ' ' : '') + t; clearTimeout(this.pt); this.pt = setTimeout(() => { try{ Native.finishListening(); }catch(e){} }, 1800); },
+  done(t){ if(this.el && t) this.el.value = (this.base ? this.base + ' ' : '') + t; this.stop(); },
+  stop(){ clearTimeout(this.t); clearTimeout(this.pt); if(this.on){ try{ Native.stopListening(); }catch(e){} } this.on = false; if(this.btn) this.btn.classList.remove('on'); }
+};
+
+/* ---------- Help Maya know you: ready-made questions ---------- */
+const KNOW = [
+  ['Family', 'spouse', 'Who is your wife or husband?', 'Wife/husband'],
+  ['Family', 'kids', 'What are your children\'s names and birthdays?', 'Children'],
+  ['Family', 'parents', 'What are your parents\' names?', 'Parents'],
+  ['Family', 'siblings', 'Who are your brothers and sisters?', 'Brothers and sisters'],
+  ['Family', 'anniv', 'When is your wedding anniversary?', 'Wedding anniversary'],
+  ['Family', 'helper', 'Do you have a nanny or helper? What\'s their name?', 'Nanny/helper'],
+  ['People', 'friends', 'Who are your best friends?', 'Best friends'],
+  ['People', 'colleagues', 'Who are your close colleagues at work?', 'Close colleagues'],
+  ['People', 'boss', 'Who is your boss or manager?', 'Boss/manager'],
+  ['People', 'classmates', 'Which classmates or batchmates do you keep in touch with?', 'Classmates/batchmates'],
+  ['Work', 'job', 'What is your job?', 'Job'],
+  ['Work', 'workplace', 'Where do you work?', 'Workplace'],
+  ['Work', 'schedule', 'What is your work schedule or rota?', 'Work schedule'],
+  ['Work', 'side', 'Do you have a part-time job or a business?', 'Side job/business'],
+  ['Home', 'city', 'Where do you live (city and area)?', 'Lives in'],
+  ['Home', 'hometown', 'Where are you from originally?', 'Hometown'],
+  ['Home', 'car', 'What car do you drive?', 'Car'],
+  ['Home', 'langs', 'Which languages do you speak?', 'Languages'],
+  ['About you', 'callme', 'What should Maya call you?', 'Likes to be called'],
+  ['About you', 'bday', 'When is your birthday?', 'Birthday'],
+  ['About you', 'food', 'What are your favourite foods?', 'Favourite food'],
+  ['About you', 'hobbies', 'What are your hobbies and sports?', 'Hobbies and sports'],
+  ['About you', 'shows', 'What music, shows or teams do you like?', 'Likes (music, shows, teams)'],
+  ['About you', 'goals', 'What are you working towards this year?', 'Goals this year'],
+  ['About you', 'allergy', 'Any allergies or health things Maya should know?', 'Allergies/health notes']
+];
+let knowAns = store.get('knowme', {});      // key -> answer, or '' when skipped
+let kmIdx = 0;
+function kmNext(from){ for(let i = from; i < KNOW.length; i++) if(!(KNOW[i][1] in knowAns)) return i; for(let i = 0; i < from; i++) if(!(KNOW[i][1] in knowAns)) return i; return -1; }
+function renderKnow(){
+  const done = KNOW.filter(q => knowAns[q[1]]).length;
+  $('kmCount').textContent = `${done} of ${KNOW.length} answered`;
+  $('kmBar').style.width = Math.round(done / KNOW.length * 100) + '%';
+  const q = KNOW[kmIdx];
+  if(kmIdx < 0 || !q){
+    $('kmGroup').textContent = 'All done'; $('kmQ').textContent = 'Thanks! Maya knows you much better now. You can still tell her anything new by voice.';
+    ['kmA','kmMic','kmSave','kmSkip'].forEach(id => $(id).style.display = 'none'); $('kmBack').textContent = 'Start again'; return;
+  }
+  ['kmA','kmMic','kmSave','kmSkip'].forEach(id => $(id).style.display = ''); $('kmBack').textContent = 'Back';
+  $('kmGroup').textContent = q[0] + ` · ${kmIdx + 1}/${KNOW.length}`; $('kmQ').textContent = q[2];
+  $('kmA').value = knowAns[q[1]] || '';
+}
+function kmSave(){
+  const q = KNOW[kmIdx]; if(!q) return; const a = $('kmA').value.trim().replace(/\s+/g, ' ');
+  if(!a){ toast('Type or say an answer, or tap Skip'); return; }
+  dict.stop();
+  // replace an older answer to the same question
+  const old = knowAns[q[1]]; if(old){ const oi = memories.findIndex(m => m === `${q[3]}: ${old}`); if(oi >= 0) memories.splice(oi, 1); }
+  knowAns[q[1]] = a; store.set('knowme', knowAns);
+  saveFact(`${q[3]}: ${a}`);
+  if(q[1] === 'callme' && a.length < 30){ settings.name = a.split(/[ ,.]/)[0] || settings.name; store.set('settings', settings); $('nameInput').value = settings.name; greet(); renderMe(); }
+  if(q[1] === 'schedule' && brainKey()){   // let her work out the rota properly
+    toast('Maya will check your schedule with you in Chat');
+    setTimeout(() => { document.querySelector('nav button[data-view="chat"]').click(); sendText('My work schedule: ' + a); }, 500);
+  } else toast('Saved ✓');
+  kmIdx = kmNext(kmIdx + 1); renderKnow();
+}
+$('kmSave').onclick = kmSave;
+$('kmSkip').onclick = () => { dict.stop(); const q = KNOW[kmIdx]; if(q && !(q[1] in knowAns)){ knowAns[q[1]] = ''; store.set('knowme', knowAns); } kmIdx = kmNext(kmIdx + 1); renderKnow(); };
+$('kmBack').onclick = () => { dict.stop(); if(kmIdx < 0){ Object.keys(knowAns).forEach(k => { if(!knowAns[k]) delete knowAns[k]; }); store.set('knowme', knowAns); kmIdx = 0; } else kmIdx = Math.max(0, kmIdx - 1); renderKnow(); };
+$('kmMic').onclick = () => { if(dict.on) dict.stop(); else dict.start($('kmA'), $('kmMic')); };
+$('kmVoice').onclick = () => {
+  if(!brainKey()){ toast('Add your Claude or OpenRouter key first'); return; }
+  const left = KNOW.filter(q => !knowAns[q[1]]).map(q => q[2]);
+  if(!left.length){ toast('All questions are answered already'); return; }
+  if(off.active) endOffline(true);
+  document.querySelector('nav button[data-view="talk"]').click();
+  wakeGreeting = true;
+  off.intro = {ask: `[Get-to-know-you interview from the app: ask ${settings.name||'Jim'} these questions one at a time, short and friendly, waiting for each answer: ${left.join(' | ')}. After each answer call remember with one short fact, then ask the next. If he says skip, move on; if he says stop, thank him and stop. For the work schedule question use set_shift_pattern. Start with a one-line intro and the first question.]`};
+  if(!startOffline('talk', 'own')){ off.intro = null; wakeGreeting = false; }
+};
+kmIdx = kmNext(0); renderKnow();
+
+/* ---------- Clean up memories: duplicates and clashes ---------- */
+const words = m => new Set(normFact(m).split(' ').filter(w => w.length > 1));
+function simil(a, b){ const A = words(a), B = words(b); let n = 0; A.forEach(w => { if(B.has(w)) n++; }); return n / Math.max(1, A.size + B.size - n); }
+function localClean(){
+  const items = []; const used = new Set();
+  for(let i = memories.length - 1; i >= 0; i--){
+    if(used.has(i)) continue;
+    const grp = [i];
+    for(let j = i - 1; j >= 0; j--){ if(!used.has(j) && simil(memories[i], memories[j]) >= 0.6) grp.push(j); }
+    if(grp.length > 1){ grp.forEach(x => used.add(x)); items.push({ids:grp, q: grp.some(x => simil(memories[i], memories[x]) < 0.95) ? 'These look like the same thing with different details. Which one is right?' : 'Saved more than once. Keep one:'}); }
+  }
+  return items;
+}
+async function smartClean(){
+  const list = memories.map((m, i) => ({i, m})).slice(-300);
+  const sys = 'You check a personal assistant\'s saved facts about its user for duplicates and contradictions (different spellings of the same name, two versions of the same fact, an outdated fact next to a newer one). Reply with JSON only: {"items":[{"ids":[numbers],"question":"short question to the user"}]}. Each item lists 2 to 4 fact numbers that are about the same thing. Do not list facts that are simply related. If nothing is wrong, reply {"items":[]}.';
+  const out = await brainOnce(sys, list.map(x => `${x.i}: ${x.m}`).join('\n'), 1500);
+  const j = JSON.parse((out.match(/\{[\s\S]*\}/) || ['{"items":[]}'])[0]);
+  return (j.items || []).map(x => ({ids:(x.ids || []).map(Number).filter(n => n >= 0 && n < memories.length), q:String(x.question || 'Which one is right?')})).filter(x => x.ids.length > 1);
+}
+function showClean(items){
+  const box = $('cleanBox'); box.innerHTML = '';
+  if(!items.length){ box.innerHTML = '<p class="hint">✓ No duplicates or clashes found.</p>'; return; }
+  const snap = memories.slice();   // indexes refer to this list
+  const h = document.createElement('p'); h.className = 'hint'; h.textContent = `${items.length} thing${items.length > 1 ? 's' : ''} to check. Tap the right one; the others are deleted.`; box.appendChild(h);
+  items.forEach(it => {
+    const d = document.createElement('div'); d.className = 'cl-item';
+    const q = document.createElement('p'); q.textContent = it.q; d.appendChild(q);
+    it.ids.forEach(id => { const b = document.createElement('button'); b.textContent = snap[id]; b.onclick = () => {
+      const drop = it.ids.filter(x => x !== id).map(x => snap[x]);
+      memories = memories.filter(m => !drop.includes(m)); store.set('memories', memories); renderMem(); d.remove(); toast('Fixed ✓');
+      if(!box.querySelector('.cl-item')) box.innerHTML = '<p class="hint">✓ All cleaned up.</p>';
+    }; d.appendChild(b); });
+    const k = document.createElement('button'); k.className = 'keep'; k.textContent = 'Keep all (they are different)'; k.onclick = () => d.remove(); d.appendChild(k);
+    box.appendChild(d);
+  });
+}
+$('memClean').onclick = async () => {
+  if(memories.length < 2){ toast('Nothing to clean yet'); return; }
+  const b = $('memClean'); b.disabled = true; b.textContent = 'Checking…';
+  let items = [];
+  try{ items = brainKey() ? await smartClean() : localClean(); }catch(e){ items = localClean(); }
+  b.disabled = false; b.textContent = '🧹 Clean up memories';
+  showClean(items);
+};
 
 /* ---------- Auto-send (Maya taps Send after Jim says yes) ---------- */
 const autoOn = () => !!(Native.autoSendOn && Native.autoSendOn()==='true');
