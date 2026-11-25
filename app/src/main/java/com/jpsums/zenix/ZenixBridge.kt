@@ -360,6 +360,21 @@ class ZenixBridge(private val activity: MainActivity) {
         activity.ears.open(key, lang, flux == "true", words)
         return ok("opening")
     }
+    // ---------- "Check Zenix": facts for the self-check ----------
+    @JavascriptInterface fun contactCount(): String = try {
+        if (!has(Manifest.permission.READ_CONTACTS)) "-1"
+        else activity.contentResolver.query(ContactsContract.Contacts.CONTENT_URI, arrayOf(ContactsContract.Contacts._ID), null, null, null)?.use { it.count.toString() } ?: "0"
+    } catch (_: Exception) { "-1" }
+    @JavascriptInterface fun canExactAlarms(): String = try {
+        (Build.VERSION.SDK_INT < 31 || activity.getSystemService(AlarmManager::class.java).canScheduleExactAlarms()).toString()
+    } catch (_: Exception) { "true" }
+    /** Who a spoken name would reach ("my wife" -> "My Lov WIFE"), without calling anyone. */
+    @JavascriptInterface fun whoIs(name: String): String {
+        val c = findContact(name) ?: return fail("nobody")
+        return JSONObject().put("ok", true).put("message", c.name).put("sure", c.sure).toString()
+    }
+    @JavascriptInterface fun phoneInfo(): String = "${Build.MANUFACTURER} ${Build.MODEL}, Android ${Build.VERSION.RELEASE}"
+
     /** Names of his starred (favourite) contacts, so the listener spells them right. */
     @JavascriptInterface fun starredContacts(): String {
         val arr = org.json.JSONArray()

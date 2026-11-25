@@ -676,6 +676,18 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
           <p class="status-line" id="bkState"></p>
         </div>
       </details>
+      <details class="set-item" data-sec="report">
+        <summary><span class="ico"><svg viewBox="0 0 24 24"><path d="M9 3h6l1 2h3v16H5V5h3l1-2z"/><path d="M9 12l2 2 4-4"/></svg></span><span class="set-t"><b>Check Zenix &amp; report a problem</b><span id="sumReport"></span></span><svg class="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></summary>
+        <div class="set-body">
+          <p class="hint">A quick health check of everything Zenix needs on this phone.</p>
+          <div class="toggle-row" style="margin-top:0"><span class="status-line" style="margin:0" id="checkState">Not run yet</span><button class="btn-line" id="checkRun">Run check</button></div>
+          <div id="checkList"></div>
+          <p class="sub-label">Something went wrong?</p>
+          <p class="hint" style="margin-top:0">Zenix keeps a short diary on this phone of what she heard and what she did (the last 400 steps). When she gets something wrong, send it to whoever looks after the app. It never includes your keys, but it does include what you said and the names involved.</p>
+          <div class="inline"><button class="btn-line" id="repShare" style="flex:1">Send report</button><button class="btn-line" id="repCopy" style="flex:1">Copy</button><button class="btn-line" id="repClear">Clear</button></div>
+          <pre id="repPreview" style="margin:10px 0 0;font:11px/1.45 ui-monospace,monospace;color:var(--muted);white-space:pre-wrap;word-break:break-word;max-height:190px;overflow:auto"></pre>
+        </div>
+      </details>
       <details class="set-item" data-sec="about">
         <summary><span class="ico blue"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg></span><span class="set-t"><b>About &amp; updates</b><span id="sumAbout"></span></span><svg class="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></summary>
         <div class="set-body">
@@ -883,7 +895,23 @@ function splitLinks(t){
   return {text:x, src};
 }
 const stripTags = t => String(t||'').replace(/\[[a-z][a-z ,'-]{0,28}\]\s*/gi, '').replace(/\s{2,}/g,' ').trim();
+/* ---------- her diary: what she heard and what she did, kept on the phone so a mistake can be traced ---------- */
+let zlog = (() => { try{ const v = JSON.parse(localStorage.getItem('zenix_zlog') || '[]'); return Array.isArray(v) ? v : []; }catch(e){ return []; } })();
+let zlogDirty = false, zlogReady = false;
+setTimeout(() => { zlogReady = true; }, 1500);
+function logEv(kind, text){
+  if(!zlogReady) return;
+  let t = (typeof text === 'string' ? text : (() => { try{ return JSON.stringify(text); }catch(e){ return String(text); } })()) || '';
+  t = t.replace(/\s+/g, ' ').replace(/\b(?:sk-[a-z0-9]+-[\w-]{8,}|[A-Za-z0-9_-]{36,})\b/g, '[key]').slice(0, 320);
+  zlog.push([Date.now(), kind, t]); if(zlog.length > 400) zlog.splice(0, zlog.length - 400);
+  zlogDirty = true;
+}
+setInterval(() => { if(zlogDirty){ zlogDirty = false; try{ localStorage.setItem('zenix_zlog', JSON.stringify(zlog)); }catch(e){} } }, 3000);
+window.zenixDbg = (what, text) => logEv(what, text);
+window.addEventListener('error', e => logEv('error', (e.message || 'error') + ' @' + (e.lineno || '')));
+window.addEventListener('unhandledrejection', e => logEv('error', 'promise: ' + ((e.reason && e.reason.message) || e.reason)));
 function addMsg(who, text){
+  logEv(who==='user' ? 'you' : who==='ai' ? 'zenix' : 'note', text);
   let src = null;
   if(who==='ai'){ const sp = splitLinks(stripTags(text)); text = sp.text; if(sp.src.length) src = sp.src.slice(0, 6); chatTyping = false; }
   if(!text) return;
@@ -1445,7 +1473,8 @@ const ctlOn = () => !!(Native.ctlOn && Native.ctlOn()==='true');
 const CTL_OFF = "Phone control is off. In Zenix's Settings, open Control other apps and turn it on.";
 function screenDo(action, arg){
   if(!Native.ctl) return Promise.resolve(NA);
-  return new Promise(res => {
+  return new Promise(res0 => {
+    const res = v => { logEv('screen', action + (arg ? ' "' + arg + '"' : '') + ' → ' + (v.ok ? 'ok: ' : 'FAILED: ') + v.message + ' (front app: ' + frontApp() + ')'); res0(v); };
     const id = 's' + (++scrSeq); scrWait[id] = res;
     try{ Native.ctl(id, action, arg==null ? '' : String(arg)); }catch(e){ delete scrWait[id]; res({ok:false, message:"That didn't work."}); return; }
     setTimeout(() => { if(scrWait[id]){ delete scrWait[id]; res({ok:false, message:"The screen didn't answer."}); } }, 12000);
@@ -1987,7 +2016,8 @@ function matchInstant(raw){
 /* run an instant command; anything it can't do cleanly goes to the brain as usual */
 async function runInstant(fn, text, speakIt, after){
   speech.muted = false;
-  let r = null; try{ r = await fn(); }catch(e){ r = null; }
+  let r = null; try{ r = await fn(); }catch(e){ r = null; logEv('error', 'instant command failed: ' + e.message); }
+  logEv('quick', r ? (r.silent ? r.note : r) : 'not handled here, passed to the brain');
   if(!r){ return ownRespond(text, speakIt, after); }
   if(r.silent){   // a swipe on the screen: do it, say nothing, keep listening
     $('actionLine').textContent = r.note || '';
@@ -2181,12 +2211,13 @@ window.zenixOnSpeech = async (t) => {
   if(dict.on){ dict.done(t); return; }
   clearTimeout(partialTimer);
   if(!off.active || off.kind!=='talk') return;
+  if(t) logEv('heard', '[' + (off.brain!=='own' ? (earsLocal ? 'own offline ears' : 'phone offline') : (typeof dg!=='undefined' && dg.active ? (dg.flux ? 'deepgram flux' : 'deepgram') : 'phone')) + '] ' + t);
   if(t && !tr.on){   // "Hey Zenix" (however it was heard) is how he called her, not part of the question
     t = t.replace(/^\s*(?:(?:hey|hi|ok|okay|hello)[,\s]+)?(?:zenix|xenix|zenics|zennix|zinnix|xanax|zanax|xanex|zen ?nix|zen ?ix|zen ?ex|zen x|zee ?nix|xen ?ix)\b[,.!?\s]*/i, '').trim();
     if(!t){ offListen(); return; }
   }
   if(!t){ trMiss(); offListen(); return; }
-  if(off.brain==='own' && mediaNoise(t)){ $('liveLine').textContent = ''; offListen(); return; }   // that was the video, not Jim
+  if(off.brain==='own' && mediaNoise(t)){ logEv('skip', 'taken as sound from a video or music'); $('liveLine').textContent = ''; offListen(); return; }   // that was the video, not Jim
   awaySince = 0;   // he is using her from another app: the "you were away" clock starts over
   off.heard = true; speech.muted = false;
   srErrs = 0; off.quietSince = 0; off.trusted = false;   // Jim is talking now: the normal lock-screen rules apply again
@@ -2210,6 +2241,7 @@ window.zenixOnSpeech = async (t) => {
 window.zenixOnSpeechError = (code) => {
   if(dict.on){ dict.done(''); return; }
   if(!off.active || off.kind!=='talk') return;
+  if(code!==6 && code!==7) logEv('mic', 'listening error ' + code);
   off.earsAt = Date.now();
   if(code===6 || code===7){ srErrs = 0; trMiss(); setTimeout(offListen, 350); return; }   // nothing was said: keep listening
   srErrs++;
@@ -2777,6 +2809,7 @@ function stopTalking(){   // "stop" / "cancel": quiet at once, then she listens
 /* what the stop-word listener heard last, shown in Settings (useful when "stop" isn't caught) */
 window.zenixBargeHeard = (t) => { const el = $('bargeHeard'); if(!el) return; el.style.display = ''; el.textContent = 'Heard while she talked: "' + String(t||'').replace(/\[unk\]/g, '…') + '"'; };
 window.zenixBarge = (cmd) => {
+  logEv('barge', cmd + (speakingNow() ? '' : ' (ignored: she was not talking)'));
   if(!(off.active && off.kind==='talk') || !settings.barge || !speakingNow()) return;
   // she is saying that very word herself right now: that was her, not him
   const saying = ((speech.prevText||'') + ' ' + (speech.nowText||'') + ' ' + (off.sayingText||'')).toLowerCase();
@@ -2989,8 +3022,8 @@ window.zenixDGMsg = (txt) => {
     if(m.speech_final && dg.buf.trim()) dgFinish();
   } else if(m.type==='UtteranceEnd' && !dg.paused && dg.buf.trim()) dgFinish();
 };
-window.zenixDGOpen = (ok, err) => { const w=dg.opening; dg.opening=null; if(!w) return; ok ? w.resolve() : w.reject(new Error(/401|403/.test(err||'') ? 'Deepgram key not accepted' : ('Could not connect to Deepgram '+(err||'')).trim())); };
-window.zenixDGClosed = () => { const was=dg.active; dg.active=false; dg.paused=true; if(was && off.active && off.brain==='own' && off.kind==='talk'){ dg.failed=true; dg.failedAt=Date.now(); toast('Deepgram dropped for a moment, using phone listening');
+window.zenixDGOpen = (ok, err) => { if(!ok) logEv('ears', 'Deepgram could not connect: ' + err); const w=dg.opening; dg.opening=null; if(!w) return; ok ? w.resolve() : w.reject(new Error(/401|403/.test(err||'') ? 'Deepgram key not accepted' : ('Could not connect to Deepgram '+(err||'')).trim())); };
+window.zenixDGClosed = () => { const was=dg.active; if(was) logEv('ears', 'Deepgram line dropped'); dg.active=false; dg.paused=true; if(was && off.active && off.brain==='own' && off.kind==='talk'){ dg.failed=true; dg.failedAt=Date.now(); toast('Deepgram dropped for a moment, using phone listening');
     // if she's mid-answer, the normal "finished speaking" step starts the phone's listening (no listening to her own voice)
     if(!(speech.playing || speech.q.length || speech.streamOpen || speech.hold)) offListen(); } };
 window.zenixDGTest = (ok, msg) => { $('dgState').textContent = ok ? 'Deepgram key works ✓' : ('✗ '+msg); if(!ok) toast(msg); };
@@ -3462,7 +3495,7 @@ function wakeResumeLater(){
   if(settings.wake && Native && Native.wakeResume) setTimeout(()=>{ if(!inVoiceChat()){ Native.wakeResume(); waitWakeReady(); } renderWake(); }, 900);
 }
 let wakeMedia = false;
-window.zenixWake = () => {
+window.zenixWake = () => { logEv('wake', 'heard her name');
   if(connecting || (convo && session==='talk') || (off.active && off.kind==='talk')) return;   // already talking; the listener comes back when that chat ends
   try{ wakeMedia = !!(Native.musicActive && Native.musicActive()==='true'); }catch(e){ wakeMedia = false; }
   document.querySelector('nav button[data-view="talk"]').click();
@@ -3782,7 +3815,7 @@ renderAgent();
 
 
 /* ---------- Easier Zenix: setup checklist, everyday settings, chat chips, welcome guide ---------- */
-const EVERYDAY = ['brain','voice','wake','mem','routines','lists'];
+const EVERYDAY = ['brain','voice','wake','mem','routines','lists','report'];
 (() => {
   const list = $('everyList');
   EVERYDAY.forEach(k => { const d = document.querySelector('.set-item[data-sec="' + k + '"]'); if(d) list.appendChild(d); });
@@ -4030,6 +4063,88 @@ renderAuto();
 function renderBarge(){ if(!Native.bargeStart){ $('bargeRow').style.display = 'none'; return; } $('bargeToggle').classList.toggle('on', !!settings.barge); }
 $('bargeToggle').onclick = () => { settings.barge = !settings.barge; store.set('settings', settings); renderBarge(); toast(settings.barge ? 'Say "stop", "pause", "continue" or "end" while she talks' : 'She won\'t listen while she talks'); if(settings.barge && Native.bargeReady && Native.bargeReady()!=='true') toast('Turn on "Hey Zenix" once: it downloads the listener this needs'); };
 renderBarge();
+
+/* every tool she uses goes in the diary with what it was given and what came back */
+Object.keys(clientTools).forEach(name => {
+  const run = clientTools[name]; if(typeof run !== 'function') return;
+  const brief = v => { let s = typeof v === 'string' ? v : (() => { try{ return JSON.stringify(v); }catch(e){ return String(v); } })(); s = String(s || ''); return s.length > 220 ? s.slice(0, 220) + '…' : s; };
+  clientTools[name] = async (args) => {
+    try{ const out = await run(args); logEv('tool', name + ' ' + brief(args) + ' → ' + brief(out)); return out; }
+    catch(e){ logEv('tool', name + ' ' + brief(args) + ' → ERROR ' + e.message); throw e; }
+  };
+});
+
+/* ---------- Check Zenix & report a problem ---------- */
+let lastCheck = store.get('lastCheck', null);
+function reportText(){
+  const safe = f => { try{ return f(); }catch(e){ return '?'; } };
+  const head = [
+    'ZENIX PROBLEM REPORT',
+    'Version ' + (myVersion || '?') + ' · ' + new Date().toString().slice(0, 24) + ' · ' + safe(() => Native.phoneInfo ? Native.phoneInfo() : 'web'),
+    'Brain: ' + settings.engine + (settings.engine==='own' ? ' / ' + (settings.provider==='openrouter' ? 'OpenRouter ' + (settings.orModel || 'grok') : 'Claude ' + settings.model) : '') +
+      ' · Ears: ' + settings.ears + (dgKey() ? ' (Deepgram key saved)' : '') + ' · Voice: ' + settings.voice + ' · Language: ' + settings.offlineLang + ' · Offline mode: ' + settings.mode,
+    'Hey Zenix: ' + (settings.wake ? 'on' : 'off') + safe(() => { const w = wakeSt(); return ' (' + (w.state || '?') + (w.running ? ', listening' : ', not listening') + (w.names ? ', words: ' + w.names : '') + (w.heard ? ', last heard: ' + w.heard : '') + ')'; }) +
+      ' · Stop by voice: ' + (settings.barge ? 'on' : 'off') + ' · Phone control: ' + (safe(ctlOn) ? 'on' : 'off') + ' · Auto-send: ' + (safe(autoOn) ? 'on' : 'off'),
+    'Setup: ' + safe(() => setupItems().map(i => (i.ok ? '✓' : '✗') + ' ' + i.t).join(', ')),
+    lastCheck ? 'Last check (' + new Date(lastCheck.at).toString().slice(4, 21) + '): ' + lastCheck.items.map(i => (i.ok ? '✓' : '✗') + ' ' + i.t + (i.d ? ' [' + i.d + ']' : '')).join(' · ') : 'Check not run',
+    '--- diary, oldest first ---'
+  ];
+  const lines = zlog.map(([t, k, x]) => new Date(t).toTimeString().slice(0, 8) + '  ' + String(k).padEnd(7) + x);
+  return head.concat(lines).join('\n');
+}
+function renderReport(){
+  if(!$('repPreview')) return;
+  $('repPreview').textContent = zlog.slice(-8).map(([t, k, x]) => new Date(t).toTimeString().slice(0, 5) + ' ' + k + ': ' + x).join('\n') || 'Nothing recorded yet.';
+  $('sumReport').textContent = lastCheck ? (lastCheck.items.every(i => i.ok) ? 'All good ✓' : lastCheck.items.filter(i => !i.ok).length + ' to fix') : 'Health check and diary';
+  if(lastCheck){
+    $('checkState').textContent = 'Checked ' + new Date(lastCheck.at).toLocaleString([], {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'});
+    const box = $('checkList'); box.innerHTML = '';
+    lastCheck.items.forEach(i => { const row = document.createElement('div'); row.className = 'toggle-row'; row.style.marginTop = '6px';
+      const d = document.createElement('div'); const b = document.createElement('b'); b.textContent = (i.ok ? '✓ ' : '✗ ') + i.t; b.style.color = i.ok ? '' : '#ff7a8a'; const sm = document.createElement('small'); sm.textContent = i.d || ''; d.appendChild(b); d.appendChild(sm); row.appendChild(d); box.appendChild(row); });
+  }
+}
+async function runCheck(){
+  const items = []; const add = (ok, t, d) => items.push({ok: !!ok, t, d: d || ''});
+  const yesN = f => { try{ return !!(Native[f] && Native[f]()==='true'); }catch(e){ return false; } };
+  $('checkState').textContent = 'Checking…'; $('checkRun').disabled = true;
+  try{
+    add(!!myVersion, 'App version', myVersion ? 'v' + myVersion : 'unknown');
+    // brain: one tiny real question
+    if(settings.engine==='own'){
+      if(!brainKey()) add(false, 'Brain key', 'No key saved. Settings → Brain.');
+      else { const t0 = performance.now(); let ans = '', err = '';
+        try{ ans = await Promise.race([brainOnce('Reply with the single word OK.', 'Say OK', 8), new Promise((_, rej) => setTimeout(() => rej(new Error('no answer in 15 s')), 15000))]); }catch(e){ err = e.message || String(e); }
+        add(!!ans, 'Brain answers', ans ? Math.round(performance.now() - t0) / 1000 + ' s' : 'Failed: ' + err); }
+    } else add(true, 'Brain', 'ElevenLabs agent');
+    // ears
+    if(settings.ears==='deepgram'){
+      if(!dgKey()) add(false, 'Deepgram ears', 'No Deepgram key. Settings → Keys.');
+      else if(Native.dgTest){ const r = await new Promise(res => { const old = window.zenixDGTest; const done = (ok, msg) => { window.zenixDGTest = old; res({ok, msg}); }; window.zenixDGTest = done; Native.dgTest(dgKey()); setTimeout(() => done(false, 'no answer in 12 s'), 12000); });
+        add(r.ok, 'Deepgram ears', r.ok ? 'Key works · ' + hearWords().length + ' words she knows' : r.msg); }
+    } else add(true, 'Ears', 'Phone listening' + (dgKey() ? ' (Deepgram is available and better)' : ''));
+    add(yesN('hasMicPermission'), 'Microphone', yesN('hasMicPermission') ? '' : 'Allow the microphone for Zenix.');
+    const n = Native.contactCount ? +Native.contactCount() : -2;
+    if(n > -2) add(n >= 0, 'Contacts', n >= 0 ? n + ' contacts readable' : 'Allow Contacts so she can call and message people.');
+    if(Native.whoIs && n > 0){ const w = (() => { try{ return JSON.parse(Native.whoIs('my wife')); }catch(e){ return null; } })(); if(w && w.ok) add(w.sure !== false, '"Call my wife" reaches', w.message + (w.sure === false ? ' (not sure: she would ask first)' : '')); }
+    if(Native.canExactAlarms) add(yesN('canExactAlarms'), 'Alarms on time', yesN('canExactAlarms') ? '' : 'Allow "Alarms & reminders" for Zenix in phone Settings → Apps → Special access.');
+    if(Native.wakeStatus){ const w = wakeSt(); add(!settings.wake || (w.state==='ready' && w.running), '"Hey Zenix"', !settings.wake ? 'Switched off' : (w.state==='ready' ? (w.running ? 'Listening for: ' + (w.names || '?') : 'Ready but not listening right now') : 'Listener not downloaded')); }
+    if(Native.bargeReady) add(!settings.barge || yesN('bargeReady'), 'Stop her by voice', !settings.barge ? 'Switched off' : (yesN('bargeReady') ? 'Ready' : 'Needs the "Hey Zenix" listener (turn Hey Zenix on once).'));
+    if(Native.ctlOn) add(ctlOn(), 'Control other apps', ctlOn() ? 'On' : 'Off: Settings → Control other apps.');
+    if(Native.autoSendOn) add(true, 'Auto-send messages', autoOn() ? 'On' : 'Off (optional: she opens the chat, you tap Send)');
+    try{ setupItems().filter(i => ['overlay', 'full', 'batt', 'notif'].includes(i.k)).forEach(i => add(i.ok, i.t, i.ok ? '' : i.d)); }catch(e){}
+    add(true, 'Offline brain', offlineReady() ? 'Installed (used only with no connection)' : 'Not installed (optional)');
+  }catch(e){ add(false, 'Check stopped', e.message); }
+  lastCheck = {at: Date.now(), items}; store.set('lastCheck', lastCheck);
+  logEv('check', items.map(i => (i.ok ? '✓' : '✗') + i.t + (i.d ? '=' + i.d : '')).join(' · '));
+  $('checkRun').disabled = false; renderReport();
+  toast(items.every(i => i.ok) ? 'All good ✓' : items.filter(i => !i.ok).length + ' thing(s) to fix');
+}
+$('checkRun').onclick = runCheck;
+$('repShare').onclick = () => { const t = reportText(); if(Native.shareText && IS_APP) Native.shareText('Zenix problem report', t); else { try{ navigator.clipboard.writeText(t); toast('Report copied'); }catch(e){ toast('Could not copy'); } } };
+$('repCopy').onclick = async () => { try{ await navigator.clipboard.writeText(reportText()); toast('Report copied. Paste it in a message.'); }catch(e){ if(Native.shareText) Native.shareText('Zenix problem report', reportText()); } };
+$('repClear').onclick = () => { zlog = []; zlogDirty = true; renderReport(); toast('Diary cleared'); };
+document.querySelector('.set-item[data-sec="report"]').addEventListener('toggle', renderReport);
+renderReport();
 /* ---------- Control other apps (Zenix phone control) ---------- */
 function renderCtl(){
   if(!Native.ctlOn){ $('ctlState').textContent='Android app only'; $('ctlBtn').style.display='none'; $('ctlInfo').style.display='none'; $('sumCtl').textContent='Android app only'; return; }
