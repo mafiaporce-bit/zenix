@@ -25,6 +25,7 @@ class ReminderReceiver : BroadcastReceiver() {
         val text = intent.getStringExtra("text") ?: "Reminder"
         val title = intent.getStringExtra("title") ?: "Zenix reminder"
         val id = intent.getIntExtra("id", 1)
+        ReminderStore.remove(context, id)
         val routine = intent.getStringExtra("routine")
         // an alarm for a set day always rings like an alarm, whatever the reminder sound setting is
         if (intent.getBooleanExtra("alarm", false) || AlarmRinger.isOn(context)) { AlarmRinger.start(context, title, text, routine); return }

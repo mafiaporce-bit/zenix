@@ -77,7 +77,7 @@ class AlarmRinger : Service() {
         /** Rings again in a few minutes. */
         fun snooze(c: Context, title: String, text: String, routine: String?, minutes: Int = 10) {
             val at = System.currentTimeMillis() + minutes * 60_000L
-            val id = (at / 1000 % 100000).toInt() + 300000
+            val id = ReminderStore.newId()
             val i = Intent(c, ReminderReceiver::class.java).putExtra("text", text).putExtra("title", title).putExtra("id", id)
             if (routine != null) i.putExtra("routine", routine)
             val pi = PendingIntent.getBroadcast(c, id, i, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
@@ -85,6 +85,7 @@ class AlarmRinger : Service() {
             try {
                 if (Build.VERSION.SDK_INT >= 31 && !am.canScheduleExactAlarms()) am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pi)
                 else am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pi)
+                ReminderStore.save(c, id, at, i)
             } catch (_: Exception) { }
         }
     }

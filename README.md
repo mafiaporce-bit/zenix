@@ -1,16 +1,11 @@
-# ZeniX — Personal AI Assistant (Android)
+# Zenix
 
-ZeniX is Jim's voice assistant: ElevenLabs voice with a Claude brain, plus real phone skills —
-alarms, reminders, opening apps, calls, WhatsApp / Messenger / SMS, reading texts, email,
-calendar, web search and memory across chats.
+Jim's personal voice assistant for Android (Samsung Galaxy S24 Ultra), with a browser version of the same screen.
 
-## Get the APK
-Every push to `main` builds the app automatically (GitHub Actions).
-Open the **Releases → ZeniX (latest build)** page on your phone, download `ZeniX.apk` and tap to install.
+- **Install on the phone:** download `ZeniX.apk` from the [latest release](https://github.com/mafiaporce-bit/zenix/releases/tag/latest) and tap it. It installs over the old version; nothing is lost.
+- **Build:** every push to `main` runs the checks in `tests/`, builds the APK with GitHub Actions and publishes it to the `latest` release.
+- **Browser version:** `netlify.toml` publishes `app/src/main/assets`. Phone-only features (calls, wake word, alarms, control of other apps, offline ears) do not run in a browser.
+- **Keys:** API keys are pasted into the app and stay on the device. None are in this repository.
+- **Changes:** see [CHANGELOG.md](CHANGELOG.md).
 
-## Project
-- `app/src/main/assets/index.html` — the ZeniX screen (talk, chat, memory)
-- `app/src/main/java/com/jpsums/zenix/ZenixBridge.kt` — phone actions ZeniX can call
-- `.github/workflows/build-apk.yml` — the APK build
-
-Copyright © 2026 Zenix_dev@company. All rights reserved. Developed by JPSums
+Checks: `python3 tests/check-source.py` and `node --test tests/intelligence.test.mjs`.

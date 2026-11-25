@@ -13,7 +13,7 @@ android {
         targetSdk = 34
         val run = (System.getenv("GITHUB_RUN_NUMBER") ?: "0").toInt()
         versionCode = run + 100
-        versionName = "2.$run"
+        versionName = "2.${run + 17}"   // the 2.90 line starts at build 73
     }
 
     signingConfigs {

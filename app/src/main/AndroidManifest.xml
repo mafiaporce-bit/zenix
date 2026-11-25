@@ -73,6 +73,7 @@
         </activity>
 
         <receiver android:name=".ReminderReceiver" android:exported="false" />
+        <service android:name=".AutopilotJob" android:permission="android.permission.BIND_JOB_SERVICE" android:exported="true" />
 
         <service
             android:name=".AlarmRinger"

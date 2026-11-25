@@ -25,6 +25,7 @@ class MainActivity : Activity() {
     lateinit var brain: OfflineBrain
     lateinit var updater: Updater
     lateinit var ears: DeepgramEars
+    private var imagePicker: android.webkit.ValueCallback<Array<android.net.Uri>>? = null
     private var pendingWebPermission: PermissionRequest? = null
     private var pendingGeo: Pair<String, android.webkit.GeolocationPermissions.Callback>? = null
     private var pageReady = false
@@ -44,6 +45,7 @@ class MainActivity : Activity() {
         private const val PERM_GEO = 43
         private const val PICK_BACKUP = 77
         private const val PICK_RING = 78
+        private const val PICK_VISION = 79
         const val UPDATE_CHANNEL_ID = "zenix_updates"
         val ALL_PERMISSIONS: Array<String>
             get() {
@@ -77,6 +79,9 @@ class MainActivity : Activity() {
         webView.settings.apply {
             javaScriptEnabled = true
             domStorageEnabled = true
+            allowFileAccess = false
+            allowContentAccess = false
+            mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
             mediaPlaybackRequiresUserGesture = false
             cacheMode = WebSettings.LOAD_DEFAULT
             setGeolocationEnabled(true)
@@ -89,7 +94,17 @@ class MainActivity : Activity() {
         webView.webViewClient = object : WebViewClient() {
             override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? =
                 assetLoader.shouldInterceptRequest(request.url)
+            override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
+                val u = request.url
+                if (request.isForMainFrame && u.scheme == "https" && u.host == "appassets.androidplatform.net" && u.path == "/assets/index.html") return false
+                // anything else never loads inside Zenix; a link he tapped himself opens in the phone's browser
+                if (request.isForMainFrame && request.hasGesture() && (u.scheme == "https" || u.scheme == "http")) {
+                    try { startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, u).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) } catch (_: Exception) { }
+                }
+                return true
+            }
             override fun onPageFinished(view: WebView, url: String) {
+                if (url != "https://appassets.androidplatform.net/assets/index.html") return
                 pageReady = true
                 if (pendingWake) { pendingWake = false; view.postDelayed({ onWake() }, 900) }
                 if (pendingUpdate) { pendingUpdate = false; view.postDelayed({ runJs("window.zenixStartUpdate && window.zenixStartUpdate()") }, 1200) }
@@ -97,9 +112,20 @@ class MainActivity : Activity() {
             }
         }
         webView.webChromeClient = object : WebChromeClient() {
+            override fun onShowFileChooser(view: WebView, callback: android.webkit.ValueCallback<Array<android.net.Uri>>, params: FileChooserParams): Boolean {
+                if (isLocked() || view.url != "https://appassets.androidplatform.net/assets/index.html" || !params.acceptTypes.any { it.startsWith("image/") }) { callback.onReceiveValue(null); return true }
+                imagePicker?.onReceiveValue(null)
+                imagePicker = callback
+                val intent = android.content.Intent(android.content.Intent.ACTION_OPEN_DOCUMENT).apply {
+                    addCategory(android.content.Intent.CATEGORY_OPENABLE); type = "image/*"
+                }
+                try { startActivityForResult(intent, PICK_VISION) } catch (_: Exception) { imagePicker = null; callback.onReceiveValue(null) }
+                return true
+            }
             /** The page wants the microphone (voice chat) or the camera ("what's this?"). */
             override fun onPermissionRequest(request: PermissionRequest) {
                 runOnUiThread {
+                    if (request.origin.toString().trimEnd('/') != "https://appassets.androidplatform.net") { request.deny(); return@runOnUiThread }
                     val missing = webNeeds(request).filter { checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED }
                     if (webNeeds(request).isEmpty()) request.deny()
                     else if (missing.isEmpty()) answerWeb(request)
@@ -114,6 +140,7 @@ class MainActivity : Activity() {
             /** The map asked "where am I?": pass on Android's location permission (asking Jim the first time). */
             override fun onGeolocationPermissionsShowPrompt(origin: String, callback: android.webkit.GeolocationPermissions.Callback) {
                 runOnUiThread {
+                    if (origin.trimEnd('/') != "https://appassets.androidplatform.net") { callback.invoke(origin, false, false); return@runOnUiThread }
                     if (hasLocation()) callback.invoke(origin, true, false)
                     else {
                         pendingGeo?.let { (o, cb) -> try { cb.invoke(o, false, false) } catch (_: Exception) { } }
@@ -238,6 +265,12 @@ class MainActivity : Activity() {
     @Deprecated("Deprecated in Java")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: android.content.Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == PICK_VISION) {
+            val uri = data?.data
+            imagePicker?.onReceiveValue(if (resultCode == RESULT_OK && uri != null && uri.scheme == "content") arrayOf(uri) else null)
+            imagePicker = null
+            return
+        }
         if (requestCode == PICK_RING) {
             if (resultCode == RESULT_OK) {
                 @Suppress("DEPRECATION")
@@ -310,6 +343,7 @@ class MainActivity : Activity() {
     }
 
     override fun onDestroy() {
+        imagePicker?.onReceiveValue(null); imagePicker = null
         if (::brain.isInitialized) brain.shutdown()
         if (::ears.isInitialized) ears.close()
         stopService(android.content.Intent(this, VoiceService::class.java))

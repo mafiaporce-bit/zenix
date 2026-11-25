@@ -148,7 +148,7 @@ object Routines {
 class RoutineReceiver : BroadcastReceiver() {
     override fun onReceive(c: Context, intent: Intent) {
         val id = intent.getIntExtra("rid", -1)
-        if (id == -1) { Routines.scheduleAll(c); return }   // phone restarted or Zenix was updated
+        if (id == -1) { Routines.scheduleAll(c); ReminderStore.restore(c); return }   // phone restarted or Zenix was updated
         val r = Routines.find(c, id) ?: return
         if (r.optString("date").isNotBlank()) Routines.delete(c, id) else Routines.schedule(c, r)
         Routines.fire(c, r)

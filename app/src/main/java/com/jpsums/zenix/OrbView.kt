@@ -51,6 +51,9 @@ class OrbView(context: Context) : View(context) {
     override fun onAttachedToWindow() { super.onAttachedToWindow(); animator.start() }
     override fun onDetachedFromWindow() { animator.cancel(); super.onDetachedFromWindow() }
 
+    private val clipPath = android.graphics.Path()
+    private val silkPath = android.graphics.Path()
+
     override fun onDraw(canvas: Canvas) {
         val cx = width / 2f
         val cy = height / 2f
@@ -71,16 +74,29 @@ class OrbView(context: Context) : View(context) {
         core.alpha = (40 + 150 * energy * (0.4f + 0.6f * talk)).toInt().coerceIn(0, 255)
         canvas.drawCircle(cx, cy, maxR * 0.34f, core)
 
-        // two loops of light turning inside the glass
-        for (k in 0..1) {
-            canvas.save()
-            canvas.rotate((if (k == 0) 1f else -1f) * t * 14f + k * 70f, cx, cy)
-            val squash = 0.38f + 0.3f * (0.5f + 0.5f * kotlin.math.sin(t * 0.9f + k * 2f)) + 0.12f * energy * talk
-            oval.set(cx - r * 0.9f, cy - r * 0.9f * squash, cx + r * 0.9f, cy + r * 0.9f * squash)
-            loopPaint.strokeWidth = maxR * 0.022f
-            loopPaint.alpha = (70 + 110 * energy).toInt().coerceIn(0, 255) - k * 25
-            canvas.drawOval(oval, loopPaint)
-            canvas.restore()
+        // Fine silver silk bands, confined inside the glass sphere.
+        canvas.save()
+        clipPath.rewind(); clipPath.addCircle(cx, cy, r, android.graphics.Path.Direction.CW)
+        canvas.clipPath(clipPath)
+        for (k in 0..13) {
+            val path = silkPath; path.rewind()
+            val phase = t * (0.9f + energy) + k * 0.18f
+            for (j in 0..48) {
+                val x = -1f + j / 24f
+                val y = kotlin.math.sin(x * 3.4f + phase) * (0.18f + energy * 0.12f) + (k - 6.5f) * 0.043f
+                if (j == 0) path.moveTo(cx + x*r, cy + y*r) else path.lineTo(cx + x*r, cy + y*r)
+            }
+            loopPaint.strokeWidth = maxR * 0.009f
+            loopPaint.alpha = (45 + 70 * energy + k * 4).toInt().coerceIn(0,255)
+            canvas.drawPath(path, loopPaint)
+        }
+        canvas.restore()
+        for (k in 0..32) {
+            val a = k * 2.39996f + t * 0.13f
+            val d = r * (1.08f + 0.13f * kotlin.math.sin(k * 1.7f + t))
+            arc.alpha = 65 + k % 4 * 30
+            arc.strokeWidth = maxR * 0.018f
+            canvas.drawPoint(cx + kotlin.math.cos(a)*d, cy + kotlin.math.sin(a)*d, arc)
         }
 
         // the rim: a soft halo under a bright, slowly turning edge

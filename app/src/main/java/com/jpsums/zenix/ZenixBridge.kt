@@ -49,6 +49,12 @@ class ZenixBridge(private val activity: MainActivity) {
     // ---------- basics ----------
     @JavascriptInterface fun hasMicPermission(): String = has(Manifest.permission.RECORD_AUDIO).toString()
     @JavascriptInterface fun requestPermissions(): String { activity.runOnUiThread { activity.requestAllPermissions() }; return ok("Asking for permissions.") }
+    // API keys: kept encrypted by the phone's own key store (never in plain storage, never in a backup of the page)
+    @JavascriptInterface fun secretGet(name: String): String = SecretStore.get(activity, name)
+    @JavascriptInterface fun secretSet(name: String, value: String): String = SecretStore.put(activity, name, value).toString()
+    // Autopilot: "when the internet is back / gone, remind me…" checked in the background
+    @JavascriptInterface fun saveAutopilot290(raw: String): String = if (AutopilotJob.save(activity, raw)) "true" else "false"
+    @JavascriptInterface fun firedAutopilot290(): String = AutopilotJob.fired(activity)
     @JavascriptInterface fun keepAwake(on: String): String { activity.setKeepAwake(on == "true"); return ok("ok") }
 
     /** Saves the PIN-locked backup into Downloads/Zenix (survives clearing Zenix's data). */
@@ -93,7 +99,7 @@ class ZenixBridge(private val activity: MainActivity) {
 
     // ---------- routines (things Zenix does by herself at a set time) ----------
     @JavascriptInterface fun routineAdd(title: String, prompt: String, hour: String, minute: String, days: String, date: String): String {
-        val h = hour.toIntOrNull(); val m = minute.toIntOrNull() ?: 0
+        val h = hour.toIntOrNull(); val m = (minute.toIntOrNull() ?: 0).takeIf { it in 0..59 } ?: return fail("Invalid minute.")
         if (h == null || h !in 0..23 || m !in 0..59) return fail("I didn't get the time for that.")
         if (prompt.isBlank()) return fail("What should I do at that time?")
         if (date.isNotBlank() && !Regex("\\d{4}-\\d{2}-\\d{2}").matches(date.trim())) return fail("Give the date as 2026-11-20.")
@@ -324,13 +330,6 @@ class ZenixBridge(private val activity: MainActivity) {
         micTurns.execute { try { barge.stopAndWait() } catch (_: Throwable) { }; try { activity.ears.takeMicBack() } catch (_: Throwable) { } }
         return ok("ok")
     }
-    /** Real internet right now (connected AND working), not just "Wi-Fi is on". */
-    @JavascriptInterface fun online(): String = try {
-        val cm = activity.getSystemService(android.net.ConnectivityManager::class.java)
-        val caps = cm.getNetworkCapabilities(cm.activeNetwork)
-        (caps != null && caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
-            caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_VALIDATED)).toString()
-    } catch (_: Exception) { "true" }
     @JavascriptInterface fun speak(text: String, lang: String): String { activity.brain.speak(text, lang); return ok("speaking") }
     @JavascriptInterface fun stopSpeaking(): String { activity.brain.stopSpeaking(); return ok("stopped") }
     // ---------- "Hey Zenix" wake word ----------
@@ -614,8 +613,8 @@ class ZenixBridge(private val activity: MainActivity) {
     // ---------- alarms & reminders ----------
     @JavascriptInterface
     fun setAlarm(hour: String, minute: String, label: String): String {
-        val h = hour.toIntOrNull() ?: return fail("I didn't get the hour.")
-        val m = minute.toIntOrNull() ?: 0
+        val h = hour.toIntOrNull()?.takeIf { it in 0..23 } ?: return fail("I didn't get the hour.")
+        val m = (minute.toIntOrNull() ?: 0).takeIf { it in 0..59 } ?: return fail("I didn't get the minute.")
         val i = Intent(AlarmClock.ACTION_SET_ALARM)
             .putExtra(AlarmClock.EXTRA_HOUR, h)
             .putExtra(AlarmClock.EXTRA_MINUTES, m)
@@ -629,7 +628,7 @@ class ZenixBridge(private val activity: MainActivity) {
     fun setAlarmAt(label: String, atMs: String): String {
         val at = atMs.toLongOrNull() ?: return fail("I didn't get when.")
         if (at <= System.currentTimeMillis()) return fail("That time has already passed.")
-        val id = (at / 1000 % Int.MAX_VALUE).toInt()
+        val id = ReminderStore.newId()
         val intent = Intent(activity, ReminderReceiver::class.java)
             .putExtra("text", label.ifBlank { "Alarm" }).putExtra("title", "⏰ Zenix alarm").putExtra("id", id).putExtra("alarm", true)
         val pi = PendingIntent.getBroadcast(activity, id, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
@@ -639,16 +638,17 @@ class ZenixBridge(private val activity: MainActivity) {
             val show = PendingIntent.getActivity(activity, id, Intent(activity, MainActivity::class.java), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
             if (Build.VERSION.SDK_INT >= 31 && !am.canScheduleExactAlarms()) am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pi)
             else am.setAlarmClock(AlarmManager.AlarmClockInfo(at, show), pi)
+            try { ReminderStore.save(activity, id, at, intent) } catch (_: Exception) { }   // so it is set again after a phone restart or an app update
             val day = SimpleDateFormat("EEEE d MMMM, h:mm a", Locale.ENGLISH).format(Date(at))
-            ok("Alarm set for $day.")
+            ok("Alarm set for $day." + if (Build.VERSION.SDK_INT >= 31 && !am.canScheduleExactAlarms()) " Exact alarm permission is off, so it may ring late." else "")
         } catch (e: Exception) { fail("Couldn't set the alarm: ${e.message}") }
     }
 
     /** A Clock app alarm that repeats on weekdays (days: 1=Sunday … 7=Saturday, comma separated). */
     @JavascriptInterface
     fun setAlarmRepeat(hour: String, minute: String, label: String, days: String): String {
-        val h = hour.toIntOrNull() ?: return fail("I didn't get the hour.")
-        val m = minute.toIntOrNull() ?: 0
+        val h = hour.toIntOrNull()?.takeIf { it in 0..23 } ?: return fail("I didn't get the hour.")
+        val m = (minute.toIntOrNull() ?: 0).takeIf { it in 0..59 } ?: return fail("I didn't get the minute.")
         val list = ArrayList(days.split(",").mapNotNull { it.trim().toIntOrNull() }.filter { it in 1..7 })
         if (list.isEmpty()) return fail("Which days?")
         val i = Intent(AlarmClock.ACTION_SET_ALARM)
@@ -661,9 +661,9 @@ class ZenixBridge(private val activity: MainActivity) {
 
     @JavascriptInterface
     fun setReminder(text: String, minutes: String): String {
-        val mins = minutes.toLongOrNull() ?: return fail("I didn't get when to remind you.")
+        val mins = minutes.toLongOrNull()?.takeIf { it in 1..5256000 } ?: return fail("I didn't get when to remind you.")
         val at = System.currentTimeMillis() + mins * 60_000
-        val id = (at / 1000 % Int.MAX_VALUE).toInt()
+        val id = ReminderStore.newId()
         val intent = Intent(activity, ReminderReceiver::class.java).putExtra("text", text).putExtra("id", id)
         val pi = PendingIntent.getBroadcast(activity, id, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         val am = activity.getSystemService(AlarmManager::class.java)
@@ -673,8 +673,9 @@ class ZenixBridge(private val activity: MainActivity) {
             } else {
                 am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pi)
             }
+            try { ReminderStore.save(activity, id, at, intent) } catch (_: Exception) { }
             val time = SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date(at))
-            ok("Reminder set for $time: $text")
+            ok("Reminder set for $time: $text" + if (Build.VERSION.SDK_INT >= 31 && !am.canScheduleExactAlarms()) " Exact alarm permission is off, so it may come late." else "")
         } catch (e: Exception) { fail("Couldn't set the reminder: ${e.message}") }
     }
 
@@ -715,7 +716,8 @@ class ZenixBridge(private val activity: MainActivity) {
 
     @JavascriptInterface
     fun openUrl(url: String): String =
-        if (launch(Intent(Intent.ACTION_VIEW, Uri.parse(url)))) ok("Opened it on your screen.") else fail("Couldn't open the browser.")
+        if (Uri.parse(url).scheme !in listOf("https", "http")) fail("I can only open web links.")
+        else if (launch(Intent(Intent.ACTION_VIEW, Uri.parse(url)))) ok("Opened it on your screen.") else fail("Couldn't open the browser.")
 
     // ---------- calls & messages ----------
     @JavascriptInterface
@@ -884,7 +886,8 @@ class ZenixBridge(private val activity: MainActivity) {
                         put(CalendarContract.Events.EVENT_TIMEZONE, TimeZone.getDefault().id)
                         if (location.isNotBlank()) put(CalendarContract.Events.EVENT_LOCATION, location)
                     }
-                    activity.contentResolver.insert(CalendarContract.Events.CONTENT_URI, v)
+                    val inserted = activity.contentResolver.insert(CalendarContract.Events.CONTENT_URI, v)
+                    if (inserted == null) return fail("The calendar didn't confirm it saved the event.")
                     return ok("Added \"$title\" on ${SimpleDateFormat("EEE d MMM, h:mm a", Locale.getDefault()).format(Date(startMs))}.")
                 } catch (_: Exception) { }
             }

@@ -33,13 +33,18 @@ jobs:
         with:
           gradle-version: '8.9'
 
+      - name: Checks before building
+        run: |
+          python3 tests/check-source.py
+          node --test tests/intelligence.test.mjs
+
       - name: Build APK
         run: gradle :app:assembleDebug --no-daemon --stacktrace
 
       - name: Rename APK
         run: |
           cp app/build/outputs/apk/debug/app-debug.apk ZeniX.apk
-          echo "{\"versionCode\": $((GITHUB_RUN_NUMBER + 100)), \"versionName\": \"2.$GITHUB_RUN_NUMBER\"}" > version.json
+          echo "{\"versionCode\": $((GITHUB_RUN_NUMBER + 100)), \"versionName\": \"2.$((GITHUB_RUN_NUMBER + 17))\"}" > version.json
           cat version.json
 
       - name: Upload artifact
