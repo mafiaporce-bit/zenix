@@ -296,6 +296,22 @@ class ZenixBridge(private val activity: MainActivity) {
     private val localEars by lazy { VoskEars(activity) }
     @JavascriptInterface fun localEarsReady(): String = localEars.ready().toString()
     @JavascriptInterface fun startListeningLocal(): String { activity.brain.stopListening(); localEars.start(); return ok("listening") }
+    /** Same, but first hands over the last few seconds the online listener heard before its line died. */
+    @JavascriptInterface fun startListeningLocalRecent(): String {
+        val pre = try { activity.ears.recent() } catch (_: Throwable) { null }
+        try { activity.ears.close() } catch (_: Throwable) { }   // the dead line lets go of the microphone first
+        activity.brain.stopListening(); localEars.start(pre)
+        return ok("listening")
+    }
+    /** Open the Deepgram line without taking the microphone (to prove it works before switching back to it). */
+    @JavascriptInterface fun dgOpenIdle(key: String, lang: String, flux: String, wordsJson: String): String {
+        val words = try { val a = org.json.JSONArray(wordsJson); (0 until a.length()).map { a.optString(it) } } catch (_: Exception) { emptyList() }
+        activity.ears.open(key, lang, flux == "true", words, false)
+        return ok("opening")
+    }
+    /** The proven line takes the microphone from the offline listener. */
+    @JavascriptInterface fun dgTakeMic(): String { localEars.cancel(); activity.brain.stopListening(); micTurns.execute { try { Thread.sleep(120); activity.ears.takeMicBack() } catch (_: Throwable) { } }; return ok("ok") }
+    @JavascriptInterface fun dgState(): String = JSONObject().put("open", activity.ears.isOpen()).put("mic", activity.ears.hasMic()).toString()
     // listening for "stop / pause / continue / end" while she is talking
     private val barge by lazy { BargeEars(activity) }
     @JavascriptInterface fun bargeReady(): String = barge.ready().toString()

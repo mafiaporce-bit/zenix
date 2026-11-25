@@ -1182,7 +1182,7 @@ setInterval(() => {
     if(talkBusy()){ if(away) awaySince = now; return; }
     // ears that died silently (it happens behind other apps): start them again
     const dgOn = typeof dg!=='undefined' && dg.active;
-    if(!dgOn && off.brain==='own' && !nativeSpeakResolve && off.earsAt && now - off.earsAt > 15000){ off.earsAt = now; try{ Native.stopListening(); }catch(e){} offListen(); }
+    if(!dgOn && off.brain==='own' && Z.ears==='online' && !nativeSpeakResolve && off.earsAt && now - off.earsAt > 15000){ off.earsAt = now; try{ Native.stopListening(); }catch(e){} offListen(); }
     if(off.fromWake && !off.heard && off.wakeAt && now - off.wakeAt > 20000 && !off.thinking){ endOffline(true); addMsg('sys', 'Voice chat ended (nobody spoke)'); idleLook(); return; }
     if(!off.quietSince) return;
     if(away){
@@ -1504,6 +1504,7 @@ clientTools.phone_screen = async ({action, text, big}) => {
   return reply(await screenDo(a, arg));
 };
 /* the same thing as an instant command (no brain, no waiting) */
+let scrollStop = 0;   // "stop scrolling" ends a long scroll that is still going
 function screenInstant(action, arg, times){
   return async () => {
     if(!Native.ctl) return null;
@@ -1511,8 +1512,8 @@ function screenInstant(action, arg, times){
     if(!ctlOn()){ toast('Settings → Control other apps → Turn on'); return CTL_OFF; }
     if(SCREEN_OTHER.includes(action) && !document.hidden) return 'That one is for other apps. Open the app first, then tell me, and I\'ll do it while my circle floats on top.';
     lastScreen = {action, arg, t: Date.now()};
-    let r = null;
-    for(let i = 0; i < (times || 1); i++){ r = await screenDo(action, arg); if(!r.ok) break; if(i < (times || 1) - 1) await new Promise(x => setTimeout(x, 380)); }
+    let r = null; const began = Date.now();
+    for(let i = 0; i < (times || 1); i++){ r = await screenDo(action, arg); if(!r.ok || scrollStop > began) break; if(i < (times || 1) - 1) await new Promise(x => setTimeout(x, 380)); }
     if(!r.ok) return r.message;
     return SCREEN_QUIET[action] ? {silent:true, note:SCREEN_QUIET[action]} : r.message;
   };
@@ -1998,6 +1999,11 @@ function matchInstant(raw){
   if((m = low.match(/^(?:turn\s+)?(?:the\s+)?(?:volume|sound)\s+(up|down)$/)) || (m = low.match(/^(?:turn\s+)?(up|down)\s+(?:the\s+)?(?:volume|sound)$/))){
     const d = m[1]; return async () => { showAction('🔊 Volume ' + d); return nat('volume', d, ''); };
   }
+  if((m = low.match(/^(increase|raise|decrease|lower|reduce)\s+(?:the\s+|my\s+)?(?:volume|sound)$/)) || (m = low.match(/^(?:make\s+it\s+|(?:the\s+)?(?:volume|sound)\s+)?(louder|higher|quieter|lower|softer)$/)) && /volume|sound|make it|louder|quieter|softer/.test(low)){
+    const d = /increase|raise|louder|higher/.test(m[1]) ? 'up' : 'down'; return async () => { showAction('🔊 Volume ' + d); return nat('volume', d, ''); };
+  }
+  if(/^(?:mute|silence)\s+(?:the\s+|my\s+)?(?:volume|sound|phone)$/.test(low)) return async () => nat('volume', 'mute', '');
+  if(/^stop\s+(?:the\s+)?scroll(?:ing)?$|^stop\s+(?:moving|swiping)$/.test(low)) return async () => { scrollStop = Date.now(); return {silent:true, note:'⏹ Stopped scrolling'}; };
   if((m = low.match(/^(?:set\s+)?(?:the\s+)?(?:volume|sound)\s+(?:to|at)\s+(\d{1,3})\s*(?:%|percent)?$/))){
     const v = Math.min(100, +m[1]); return async () => { showAction('🔊 Volume ' + v); return nat('volume', 'set', v); };
   }
@@ -2021,7 +2027,9 @@ function matchInstant(raw){
 /* run an instant command; anything it can't do cleanly goes to the brain as usual */
 async function runInstant(fn, text, speakIt, after){
   speech.muted = false;
+  const tCmd = performance.now();
   let r = null; try{ r = await fn(); }catch(e){ r = null; logEv('error', 'instant command failed: ' + e.message); }
+  if(r) Z.lastCmd = {text: String(text).slice(0, 60), ms: Math.round(performance.now() - tCmd), at: Date.now()};
   logEv('quick', r ? (r.silent ? r.note : r) : 'not handled here, passed to the brain');
   if(r && window.ZenixOrb && window.ZenixOrb.done) window.ZenixOrb.done();
   if(!r){ return ownRespond(text, speakIt, after); }
@@ -2074,42 +2082,160 @@ const listenLang = () => off.langFallback || settings.offlineLang;
 /* when no voice chat is running, the Talk screen goes back to its resting look */
 function idleLook(){ if((off.active && off.kind==='talk') || convo || connecting) return; setOrb('idle'); $('modeLabel').textContent=''; }
 function offlineReady(){ if(!Native || !Native.offlineStatus) return false; try{ return JSON.parse(Native.offlineStatus()).state==='ready'; }catch(e){ return false; } }
-/* no working internet right now (the phone tells us; "Wi-Fi on but no internet" counts as down) */
-/* The phone's own "internet works" flag can be wrong on some networks, so a "down" answer is double-checked
-   with a real quick request before Zenix goes offline. */
-const netProbe = { okAt: 0, failAt: 0, busy: null };
-function probeNet(){
-  if(netProbe.busy) return netProbe.busy;
-  const c = new AbortController(); const t = setTimeout(() => c.abort(), 2500);
-  const host = settings.provider==='openrouter' ? 'https://openrouter.ai/api/v1/models' : 'https://api.anthropic.com/v1/models';
-  netProbe.busy = fetch(host, {method:'HEAD', mode:'no-cors', cache:'no-store', signal:c.signal})
-    .then(() => { netProbe.okAt = Date.now(); return true; }, () => { netProbe.failAt = Date.now(); return false; })
-    .finally(() => { clearTimeout(t); netProbe.busy = null; });
-  return netProbe.busy;
+/* ====================== ZENIX's nervous system: every part has its own health ======================
+   Ears, brain, voice and phone control are separate parts. One failing never switches another off, and
+   device commands never wait for the internet.
+   Nothing here trusts the phone's "connected" flag: on a real phone it said "no internet" while the internet
+   worked, which is what made her go offline by mistake. Only real evidence counts: a listener's line dropping,
+   a real request failing or timing out, a real request working. Silence is never treated as a failure. */
+const Z = {
+  net:         {state:'unknown', at:0, ms:0},      // ok | slow | down | unknown   (from real requests only)
+  earsOnline:  {state:'unknown', err:'', at:0},    // ok | failed | unknown
+  cloudAI:     {state:'unknown', err:'', at:0},
+  voiceOnline: {state:'unknown', err:'', at:0},
+  ears:'online',            // which ears are in use right now: online | offline
+  since:0, reason:'', failoverMs:0, t0:0, backoff:8000, nextTry:0, okStreak:0, recovering:false, failing:false, lastRecover:0,
+  count:0, lastHeard:null, lastCmd:null, conf:null, lastKey:'', lastKeyAt:0, lastKeyEars:'', partialAt:0, loudStart:0, loudAt:0, told:0
+};
+const netFresh = ms => Date.now() - Z.net.at < ms;
+let probeBusy = null;
+/* one real, tiny request to two different places: the only way to know the internet works */
+function probeNet(ms){
+  if(probeBusy) return probeBusy;
+  const t0 = performance.now(), limit = ms || 2000;
+  const one = url => { const c = new AbortController(); const t = setTimeout(() => c.abort(), limit);
+    return fetch(url, {method:'HEAD', mode:'no-cors', cache:'no-store', signal:c.signal}).finally(() => clearTimeout(t)); };
+  const brainHost = settings.provider==='openrouter' ? 'https://openrouter.ai/api/v1/models' : 'https://api.anthropic.com/v1/models';
+  const tries = [one(brainHost), one('https://www.gstatic.com/generate_204')];
+  const any = new Promise((res, rej) => { let bad = 0; tries.forEach(p => p.then(res, () => { if(++bad === tries.length) rej(); })); });
+  probeBusy = any.then(() => { const d = Math.round(performance.now() - t0); Z.net = {state: d > 1500 ? 'slow' : 'ok', at:Date.now(), ms:d}; return true; },
+                       () => { Z.net = {state:'down', at:Date.now(), ms:Math.round(performance.now() - t0)}; return false; })
+                 .finally(() => { probeBusy = null; });
+  return probeBusy;
 }
-function netDown(){
-  if(!navigator.onLine) return true;
-  let phoneSaysDown = false; try{ phoneSaysDown = !!(Native.online && Native.online()==='false'); }catch(e){}
-  if(!phoneSaysDown) return false;
-  if(Date.now() - netProbe.okAt < 60000) return false;     // a real request just worked: the internet is fine
-  if(Date.now() - netProbe.failAt < 20000) return true;    // a real request just failed too
-  probeNet(); return false;                                  // not sure yet: stay online, the check runs in the background
-}
-function wantOffline(){ return settings.mode==='offline' || (settings.mode==='auto' && !navigator.onLine && offlineReady()); }
-/* the internet dropped in the middle of an online voice chat: the offline brain takes over without ending the chat */
-function switchOffline(){
-  if(!(off.active && off.kind==='talk' && off.brain==='own') || tr.on) return false;
-  if(settings.mode!=='auto' || !offlineReady()) return false;
-  if(navigator.onLine && !off.probeFailed){ probeNet().then(ok => { if(!ok && off.active){ off.probeFailed = true; switchOffline(); off.probeFailed = false; } }); return false; }
-  stopSpeech(); try{ dgClose(); }catch(e){} try{ Native.stopListening(); }catch(e){}
-  off.brain = 'offline'; off.thinking = false; off.langFallback = ''; srErrs = 0;
-  $('dot').className = 'dot busy'; $('statusText').textContent = 'Offline';
-  addMsg('sys', 'No internet: offline Zenix took over'); toast('No internet. Offline Zenix took over.');
-  setTimeout(offListen, 250);
+function wantOffline(){ return settings.mode==='offline'; }   // only when he chose it: otherwise each part looks after itself
+let earsLocal = false;   // (full offline mode) this phone has no offline voice pack: Zenix listens with her own ears
+const localEarsOk = () => { try{ return !!(Native.localEarsReady && Native.localEarsReady()==='true'); }catch(e){ return false; } };
+const earsName = () => off.brain!=='own' ? (earsLocal ? 'own offline ears' : 'phone offline')
+  : Z.ears==='offline' ? (localEarsOk() ? 'own offline ears' : 'phone offline')
+  : (typeof dg!=='undefined' && dg.active ? (dg.flux ? 'deepgram flux' : 'deepgram') : 'phone online');
+const listenLabel = () => off.brain!=='own' ? 'Listening… (offline)' : Z.ears==='offline' ? 'Listening… (offline ears)' : 'Listening…';
+
+/* Online listening has REALLY failed (a dropped line, a network error, no answer while he is talking).
+   Decide in about a second whether it is the internet or only this provider, then carry on with ears that work. */
+function tellOffline(){ if(Date.now() - Z.told > 120000){ Z.told = Date.now(); toast('No internet. I can still hear you and control your phone.'); } }   // said once, not at every blink
+function earsFail(reason, o){
+  o = o || {};
+  if(!(off.active && off.kind==='talk') || tr.on || off.brain!=='own') return false;
+  if(Z.ears==='offline' || Z.failing) return true;
+  Z.t0 = performance.now();
+  Z.earsOnline = {state:'failed', err:String(reason).slice(0, 120), at:Date.now()};
+  logEv('ears', 'online listening failed: ' + reason);
+  if(o.dropped && localEarsOk()){
+    // the line died in the middle of a chat: her own ears take over this instant so no word is lost, and the reason is checked beside it
+    goOfflineEars(reason, !!o.recent);
+    probeNet(1400).then(ok => {
+      if(!ok){ tellOffline(); return; }
+      logEv('ears', 'the internet still works: only the listening service dropped');
+      // a line that keeps dropping while the internet is fine is left alone for a few minutes: the other online listener is used instead
+      const now = Date.now(); Z.dgDrops = (Z.dgDrops || []).filter(x => now - x < 120000); Z.dgDrops.push(now);
+      if(o.provider==='deepgram' && Z.dgDrops.length >= 3 && Native.startListeningOnline){ dg.badUntil = now + 300000; Z.dgDrops = []; logEv('ears', 'Deepgram dropped 3 times in 2 minutes with the internet fine: using the phone\'s online listening for 5 minutes'); }
+      if(Z.ears==='offline' && Date.now() - Z.lastRecover > 60000){ Z.okStreak = 1; Z.nextTry = Date.now() + 2500; }   // not flapping: go back soon
+    });
+    return true;
+  }
+  Z.failing = true;
+  const decide = netOk => {
+    Z.failing = false;
+    if(!(off.active && off.kind==='talk') || Z.ears==='offline') return;
+    if(netOk && o.provider==='deepgram' && Native.startListeningOnline){   // the internet is fine, only Deepgram is not: use the other online listener
+      dg.failed = true; dg.failedAt = Date.now(); try{ dgClose(); }catch(e){}
+      logEv('ears', 'the internet works, only Deepgram is down: using the phone\'s online listening');
+      if(!talkBusy()) offListen();
+      return;
+    }
+    if(netOk && o.provider==='phone'){ if(o.retry) o.retry(); return; }   // not the internet: the usual handling for that error
+    tellOffline(); goOfflineEars(reason, !!o.recent);
+  };
+  if(netFresh(3000) && Z.net.state==='down') decide(false); else probeNet(1400).then(decide);
   return true;
 }
-let earsLocal = false;   // this phone has no offline voice pack: Zenix listens with her own ears
-const localEarsOk = () => { try{ return !!(Native.localEarsReady && Native.localEarsReady()==='true'); }catch(e){ return false; } };
+function goOfflineEars(reason, withRecent){
+  Z.ears = 'offline'; Z.since = Date.now(); Z.reason = String(reason).slice(0, 120); Z.count++; Z.okStreak = 0;
+  // an internet that keeps coming and going: wait longer each time before trusting it again
+  Z.backoff = (Date.now() - Z.lastRecover < 60000) ? Math.min(60000, Math.max(20000, Z.backoff*2)) : 8000;
+  Z.nextTry = Date.now() + Math.max(10000, Z.backoff);
+  srErrs = 0; off.langFallback = '';
+  logEv('ears', 'switched to offline ears (' + Z.reason + ')');
+  if(talkBusy()){ try{ dgClose(); }catch(e){} return; }   // she is mid-sentence: the offline ears start when she finishes
+  startOfflineEars(withRecent);
+}
+function startOfflineEars(withRecent){
+  setOrb('listening'); $('modeLabel').textContent = listenLabel(); off.earsAt = Date.now();
+  if(localEarsOk()){
+    if(withRecent && Native.startListeningLocalRecent){ dg.active = false; dg.paused = true; Native.startListeningLocalRecent(); }   // hands over the last 2 s he said
+    else { try{ dgClose(); }catch(e){} try{ Native.stopListening(); }catch(e){} Native.startListeningLocal(); }
+  } else { try{ dgClose(); }catch(e){} Native.startListening(listenLang()); }   // no own ears downloaded: the phone's own offline listening, if it has any
+}
+/* The internet seems back. Prove it, prove the listener itself, and only then switch, never in the middle of a command. */
+function tryOnlineEars(){
+  if(talkBusy() || Date.now() - Z.partialAt < 1500) { Z.nextTry = Date.now() + 1000; return Promise.resolve('later'); }
+  const wantDG = IS_APP && settings.ears==='deepgram' && !!dgKey() && settings.offlineLang!=='fil-PH' && Date.now() > (dg.badUntil || 0);
+  const done = how => { Z.ears = 'online'; Z.lastRecover = Date.now(); Z.earsOnline = {state:'ok', err:'', at:Date.now()}; logEv('ears', 'back on online ears (' + how + ') after ' + Math.round((Date.now() - Z.since)/1000) + ' s offline'); $('modeLabel').textContent = listenLabel(); return true; };
+  if(wantDG && Native.dgOpenIdle){
+    return new Promise(res => {
+      const mine = dg.opening = {resolve: () => res(true), reject: () => res(false)};
+      const flux = !!Native.dgOpenFlux && !dg.noFlux;
+      Native.dgOpenIdle(dgKey(), 'en', flux ? 'true' : 'false', JSON.stringify(hearWords()));
+      setTimeout(() => { if(dg.opening === mine){ dg.opening = null; res(false); } }, 6000);
+    }).then(ok => {
+      if(!ok || !(off.active && off.kind==='talk') || Z.ears!=='offline'){ try{ Native.dgClose(); }catch(e){} return false; }
+      if(talkBusy() || Date.now() - Z.partialAt < 1500){ try{ Native.dgClose(); }catch(e){} Z.nextTry = Date.now() + 1500; return 'later'; }   // he started talking meanwhile: don't cut him off
+      dg.active = true; dg.paused = true; dg.failed = false; dg.flux = !!Native.dgOpenFlux && !dg.noFlux;
+      Native.dgTakeMic(); done('Deepgram'); dgResume(); off.earsAt = Date.now();
+      return true;
+    });
+  }
+  if(Date.now() - (Z.phoneBadAt || 0) < 300000){ Z.nextTry = Date.now() + 60000; return Promise.resolve('later'); }   // that listener itself was broken a moment ago: no point bouncing back to it
+  done('phone'); try{ Native.stopListening(); }catch(e){} setTimeout(offListen, 150);
+  return Promise.resolve(true);
+}
+setInterval(() => {
+  const now = Date.now();
+  if(!(off.active && off.kind==='talk' && off.brain==='own') || tr.on) return;
+  if(Z.ears==='offline'){
+    if(Z.recovering || now < Z.nextTry) return;
+    Z.recovering = true;
+    probeNet(2000).then(ok => {
+      if(!ok){ Z.okStreak = 0; Z.backoff = Math.min(60000, Math.round(Z.backoff*1.6)); Z.nextTry = Date.now() + Z.backoff; Z.recovering = false; return; }
+      if(++Z.okStreak < 2){ Z.nextTry = Date.now() + 3000; Z.recovering = false; return; }   // it has to stay up, not just blink
+      return tryOnlineEars().then(r => {
+        Z.recovering = false;
+        if(r !== false) return;
+        if(Native.startListeningOnline && !talkBusy() && Date.now() - Z.partialAt > 1500 && off.active && Z.ears==='offline'){
+          dg.failed = true; dg.failedAt = Date.now(); Z.ears = 'online'; Z.lastRecover = Date.now();
+          logEv('ears', 'the internet is back but Deepgram is not: using the phone\'s online listening for now');
+          try{ Native.stopListening(); }catch(e){} setTimeout(offListen, 150); return;
+        }
+        Z.okStreak = 0; Z.backoff = Math.min(60000, Math.round(Z.backoff*1.6)); Z.nextTry = Date.now() + Z.backoff; logEv('ears', 'the internet answers but the online listener doesn\'t yet: staying on offline ears');
+      });
+    }).catch(() => { Z.recovering = false; });
+    return;
+  }
+  // online: he started talking over a second ago and Deepgram hasn't answered at all. Silence never counts, and neither does a slow answer:
+  // only a real check that finds no internet switches the ears. (A dead line is also noticed by itself within seconds.)
+  if(typeof dg!=='undefined' && dg.active && !dg.paused && Z.loudStart && now - Z.loudAt < 500 && now - Z.loudStart > 1200 && (dg.lastMsgAt || 0) < Z.loudStart + 200 && now - (Z.softAt || 0) > 10000){
+    Z.softAt = now;
+    probeNet(1200).then(ok => { if(!ok && dg.active && Z.ears==='online') earsFail('no internet while he was talking', {provider:'deepgram', dropped:true, recent:!dg.paused}); });
+  }
+}, 500);
+window.zenixConf = (c, buf) => { Z.conf = {c: +c, at: Date.now(), buf: !!buf}; };   // how sure her offline ears were, and whether the words include the handed-over seconds
+window.zenixZ = Z;   // read by the diagnostics screen and by the automatic tests (states only: no words, no keys)
+/* a question that needs the internet, asked while there is none */
+async function answerWithoutInternet(text){
+  if(offlineReady() && settings.mode!=='cloud'){ logEv('brain', 'no internet: the on-phone brain answers'); return offlineHandle(text); }
+  return 'Internet is unavailable right now, bro. I can still control your phone: scroll, open apps, alarms, calls.';
+}
 
 function parseTime(t){
   const m = t.match(/(\d{1,2})(?:[:.\s](\d{2}))?\s*(a\.?m\.?|p\.?m\.?|ng umaga|ng gabi|ng hapon)?/i);
@@ -2185,7 +2311,7 @@ function offlineSay(text, speakIt){
 function offListen(){
   if(!off.active || off.kind!=='talk') return;
   bargeOff();
-  setOrb('listening'); $('modeLabel').textContent = off.brain==='own' ? 'Listening…' : 'Listening… (offline)';
+  setOrb('listening'); $('modeLabel').textContent = listenLabel();
   if(Native.setOrbMode) Native.setOrbMode('listening');
   if(!off.quietSince) off.quietSince = Date.now();
   off.earsAt = Date.now();
@@ -2195,20 +2321,22 @@ function offListen(){
     if(Native.startListeningOnline) Native.startListeningOnline(lang); else Native.startListening(lang);
     return;
   }
+  if(off.brain==='own' && Z.ears==='offline'){ startOfflineEars(false); return; }   // the online listener is down: her offline ears, same brain, same everything else
   if(off.brain==='own' && useDGEars()){ dgListen(); return; }
   if(off.brain==='own' && Native.startListeningOnline) Native.startListeningOnline(listenLang());
   else if(earsLocal && Native.startListeningLocal){ $('modeLabel').textContent = 'Listening… (offline)'; Native.startListeningLocal(); }
   else Native.startListening(listenLang());
 }
 let srErrs = 0;
-window.zenixOnListening = () => { srErrs = 0; off.earsAt = Date.now(); if(off.active && off.kind==='talk' && !tr.on) $('modeLabel').textContent = off.brain==='own' ? 'Listening…' : 'Listening… (offline)'; };
+window.zenixOnListening = () => { srErrs = 0; off.earsAt = Date.now(); if(off.active && off.kind==='talk' && !tr.on) $('modeLabel').textContent = listenLabel();
+  if(Z.t0 && Z.ears==='offline'){ Z.failoverMs = Math.round(performance.now() - Z.t0); Z.t0 = 0; logEv('ears', 'offline ears listening ' + Z.failoverMs + ' ms after the failure'); } };
 let partialTimer=null;
 const HANGING = /\b(and|or|but|so|because|cause|at|to|the|a|an|for|with|from|of|in|on|into|about|around|like|um+|uh+|uhm|er|ah|my|your|his|her|is|are|was|if|when|then|that|this|can|could|would|will|maybe|also|plus|please|ng|sa|na|yung|ang|mga|kasi|tapos|pero|para|si|ni|kay)$/i;
 function endWait(t){ const w=(t||'').trim().toLowerCase().replace(/[.,!?…]+$/,''); return HANGING.test(w) ? 2300 : 1150; }
 window.zenixOnPartial = (t) => {
   if(dict.on){ dict.partial(t); return; }
   if(!(off.active && off.kind==='talk')) return;
-  off.earsAt = Date.now();
+  off.earsAt = Date.now(); Z.partialAt = Date.now();
   $('liveLine').textContent='You: '+t;
   clearTimeout(partialTimer);
   if(t && t.trim()){ off.quietSince = Date.now(); partialTimer = setTimeout(()=>{ if(Native.finishListening) Native.finishListening(); }, endWait(t)); }
@@ -2217,7 +2345,16 @@ window.zenixOnSpeech = async (t) => {
   if(dict.on){ dict.done(t); return; }
   clearTimeout(partialTimer);
   if(!off.active || off.kind!=='talk') return;
-  if(t) logEv('heard', '[' + (off.brain!=='own' ? (earsLocal ? 'own offline ears' : 'phone offline') : (typeof dg!=='undefined' && dg.active ? (dg.flux ? 'deepgram flux' : 'deepgram') : 'phone')) + '] ' + t);
+  const heardBy = earsName();
+  if(t) logEv('heard', '[' + heardBy + '] ' + t);
+  if(t){   // the same words arriving from two listeners during a switch are carried out once
+    const key = String(t).toLowerCase().replace(/[^a-z0-9 ]/g, '').replace(/\s+/g, ' ').trim();
+    // only words that came out of the handed-over seconds can be a repeat; anything he says after the switch is a new command
+    const fromBuffer = !!(Z.conf && Z.conf.buf && Date.now() - Z.conf.at < 800);
+    if(key && fromBuffer && Z.lastKeyEars && Z.lastKeyEars !== heardBy && Date.now() - Z.lastKeyAt < 8000 && (key === Z.lastKey || (' ' + Z.lastKey).endsWith(' ' + key))){ logEv('skip', 'the same words came from both listeners: done once'); offListen(); return; }
+    Z.lastKey = key; Z.lastKeyAt = Date.now(); Z.lastKeyEars = heardBy; Z.lastHeard = {at: Date.now(), ears: heardBy};
+    if(Z.t0 && Z.ears==='offline'){ Z.failoverMs = Math.round(performance.now() - Z.t0); Z.t0 = 0; }
+  }
   if(t && !tr.on){   // "Hey Zenix" (however it was heard) is how he called her, not part of the question
     t = t.replace(/^\s*(?:(?:hey|hi|ok|okay|hello)[,\s]+)?(?:zenix|xenix|zenics|zennix|zinnix|xanax|zanax|xanex|zen ?nix|zen ?ix|zen ?ex|zen x|zee ?nix|xen ?ix)\b[,.!?\s]*/i, '').trim();
     if(!t){ offListen(); return; }
@@ -2233,7 +2370,36 @@ window.zenixOnSpeech = async (t) => {
     if(off.brain==='own'){ speech.onIdle=()=>endOffline(); speakEnqueue('Okay bro, talk later!'); return; }
     offlineSay('Okay bro, talk later!', true); off.endAfterSpeak=true; return; }
   if(tr.on){ trHandle(t); return; }
-  if(off.brain==='own'){ const ins = matchInstant(t); if(ins){ off.quietSince = 0; runInstant(ins, t, true, ()=>offListen()); return; } ownRespond(t, true, ()=>offListen()); return; }
+  if(off.brain==='own'){
+    const ins = matchInstant(t);
+    if(ins){   // a device command: done on the phone itself, whichever ears heard it, internet or not
+      // her offline ears weren't sure, and it's something that can't be undone lightly: ask instead of guessing
+      const unsure = /offline/.test(heardBy) && Z.conf && Date.now() - Z.conf.at < 1500 && Z.conf.c < 0.5 && /^(?:zenix[,\s]+)?(?:please\s+)?(?:call|phone|ring|tawagan|close|exit|quit|kill|lock)\b/i.test(t.trim());
+      if(unsure){ logEv('skip', 'not sure enough of those words to act (' + Z.conf.c + ')'); const say = 'I think you said "' + t + '". Say it once more and I\'ll do it.'; addMsg('ai', say); speech.onIdle = () => offListen(); speakEnqueue(say); return; }
+      off.quietSince = 0; runInstant(ins, t, true, ()=>offListen()); return;
+    }
+    // a question for the brain. With no internet, don't make him wait for a timeout: the on-phone brain (or a plain answer) right away
+    if(Z.net.state==='down' ? (Z.ears==='online' || !netFresh(2500)) : (Z.ears==='offline' && !netFresh(2500))) await probeNet(1400);   // an old "no internet" reading is never trusted: look again
+    if(Z.net.state==='down' && netFresh(8000)){
+      const shaky = /offline/.test(heardBy) && Z.conf && Date.now() - Z.conf.at < 1500 && Z.conf.c < 0.6;
+      const noBrain = !(offlineReady() && settings.mode!=='cloud');
+      // not a phone command, and either she isn't sure of the words or she'd only repeat "no internet": show it, don't keep saying it
+      if(shaky || (noBrain && Date.now() - (Z.saidNoNet || 0) < 45000)){
+        logEv('skip', shaky ? 'offline ears not sure of those words, and it isn\'t a phone command' : 'needs the internet (already said so)');
+        $('liveLine').textContent = shaky ? 'I didn\'t catch that. Phone commands still work.' : 'That needs the internet. Phone commands still work.';
+        offListen(); return;
+      }
+      if(noBrain) Z.saidNoNet = Date.now();
+      off.thinking = true; $('modeLabel').textContent = 'Thinking…'; setOrb('thinking');
+      let r = ''; try{ r = await answerWithoutInternet(t); }catch(e){ r = 'Internet is unavailable right now, bro.'; } finally{ off.thinking = false; }
+      if(!off.active) return;
+      ownMsgs.push({role:'user', content:t}); ownMsgs.push({role:'assistant', content:r}); trimOwnMsgs();
+      addMsg('ai', r); if(off.kind==='talk') $('liveLine').textContent = 'Zenix: ' + r;
+      speech.streamOpen = false; speech.onIdle = () => offListen(); speakEnqueue(r); pumpSpeech();
+      return;
+    }
+    ownRespond(t, true, ()=>offListen()); return;
+  }
   const ins = matchInstant(t);   // open an app, scroll, alarm…: the same instant commands, no internet needed
   if(ins){
     let r = null; try{ r = await ins(); }catch(e){ r = null; }
@@ -2244,14 +2410,17 @@ window.zenixOnSpeech = async (t) => {
   const reply = await offlineHandle(t);
   if(off.active) offlineSay(reply, true);
 };
-window.zenixOnSpeechError = (code) => {
+window.zenixOnSpeechError = (code, skipNetCheck) => {
   if(dict.on){ dict.done(''); return; }
   if(!off.active || off.kind!=='talk') return;
   if(code!==6 && code!==7) logEv('mic', 'listening error ' + code);
   off.earsAt = Date.now();
   if(code===6 || code===7){ srErrs = 0; trMiss(); setTimeout(offListen, 350); return; }   // nothing was said: keep listening
   srErrs++;
-  // no internet: the offline brain takes over
+  // the online listener reports a network or server problem: check for real, and switch ears if the internet is gone
+  if(off.brain==='own' && Z.ears==='online' && !tr.on && !skipNetCheck && (code===1 || code===2 || code===4 || code===11 || code===12 || code===13)){
+    srErrs--; earsFail('phone listener error ' + code, {provider:'phone', retry: () => window.zenixOnSpeechError(code, true)}); return;   // an error is its own evidence: always look again, however recently the internet worked
+  }
   // this phone has no ears for that language: carry on in US English
   if((code===12 || code===13) && !off.langFallback && settings.offlineLang!=='en-US'){ off.langFallback = 'en-US'; setTimeout(offListen, 300); return; }
   // offline, and the phone can't listen without internet (no voice pack): Zenix uses her own ears
@@ -2259,7 +2428,9 @@ window.zenixOnSpeechError = (code) => {
   // busy mic or a network blip: try again, a little slower each time, then give up instead of looping forever
   // (behind another app these errors are normal, so there she just keeps trying)
   if((code===8 || code===5 || code===3 || code===2 || code===1) && (srErrs <= 12 || document.hidden)){ setTimeout(offListen, Math.min(3000, 350*srErrs)); return; }
-  toast(code===-3 ? 'Voice chat on a computer needs Chrome or Edge' : code===9 ? 'Allow the microphone for Zenix, then tap Talk again' : (off.brain!=='own' && (code===-1 || code===12 || code===13 || code===1 || code===2)) ? 'This phone can\'t listen offline yet. Turn on "Hey Zenix" once: it downloads Zenix\'s own offline ears.'
+  // the phone's online listener won't work although the internet does: her own ears keep the chat going instead of ending it
+  if(off.brain==='own' && Z.ears==='online' && !tr.on && code!==9 && code!==3 && code!==-3 && localEarsOk()){ Z.phoneBadAt = Date.now(); Z.earsOnline = {state:'failed', err:'phone listener error ' + code, at:Date.now()}; goOfflineEars('the phone\'s online listener gave error ' + code, false); return; }
+  toast(code===-3 ? 'Voice chat on a computer needs Chrome or Edge' : code===9 ? 'Allow the microphone for Zenix, then tap Talk again' : ((off.brain!=='own' || Z.ears==='offline') && (code===-1 || code===12 || code===13 || code===1 || code===2)) ? 'This phone can\'t listen offline yet. Turn on "Hey Zenix" once: it downloads Zenix\'s own offline ears.'
     : (code===1 || code===2) ? 'Listening needs the internet. Check your connection.' : code===3 ? 'Another app is using the microphone.' : 'Mic problem ('+code+'). Tap Talk again.');
   endOffline(); endedNote('The microphone stopped.');
 };
@@ -2279,6 +2450,7 @@ function startOffline(kind, brain='offline'){
   if(brain==='offline' && !offlineReady()){ toast('Download the offline brain first (Settings → Offline mode)'); goMe(); return false; }
   if(brain==='own' && !brainKey()){ toast(settings.provider==='openrouter' ? 'Add your OpenRouter key in Settings first' : 'Add your Claude key in Settings first'); goMe(); return false; }
   off.active=true; off.kind=kind; off.brain=brain; off.endAfterSpeak=false; off.quietSince=0; awaySince=0; off.langFallback=''; srErrs=0; if(typeof dg!=='undefined') dg.failed=false;
+  Z.ears='online'; Z.failing=false; Z.recovering=false; Z.okStreak=0; Z.t0=0; Z.loudStart=0;   // every chat starts by trying the best ears
   if(brain==='own'){ $('dot').className='dot on'; $('statusText').textContent='Online'; }
   else { $('dot').className='dot busy'; $('statusText').textContent='Offline'; }
   if(kind==='talk') addMsg('sys', brain==='own' ? 'Voice chat started' : 'Offline voice chat started');
@@ -2338,8 +2510,6 @@ $('brainBtn').onclick = () => {
 };
 document.querySelectorAll('[data-mode]').forEach(b=>b.onclick=()=>{ settings.mode=b.dataset.mode; store.set('settings',settings); renderOffline(); toast(b.dataset.mode==='auto'?'Auto: cloud when online, offline when not':b.dataset.mode==='offline'?'Zenix will stay offline':'Zenix will always use the cloud'); });
 document.querySelectorAll('[data-lang]').forEach(b=>b.onclick=()=>{ settings.offlineLang=b.dataset.lang; store.set('settings',settings); renderOffline(); });
-window.addEventListener('online', ()=>{ if(settings.mode==='auto') toast('Back online'); });
-window.addEventListener('offline', ()=>{ if(settings.mode==='auto') toast('No internet — Zenix will use offline mode'); });
 renderOffline();
 
 /* ---------- Own brain: Claude API direct + free phone ears + Kokoro voice ---------- */
@@ -2731,8 +2901,11 @@ function speakEnqueue(text){
   if(!expressiveOn()) text = stripTags(text);
   if(!text || !/[a-z0-9\u00C0-\uFFFF\]]/i.test(text)) return;
   const item = { text, wav:null };
-  if(settings.voice.startsWith('el:') && elKey()){ item.wav = elTTS(text).catch(()=>null); speech.q.push(item); pumpSpeech(); return; }
-  if(settings.voice.startsWith('dg:') && dgKey() && !isTagalog(text)){ item.wav = dgTTS(text).catch(()=>null); speech.q.push(item); pumpSpeech(); return; }
+  // the online voice is skipped while the internet is known to be down or the voice service just failed: the phone's own voice answers at once
+  const voiceUp = !(Z.net.state==='down' && netFresh(20000)) && !(Z.voiceOnline.state==='failed' && Date.now() - Z.voiceOnline.at < 30000) && !(Z.ears==='offline' && !(Z.net.state!=='down' && netFresh(6000)));
+  const mark = pr => pr.then(a => { Z.voiceOnline = {state:'ok', err:'', at:Date.now()}; return a; }, e => { Z.voiceOnline = {state:'failed', err:String((e && e.message) || e).slice(0, 120), at:Date.now()}; logEv('voice', 'online voice failed: ' + Z.voiceOnline.err + ' → phone voice'); return null; });
+  if(voiceUp && settings.voice.startsWith('el:') && elKey()){ item.wav = mark(elTTS(text)); speech.q.push(item); pumpSpeech(); return; }
+  if(voiceUp && settings.voice.startsWith('dg:') && dgKey() && !isTagalog(text)){ item.wav = mark(dgTTS(text)); speech.q.push(item); pumpSpeech(); return; }
   const cloudVoice = settings.voice.startsWith('dg:') || settings.voice.startsWith('el:');
   const usePhone = settings.voice==='phone' || cloudVoice || isTagalog(text) || !kokoro;
   if(!usePhone){ item.wav = genChain = genChain.then(() => kokoro.generate(text, {voice:settings.voice})).catch(() => null); }
@@ -2756,7 +2929,7 @@ async function pumpSpeech(){
   speech.playing = true; setOrb('speaking'); $('modeLabel').textContent='Zenix is speaking'; if(Native && Native.setOrbMode) Native.setOrbMode('speaking');
   try{
     // a cloud voice that takes too long is skipped for the phone's own voice, so she never goes silent
-    const audio = item.wav ? await Promise.race([item.wav, new Promise(r => setTimeout(() => r(null), 15000))]) : null;
+    const audio = item.wav ? await Promise.race([item.wav, new Promise(r => setTimeout(() => r(null), Z.net.state==='ok' && netFresh(30000) ? 15000 : 6000))]) : null;
     if(audio){
       const url = URL.createObjectURL(audio.toBlob());
       if(typeof vizCtx!=='undefined' && vizCtx && vizCtx.state!=='running'){ try{ await vizCtx.resume(); }catch(e){} }
@@ -2839,7 +3012,7 @@ async function ownRespond(text, speakIt, after, opts={}){
   if(!opts.quiet){ turnStart = performance.now(); turnTok = 0; turnSearched = false; $('modeLabel').textContent = 'Thinking…'; setOrb('thinking'); }
   speech.streamOpen = true; speech.onIdle = after || null;
   let full = '';
-  try{ full = await ownTurn(text, speakIt, opts); }
+  try{ full = await ownTurn(text, speakIt, opts); if(full) Z.cloudAI = {state:'ok', err:'', at:Date.now()}; }
   catch(e){
     if(e.name==='AbortError' || (opts.isCancelled && opts.isCancelled())) return;
     const why = String((e && e.message) || e);
@@ -2848,9 +3021,11 @@ async function ownRespond(text, speakIt, after, opts={}){
       return ownRespond(text, speakIt, after, Object.assign({}, opts, {retried:true, quiet:true}));
     }
     const net = /Failed to fetch|NetworkError|Load failed|network|timeout/i.test(why);
-    if(settings.mode==='auto' && offlineReady() && net){ speech.streamOpen=false; toast('No connection — offline brain answering'); const r=await offlineHandle(text); if(speakIt) speakEnqueue(r); addMsg('ai', r); pumpSpeech(); return; }
+    Z.cloudAI = {state:'failed', err:why.slice(0, 120), at:Date.now()}; logEv('brain', 'cloud brain failed: ' + why);
+    if(net) probeNet(1400);   // was it the internet, or only the brain's service? (the ears and phone control carry on either way)
+    if(settings.mode!=='cloud' && offlineReady() && net){ speech.streamOpen=false; const r=await offlineHandle(text); if(speakIt) speakEnqueue(r); addMsg('ai', r); pumpSpeech(); return; }
     full = why==='timeout' ? 'Sorry bro, that is taking too long. Check the internet and ask me again.'
-      : net ? 'Sorry bro, I can\'t reach the internet right now.'
+      : net ? 'Internet is unavailable right now, bro. I can still control your phone.'
       : 'Sorry bro, I couldn\'t reach my brain. ' + why;
     if(speakIt) speakEnqueue(full);
   }
@@ -2976,7 +3151,7 @@ const dgKey = () => (store.get('dgkey','')||'').trim();
 if(!settings.earsPicked){ if(IS_APP && settings.ears==='phone' && (store.get('dgkey','')||'').trim()) settings.ears = 'deepgram'; settings.earsPicked = true; store.set('settings', settings); }
 const useDGEars = () => {
   if(typeof dg!=='undefined' && dg.failed && Date.now() - (dg.failedAt || 0) > 40000) dg.failed = false;   // a dropped line is tried again after a little while, not given up on for the whole chat
-  return IS_APP && settings.ears==='deepgram' && !!dgKey() && settings.offlineLang!=='fil-PH' && !(typeof dg!=='undefined' && dg.failed);
+  return IS_APP && settings.ears==='deepgram' && !!dgKey() && settings.offlineLang!=='fil-PH' && !(typeof dg!=='undefined' && (dg.failed || Date.now() < (dg.badUntil || 0)));
 };
 /* the names and words the listener should get right */
 function hearWords(){
@@ -3009,6 +3184,8 @@ window.zenixDG = (id, b64, err) => {
 const dg = { active:false, paused:true, buf:'', t0:0, opening:null, failed:false };
 window.zenixDGMsg = (txt) => {
   let m; try{ m = JSON.parse(txt); }catch(x){ return; }
+  dg.lastMsgAt = Date.now(); if(Z.earsOnline.state!=='ok') Z.earsOnline = {state:'ok', err:'', at:Date.now()};
+  if(Z.net.state==='down' || Z.net.state==='unknown') Z.net = {state:'ok', at:Date.now(), ms:Z.net.ms};   // Deepgram answering is proof the internet works
   if(m.type==='TurnInfo'){
     if(dg.paused) return;
     const t = (m.transcript||'').trim();
@@ -3029,9 +3206,10 @@ window.zenixDGMsg = (txt) => {
   } else if(m.type==='UtteranceEnd' && !dg.paused && dg.buf.trim()) dgFinish();
 };
 window.zenixDGOpen = (ok, err) => { if(!ok) logEv('ears', 'Deepgram could not connect: ' + err); const w=dg.opening; dg.opening=null; if(!w) return; ok ? w.resolve() : w.reject(new Error(/401|403/.test(err||'') ? 'Deepgram key not accepted' : ('Could not connect to Deepgram '+(err||'')).trim())); };
-window.zenixDGClosed = () => { const was=dg.active; if(was) logEv('ears', 'Deepgram line dropped'); dg.active=false; dg.paused=true; if(was && off.active && off.brain==='own' && off.kind==='talk'){ dg.failed=true; dg.failedAt=Date.now(); toast('Deepgram dropped for a moment, using phone listening');
-    // if she's mid-answer, the normal "finished speaking" step starts the phone's listening (no listening to her own voice)
-    if(!(speech.playing || speech.q.length || speech.streamOpen || speech.hold)) offListen(); } };
+window.zenixDGClosed = () => {
+  const was = dg.active, listening = !dg.paused; dg.active = false; dg.paused = true;
+  if(was && off.active && off.brain==='own' && off.kind==='talk' && Z.ears==='online') earsFail('Deepgram line dropped', {provider:'deepgram', dropped:true, recent:listening});
+};
 window.zenixDGTest = (ok, msg) => { $('dgState').textContent = ok ? 'Deepgram key works ✓' : ('✗ '+msg); if(!ok) toast(msg); };
 function dgOpen(){
   const attempt = (flux) => new Promise((res, rej) => {
@@ -3077,15 +3255,22 @@ function dgFinal(t){
 }
 function dgTrackTime(){ if(dg.t0){ usage.cost += (Date.now()-dg.t0)/60000 * 0.0048; store.set('usage', usage); dg.t0=0; } }
 function dgPause(){ if(Native && Native.dgSending) Native.dgSending('false'); dg.paused=true; dgTrackTime(); }
-function dgResume(){ dg.buf=''; dg.lastT=''; dg.lastHeard=0; if(Native && Native.dgSending) Native.dgSending('true'); dg.paused=false; dg.t0=Date.now(); }
+function dgResume(){ dg.buf=''; dg.lastT=''; dg.lastHeard=0; dg.lastMsgAt=Date.now(); Z.loudStart=0; if(Native && Native.dgSending) Native.dgSending('true'); dg.paused=false; dg.t0=Date.now(); }
 function dgFinish(){ const t=dg.buf.trim(); dg.buf=''; dgPause(); if(t && window.zenixOnSpeech) window.zenixOnSpeech(t); }
 function dgClose(){ if(typeof specTurn!=='undefined' && specTurn) dgCancelEager(); dgTrackTime(); const was=dg.active; dg.active=false; dg.paused=true; if(was && Native && Native.dgClose) Native.dgClose(); }
 /* Called by offListen for Own brain when Deepgram ears are on */
 function dgListen(){
-  setOrb('listening'); $('modeLabel').textContent='Listening…'; if(Native.setOrbMode) Native.setOrbMode('listening');
+  setOrb('listening'); $('modeLabel').textContent = listenLabel(); if(Native.setOrbMode) Native.setOrbMode('listening');
   if(dg.active){ dgResume(); return; }
-  dgOpen().then(() => { if(off.active && off.kind==='talk') dgResume(); })
-    .catch(e => { dgClose(); dg.failed=true; dg.failedAt=Date.now(); toast(e.message+' — using phone listening'); if(off.active && off.kind==='talk' && Native.startListeningOnline) Native.startListeningOnline(listenLang()); });
+  let settled = false;
+  // while the line is being opened, a quick real check runs beside it: with no internet she doesn't wait 10 s to find out
+  if(!(netFresh(8000) && Z.net.state!=='down')) probeNet(1400).then(ok => {
+    if(ok || settled || dg.active) return; settled = true;
+    dg.opening = null; try{ Native.dgClose(); }catch(e){}
+    if(off.active && off.kind==='talk') earsFail('no internet when starting to listen', {provider:'deepgram'});
+  });
+  dgOpen().then(() => { if(settled){ try{ Native.dgClose(); }catch(e){} dg.active = false; return; } settled = true; if(off.active && off.kind==='talk') dgResume(); })
+    .catch(e => { if(settled) return; settled = true; dgClose(); if(off.active && off.kind==='talk') earsFail(e.message, {provider:'deepgram'}); });
 }
 
 function renderDG(){
@@ -3509,7 +3694,9 @@ void main(){
 })();
 window.ZenixOrb = ZenixOrb;
 /* mic level from the phone (0..1) */
-window.zenixRms = (v, lo, mi, hi) => { if(ZenixOrb){ if(ZenixOrb.state !== 'speaking') ZenixOrb.feed(v, lo, mi, hi); } else if(window.ZenixWave) window.ZenixWave.feed(v); };
+window.zenixRms = (v, lo, mi, hi) => {
+  if(v > 0.22){ const n = Date.now(); if(!Z.loudStart || n - Z.loudAt > 700) Z.loudStart = n; Z.loudAt = n; }
+  if(ZenixOrb){ if(ZenixOrb.state !== 'speaking') ZenixOrb.feed(v, lo, mi, hi); } else if(window.ZenixWave) window.ZenixWave.feed(v); };
 
 /* ---------- the sound wave under the ring: moves with his voice while she listens, with hers while she talks ---------- */
 window.ZenixWave = (() => {

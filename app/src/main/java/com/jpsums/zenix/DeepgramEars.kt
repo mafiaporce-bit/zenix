@@ -23,6 +23,7 @@ class DeepgramEars(private val activity: MainActivity) {
     private val client = OkHttpClient.Builder()
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(0, TimeUnit.MILLISECONDS)
+        .pingInterval(6, TimeUnit.SECONDS)     // a dead line is noticed within seconds, not minutes (slow mobile data still has time to answer)
         .build()
     @Volatile private var ws: WebSocket? = null
     @Volatile private var rec: AudioRecord? = null
@@ -33,9 +34,11 @@ class DeepgramEars(private val activity: MainActivity) {
 
     @Volatile private var flux = false
 
-    fun open(key: String, lang: String, useFlux: Boolean = false, terms: List<String> = emptyList()) {
+    /** withMic = false opens the line only (to check Deepgram is reachable) and leaves the microphone to whoever has it. */
+    fun open(key: String, lang: String, useFlux: Boolean = false, terms: List<String> = emptyList(), withMic: Boolean = true) {
         if (ws != null) { js("window.zenixDGOpen && window.zenixDGOpen(true, '')"); return }
         flux = useFlux
+        openWithMic = withMic
         val url = if (useFlux)
             "wss://api.deepgram.com/v2/listen?model=flux-general-en&encoding=linear16&sample_rate=16000&eot_threshold=0.75&eager_eot_threshold=0.5&eot_timeout_ms=4000"
         else "wss://api.deepgram.com/v1/listen?model=nova-3&language=$lang&encoding=linear16&sample_rate=16000&channels=1" +
@@ -46,13 +49,16 @@ class DeepgramEars(private val activity: MainActivity) {
         val req = Request.Builder().url(url + boost).header("Authorization", "Token $key").build()
         ws = client.newWebSocket(req, object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
+                if (!openWithMic) { lendIdle(); js("window.zenixDGOpen && window.zenixDGOpen(true, '')"); return }
                 if (startMic()) js("window.zenixDGOpen && window.zenixDGOpen(true, '')")
                 else { close(); js("window.zenixDGOpen && window.zenixDGOpen(false, 'Microphone busy or not allowed')") }
             }
             override fun onMessage(webSocket: WebSocket, text: String) {
+                val cur = ws; if (cur != null && cur !== webSocket) return   // a line that was already given up on: ignore it (no doubled commands)
                 js("window.zenixDGMsg && window.zenixDGMsg(${q(text)})")
             }
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+                val cur0 = ws; if (cur0 != null && cur0 !== webSocket) return
                 val code = response?.code?.toString() ?: ""
                 val body = try { response?.body?.string() ?: "" } catch (_: Exception) { "" }
                 cleanup()
@@ -60,6 +66,7 @@ class DeepgramEars(private val activity: MainActivity) {
                 js("window.zenixDGClosed && window.zenixDGClosed()")
             }
             override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
+                val cur0 = ws; if (cur0 != null && cur0 !== webSocket) return
                 cleanup()
                 js("window.zenixDGClosed && window.zenixDGClosed()")
             }
@@ -86,6 +93,7 @@ class DeepgramEars(private val activity: MainActivity) {
                     if (n < 0) break
                     val socket = ws ?: break
                     if (sending && n > 0) {
+                        remember(buf, n)
                         socket.send(buf.toByteString(0, n))
                         // loudness, and how much of it is low / middle / high notes (the orb moves differently for each)
                         var sum = 0.0; var lo = 0.0; var mi = 0.0; var hi = 0.0
@@ -113,21 +121,38 @@ class DeepgramEars(private val activity: MainActivity) {
         } catch (_: Exception) { false }
     }
 
-    fun setSending(on: Boolean) { sending = on }
+    fun setSending(on: Boolean) { if (on && !sending) forget(); sending = on }
 
-    /**
-     * While Zenix talks, another listener needs the microphone (the one that hears "stop" / "pause").
-     * Two listeners on one microphone starve each other, so this one lets go of it; the line to Deepgram stays open.
-     */
-    @Volatile private var lent = false
-    fun lendMic() {
-        if (ws == null || lent) return
-        val r = rec ?: return
+    // The last four seconds of what he said, kept in memory only. If the line dies in the middle of a command,
+    // the offline listener is given this so the start of the command isn't lost. Never saved, never sent anywhere else.
+    @Volatile private var openWithMic = true
+    private val ring = ByteArray(16000 * 2 * 4)
+    private var ringPos = 0
+    private var ringFill = 0
+    private fun forget() = synchronized(ring) { ringPos = 0; ringFill = 0 }
+    private fun remember(b: ByteArray, n: Int) = synchronized(ring) {
+        var i = 0
+        while (i < n) { ring[ringPos] = b[i]; ringPos = (ringPos + 1) % ring.size; i++ }
+        ringFill = minOf(ring.size, ringFill + n)
+    }
+    fun recent(): ShortArray = synchronized(ring) {
+        val n = ringFill and 1.inv()
+        val out = ShortArray(n / 2)
+        var p = (ringPos - n + ring.size * 2) % ring.size
+        if (p % 2 != 0) p = (p + 1) % ring.size
+        for (k in out.indices) {
+            val lo = ring[p].toInt() and 0xff; val hi = ring[(p + 1) % ring.size].toInt()
+            out[k] = ((hi shl 8) or lo).toShort()
+            p = (p + 2) % ring.size
+        }
+        out
+    }
+    fun isOpen(): Boolean = ws != null
+    fun hasMic(): Boolean = rec != null
+    /** The line is open but someone else has the microphone: keep the line alive. */
+    private fun lendIdle() {
         lent = true
-        rec = null
-        try { r.stop() } catch (_: Exception) {}
-        try { r.release() } catch (_: Exception) {}
-        thread(name = "zenix-dg-idle") {   // keep the line alive until the microphone comes back
+        thread(name = "zenix-dg-idle") {
             val silence = ByteArray(2560)
             var lastKeepAlive = 0L
             while (lent && rec == null) {
@@ -141,6 +166,20 @@ class DeepgramEars(private val activity: MainActivity) {
                 } catch (_: Exception) { break }
             }
         }
+    }
+
+    /**
+     * While Zenix talks, another listener needs the microphone (the one that hears "stop" / "pause").
+     * Two listeners on one microphone starve each other, so this one lets go of it; the line to Deepgram stays open.
+     */
+    @Volatile private var lent = false
+    fun lendMic() {
+        if (ws == null || lent) return
+        val r = rec ?: return
+        rec = null
+        try { r.stop() } catch (_: Exception) {}
+        try { r.release() } catch (_: Exception) {}
+        lendIdle()
     }
     /** She finished talking: take the microphone back. */
     fun takeMicBack() {
