@@ -1987,7 +1987,22 @@ const listenLang = () => off.langFallback || settings.offlineLang;
 /* when no voice chat is running, the Talk screen goes back to its resting look */
 function idleLook(){ if((off.active && off.kind==='talk') || convo || connecting) return; setOrb('idle'); $('modeLabel').textContent=''; }
 function offlineReady(){ if(!Native || !Native.offlineStatus) return false; try{ return JSON.parse(Native.offlineStatus()).state==='ready'; }catch(e){ return false; } }
-function wantOffline(){ return settings.mode==='offline' || (settings.mode==='auto' && !navigator.onLine); }
+/* no working internet right now (the phone tells us; "Wi-Fi on but no internet" counts as down) */
+function netDown(){ if(!navigator.onLine) return true; try{ return !!(Native.online && Native.online()==='false'); }catch(e){ return false; } }
+function wantOffline(){ return settings.mode==='offline' || (settings.mode==='auto' && netDown() && offlineReady()); }
+/* the internet dropped in the middle of an online voice chat: the offline brain takes over without ending the chat */
+function switchOffline(){
+  if(!(off.active && off.kind==='talk' && off.brain==='own') || tr.on) return false;
+  if(settings.mode!=='auto' || !offlineReady() || !netDown()) return false;
+  stopSpeech(); try{ dgClose(); }catch(e){} try{ Native.stopListening(); }catch(e){}
+  off.brain = 'offline'; off.thinking = false; off.langFallback = ''; srErrs = 0;
+  $('dot').className = 'dot busy'; $('statusText').textContent = 'Offline';
+  addMsg('sys', 'No internet: offline Maya took over'); toast('No internet. Offline Maya took over.');
+  setTimeout(offListen, 250);
+  return true;
+}
+let earsLocal = false;   // this phone has no offline voice pack: Maya listens with her own ears
+const localEarsOk = () => { try{ return !!(Native.localEarsReady && Native.localEarsReady()==='true'); }catch(e){ return false; } };
 
 function parseTime(t){
   const m = t.match(/(\d{1,2})(?:[:.\s](\d{2}))?\s*(a\.?m\.?|p\.?m\.?|ng umaga|ng gabi|ng hapon)?/i);
@@ -2074,6 +2089,7 @@ function offListen(){
   }
   if(off.brain==='own' && useDGEars()){ dgListen(); return; }
   if(off.brain==='own' && Native.startListeningOnline) Native.startListeningOnline(listenLang());
+  else if(earsLocal && Native.startListeningLocal){ $('modeLabel').textContent = 'Listening… (offline)'; Native.startListeningLocal(); }
   else Native.startListening(listenLang());
 }
 let srErrs = 0;
@@ -2105,6 +2121,13 @@ window.zenixOnSpeech = async (t) => {
     offlineSay('Okay bro, talk later!', true); off.endAfterSpeak=true; return; }
   if(tr.on){ trHandle(t); return; }
   if(off.brain==='own'){ const ins = matchInstant(t); if(ins){ off.quietSince = 0; runInstant(ins, t, true, ()=>offListen()); return; } ownRespond(t, true, ()=>offListen()); return; }
+  const ins = matchInstant(t);   // open an app, scroll, alarm…: the same instant commands, no internet needed
+  if(ins){
+    let r = null; try{ r = await ins(); }catch(e){ r = null; }
+    if(!off.active) return;
+    if(r && r.silent){ $('liveLine').textContent = r.note || ''; offListen(); return; }
+    if(r){ offlineSay(String(r).replace(/\s*Ask Jim[^.]*\.?/g, '').trim(), true); return; }
+  }
   const reply = await offlineHandle(t);
   if(off.active) offlineSay(reply, true);
 };
@@ -2114,12 +2137,16 @@ window.zenixOnSpeechError = (code) => {
   off.earsAt = Date.now();
   if(code===6 || code===7){ srErrs = 0; trMiss(); setTimeout(offListen, 350); return; }   // nothing was said: keep listening
   srErrs++;
+  // no internet: the offline brain takes over
+  if(off.brain==='own' && (code===1 || code===2 || code===12 || code===13) && switchOffline()) return;
   // this phone has no ears for that language: carry on in US English
   if((code===12 || code===13) && !off.langFallback && settings.offlineLang!=='en-US'){ off.langFallback = 'en-US'; setTimeout(offListen, 300); return; }
+  // offline, and the phone can't listen without internet (no voice pack): Maya uses her own ears
+  if(off.brain!=='own' && !earsLocal && code!==3 && code!==8 && code!==9 && localEarsOk()){ earsLocal = true; srErrs = 0; toast("Using Maya's own offline ears"); setTimeout(offListen, 200); return; }
   // busy mic or a network blip: try again, a little slower each time, then give up instead of looping forever
   // (behind another app these errors are normal, so there she just keeps trying)
   if((code===8 || code===5 || code===3 || code===2 || code===1) && (srErrs <= 12 || document.hidden)){ setTimeout(offListen, Math.min(3000, 350*srErrs)); return; }
-  toast(code===-3 ? 'Voice chat on a computer needs Chrome or Edge' : code===9 ? 'Allow the microphone for Maya, then tap Talk again' : code===-1 ? 'Offline listening is not available on this phone'
+  toast(code===-3 ? 'Voice chat on a computer needs Chrome or Edge' : code===9 ? 'Allow the microphone for Maya, then tap Talk again' : (off.brain!=='own' && (code===-1 || code===12 || code===13 || code===1 || code===2)) ? 'This phone can\'t listen offline yet. Turn on "Hey Maya" once: it downloads Maya\'s own offline ears.'
     : (code===1 || code===2) ? 'Listening needs the internet. Check your connection.' : code===3 ? 'Another app is using the microphone.' : 'Mic problem ('+code+'). Tap Talk again.');
   endOffline(); endedNote('The microphone stopped.');
 };
@@ -2865,7 +2892,7 @@ function dgListen(){
   setOrb('listening'); $('modeLabel').textContent='Listening…'; if(Native.setOrbMode) Native.setOrbMode('listening');
   if(dg.active){ dgResume(); return; }
   dgOpen().then(() => { if(off.active && off.kind==='talk') dgResume(); })
-    .catch(e => { dgClose(); dg.failed=true; toast(e.message+' — using phone listening'); if(off.active && off.kind==='talk' && Native.startListeningOnline) Native.startListeningOnline(listenLang()); });
+    .catch(e => { dgClose(); dg.failed=true; if(switchOffline()) return; toast(e.message+' — using phone listening'); if(off.active && off.kind==='talk' && Native.startListeningOnline) Native.startListeningOnline(listenLang()); });
 }
 
 function renderDG(){

@@ -289,9 +289,20 @@ class ZenixBridge(private val activity: MainActivity) {
     @JavascriptInterface fun offlineDownload(): String = activity.brain.download()
     @JavascriptInterface fun offlineDelete(): String = activity.brain.deleteModel()
     @JavascriptInterface fun offlineAsk(id: String, prompt: String): String { activity.brain.ask(id, prompt); return ok("thinking") }
-    @JavascriptInterface fun startListening(lang: String): String { activity.brain.startListening(lang); return ok("listening") }
-    @JavascriptInterface fun startListeningOnline(lang: String): String { activity.brain.startListening(lang, false); return ok("listening") }
-    @JavascriptInterface fun stopListening(): String { activity.brain.stopListening(); return ok("stopped") }
+    @JavascriptInterface fun startListening(lang: String): String { localEars.cancel(); activity.brain.startListening(lang); return ok("listening") }
+    @JavascriptInterface fun startListeningOnline(lang: String): String { localEars.cancel(); activity.brain.startListening(lang, false); return ok("listening") }
+    @JavascriptInterface fun stopListening(): String { activity.brain.stopListening(); localEars.cancel(); return ok("stopped") }
+    // Maya's own offline ears (the "Hey Maya" listener, hearing whole sentences): for phones with no offline voice pack
+    private val localEars by lazy { VoskEars(activity) }
+    @JavascriptInterface fun localEarsReady(): String = localEars.ready().toString()
+    @JavascriptInterface fun startListeningLocal(): String { activity.brain.stopListening(); localEars.start(); return ok("listening") }
+    /** Real internet right now (connected AND working), not just "Wi-Fi is on". */
+    @JavascriptInterface fun online(): String = try {
+        val cm = activity.getSystemService(android.net.ConnectivityManager::class.java)
+        val caps = cm.getNetworkCapabilities(cm.activeNetwork)
+        (caps != null && caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+            caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_VALIDATED)).toString()
+    } catch (_: Exception) { "true" }
     @JavascriptInterface fun speak(text: String, lang: String): String { activity.brain.speak(text, lang); return ok("speaking") }
     @JavascriptInterface fun stopSpeaking(): String { activity.brain.stopSpeaking(); return ok("stopped") }
     // ---------- "Hey Maya" wake word ----------
@@ -435,7 +446,7 @@ class ZenixBridge(private val activity: MainActivity) {
         return ok("checking")
     }
 
-    @JavascriptInterface fun finishListening(): String { activity.brain.finishListening(); return ok("ok") }
+    @JavascriptInterface fun finishListening(): String { activity.brain.finishListening(); localEars.finish(); return ok("ok") }
     @JavascriptInterface fun listVoices(): String = activity.brain.listVoices()
     @JavascriptInterface fun setPhoneVoice(name: String, rate: String): String {
         activity.brain.voiceName = name; activity.brain.rate = rate.toFloatOrNull() ?: 1.05f; return ok("ok")
