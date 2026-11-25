@@ -4556,6 +4556,11 @@ async function runCheck(){
     if(Native.ctlOn) add(ctlOn(), 'Control other apps', ctlOn() ? 'On' : 'Off: Settings → Control other apps.');
     if(Native.autoSendOn) add(true, 'Auto-send messages', autoOn() ? 'On' : 'Off (optional: she opens the chat, you tap Send)');
     try{ setupItems().filter(i => ['overlay', 'full', 'batt', 'notif'].includes(i.k)).forEach(i => add(i.ok, i.t, i.ok ? '' : i.d)); }catch(e){}
+    if(secureStore()){   // 2.90: the keys should now be in the phone's key store, with no plain copy left behind
+      const saved = [...SECRET_KEYS].filter(k => store.get(k, '')), plain = [...SECRET_KEYS].filter(k => localStorage.getItem('zenix_' + k));
+      add(!plain.length, 'Keys locked away', !saved.length ? 'No keys saved yet' : !plain.length ? saved.length + ' key(s) in the phone\'s key store' : 'The key store refused ' + plain.length + ' key(s): they still work, kept the old way');
+    }
+    if(nextRules.length) add(true, 'Autopilot reminders', nextRules.filter(r => !r.fired).length + ' waiting, ' + nextRules.filter(r => r.fired).length + ' done');
     add(localEarsOk(), 'Offline ears (commands with no internet)', localEarsOk() ? 'Ready' : 'Not downloaded. Turn on "Hey Zenix" once while on Wi-Fi: it downloads them.');
     add(true, 'Offline brain', offlineReady() ? 'Installed (used only with no connection)' : 'Not installed (optional)');
   }catch(e){ add(false, 'Check stopped', e.message); }
