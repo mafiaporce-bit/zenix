@@ -1668,6 +1668,94 @@ clientTools.check_sites = async ({action, name, url}) => {
   return (bad.length ? `${bad.length} of ${sites.length} need attention. ` : `All ${sites.length} are up. `) + lines.join('; ');
 };
 window.MayaTools = clientTools;
+
+/* ---------- Instant commands: simple orders are done right on the phone (under a second, no credits, no internet) ---------- */
+function durMinutes(t){
+  t = String(t||'').toLowerCase().replace(/\band\b/g, ' ').replace(/\ba half\b|\bhalf an?\b/g, '0.5 ').replace(/\ban?\s+(hour|minute)/g, '1 $1').trim();
+  let total = 0, any = false;
+  const re = /(\d+(?:\.\d+)?)\s*(hours?|hrs?|h|minutes?|mins?|m|seconds?|secs?|s)\b/g; let m, rest = t;
+  while((m = re.exec(t))){ any = true; const n = parseFloat(m[1]), u = m[2][0]; total += u === 'h' ? n*60 : u === 'm' ? n : n/60; rest = rest.replace(m[0], ''); }
+  if(!any || rest.replace(/[\s,]/g, '')) return null;
+  return total;
+}
+function timeOfDay(t){
+  const m = /^(\d{1,2})(?:[:.\s](\d{2}))?\s*(a\.?m\.?|p\.?m\.?|in the morning|in the evening|at night|tonight|ng umaga|ng gabi|ng hapon)?(\s+tomorrow)?$/i.exec(String(t||'').trim());
+  if(!m) return null;
+  let h = +m[1], mi = m[2] ? +m[2] : 0; const ap = (m[3]||'').toLowerCase();
+  if(h > 23 || mi > 59) return null;
+  if(/p|evening|night|gabi|hapon/.test(ap) && h < 12) h += 12;
+  else if(/a|morning|umaga/.test(ap) && h === 12) h = 0;
+  else if(!ap && h <= 12){   // no AM/PM: the next time that comes up
+    const now = new Date(), cand = [h % 12, h % 12 + 12].map(x => { const d = new Date(); d.setHours(x, mi, 0, 0); if(d <= now) d.setDate(d.getDate() + 1); return [x, d]; });
+    h = cand.sort((a, b) => a[1] - b[1])[0][0];
+  }
+  return {h, mi};
+}
+function matchInstant(raw){
+  let t = String(raw||'').trim().replace(/[.!?…]+$/, '').replace(/\s+/g, ' ');
+  for(let i = 0; i < 3; i++){
+    t = t.replace(/^(?:(?:hey|hi|ok|okay)\s+)?maya[,\s]+/i, '').replace(/^(?:please|pls|bro|can you|could you|would you|will you|kindly|i want you to)\s+/i, '')
+         .replace(/[,\s]+(?:please|pls|bro|for me|now|maya|right now|thanks|thank you)$/i, '').trim();
+  }
+  const low = t.toLowerCase(); let m;
+  const locked = () => !!(Native.isLocked && Native.isLocked()==='true');
+  const nat = (fn, ...a) => { const r = callNative(fn, ...a); return r && r.ok ? r.message : null; };
+  if((m = low.match(/^(?:open|launch|start|buksan mo(?: ang)?|buksan)\s+(?:me\s+|up\s+)?(?:the\s+|my\s+)?(.+?)(?:\s+app(?:lication)?)?$/))){
+    const name = m[1];
+    if(name.split(' ').length > 4 || /\b(map|maps of|website|site|link|page|camera and|file|chat with|conversation)\b|\.com|www/.test(name)) return null;
+    return async () => locked() ? null : (showAction('📱 Opening ' + name), nat('openApp', name));
+  }
+  if((m = low.match(/^(?:set|make|create|put)?\s*(?:an?|my)?\s*alarm\s*(?:for|at|on)?\s+(.+)$/)) || (m = low.match(/^wake me(?: up)? (?:at|by) (.+)$/))){
+    const tm = timeOfDay(m[1]); if(!tm) return null;
+    return async () => { showAction(`⏰ Alarm ${String(tm.h).padStart(2,'0')}:${String(tm.mi).padStart(2,'0')}`); return nat('setAlarm', tm.h, tm.mi, 'Maya alarm'); };
+  }
+  if((m = low.match(/^(?:set|start|put)?\s*(?:an?\s+)?timer\s+(?:for\s+)?(.+)$/)) || (m = low.match(/^(?:set|start)?\s*(?:an?\s+)?(.+?)\s+timer$/))){
+    const min = durMinutes(m[1]); if(!min || min > 1440) return null;
+    return async () => { showAction('⏱️ Timer'); return nat('setTimer', Math.round(min * 60), ''); };
+  }
+  if((m = low.match(/^remind me in (.+?) (?:to|that|about) (.+)$/))){
+    const min = durMinutes(m[1]); if(!min) return null; const what = t.slice(t.length - m[2].length);
+    return async () => { showAction(`⏰ Reminder in ${Math.round(min)} min`); return nat('setReminder', what, Math.max(1, Math.round(min))); };
+  }
+  if((m = low.match(/^(?:turn|switch)\s+(on|off)\s+(?:the\s+|my\s+)?(?:flash ?light|torch|flash)$/)) || (m = low.match(/^(?:turn|switch)\s+(?:the\s+|my\s+)?(?:flash ?light|torch|flash)\s+(on|off)$/)) || (m = low.match(/^(?:flash ?light|torch)\s+(on|off)$/))){
+    const on = m[1] === 'on'; return async () => { showAction(on ? '🔦 Flashlight on' : '🔦 Flashlight off'); return nat('flashlight', on); };
+  }
+  if((m = low.match(/^(?:turn\s+)?(?:the\s+)?(?:volume|sound)\s+(up|down)$/)) || (m = low.match(/^(?:turn\s+)?(up|down)\s+(?:the\s+)?(?:volume|sound)$/))){
+    const d = m[1]; return async () => { showAction('🔊 Volume ' + d); return nat('volume', d, ''); };
+  }
+  if((m = low.match(/^(?:set\s+)?(?:the\s+)?(?:volume|sound)\s+(?:to|at)\s+(\d{1,3})\s*(?:%|percent)?$/))){
+    const v = Math.min(100, +m[1]); return async () => { showAction('🔊 Volume ' + v); return nat('volume', 'set', v); };
+  }
+  if(/^(?:mute|mute (?:the )?(?:volume|sound|music))$/.test(low)) return async () => nat('volume', 'mute', '');
+  if(/^(?:next|skip)(?: (?:song|track|this))?$/.test(low)) return async () => nat('media', 'next') && 'Skipping.';
+  if(/^(?:previous|last|go back)(?: song| track)$|^previous$/.test(low)) return async () => nat('media', 'previous') && 'Going back.';
+  if(/^(?:pause|stop)(?: the)? (?:music|song|playback)$/.test(low)) return async () => nat('media', 'pause') && 'Paused.';
+  if(/^(?:play|resume|continue)(?: the)? (?:music|song)$/.test(low)) return async () => nat('media', 'play') && 'Playing.';
+  if(/^(?:what'?s |what is |how much |check )?(?:my |the )?battery(?: level| left| percentage| status)?$/.test(low)) return async () => nat('battery');
+  if((m = low.match(/^(?:turn\s+)?(on|off)\s+(?:do not disturb|dnd)$/)) || (m = low.match(/^(?:turn\s+)?(?:do not disturb|dnd)\s*(on|off)?$/))){
+    const on = (m[1] || 'on') === 'on'; return async () => nat('dnd', on);
+  }
+  if((m = low.match(/^(?:call|phone|ring|tawagan mo(?: si)?|tawagan)\s+(.+)$/))){
+    const who = t.slice(t.length - m[1].length);
+    if(/^(me|it|this|that|him|her|them|back)\b/i.test(who) || who.split(' ').length > 4 || /history|log/i.test(who)) return null;
+    if(emergencyNumber(who)) return async () => clientTools.make_call({contact: who});
+    return async () => locked() ? null : (showAction('📞 Calling ' + who), nat('makeCall', who));
+  }
+  return null;
+}
+/* run an instant command; anything it can't do cleanly goes to the brain as usual */
+async function runInstant(fn, text, speakIt, after){
+  let r = null; try{ r = await fn(); }catch(e){ r = null; }
+  if(!r){ return ownRespond(text, speakIt, after); }
+  r = String(r).replace(/\s*Ask Jim[^.]*\.?/g, '').trim();
+  const last = ownMsgs[ownMsgs.length - 1];
+  if(!last || last.role !== 'user'){ ownMsgs.push({role:'user', content:text}); ownMsgs.push({role:'assistant', content:r}); trimOwnMsgs(); }
+  addMsg('ai', r);
+  if(off.kind === 'talk') $('liveLine').textContent = 'Maya: ' + r;
+  if(speakIt){ speech.streamOpen = false; speech.onIdle = after || null; speakEnqueue(r); }
+  else if(after) after(); else idleLook();
+}
+
 /* On the lock screen, private actions need Jim's fingerprint / face first */
 const PRIVATE_TOOLS = ['navigate','make_call','send_message','read_messages','open_call_history','check_calendar','add_calendar_event','compose_email','open_app','open_website','web_search','read_notifications','reply_notification','list_read','list_remove'];
 const READ_ONLY = ['check_calendar','read_notifications','list_read'];                                   // a routine Jim set up himself may read these while locked
@@ -1814,7 +1902,7 @@ window.zenixOnSpeech = async (t) => {
     if(off.brain==='own'){ speech.onIdle=()=>endOffline(); speakEnqueue('Okay bro, talk later!'); return; }
     offlineSay('Okay bro, talk later!', true); off.endAfterSpeak=true; return; }
   if(tr.on){ trHandle(t); return; }
-  if(off.brain==='own'){ ownRespond(t, true, ()=>offListen()); return; }
+  if(off.brain==='own'){ const ins = matchInstant(t); if(ins){ off.quietSince = 0; runInstant(ins, t, true, ()=>offListen()); return; } ownRespond(t, true, ()=>offListen()); return; }
   const reply = await offlineHandle(t);
   if(off.active) offlineSay(reply, true);
 };
@@ -2550,7 +2638,7 @@ function startSpeculative(t){
   };
 }
 function dgEager(t){
-  if(!(off.active && off.brain==='own' && off.kind==='talk') || isStopWord(t)) return;
+  if(!(off.active && off.brain==='own' && off.kind==='talk') || isStopWord(t) || tr.on || matchInstant(t)) return;
   if(specTurn && normT(specTurn.text)===normT(t)) return;
   dgCancelEager(); specTurn = startSpeculative(t);
 }
@@ -2694,7 +2782,8 @@ async function sendText(text){
   if((off.active && off.brain==='own') || (!off.active && !convo && want==='own')){
     if(!off.active && !startOffline('chat','own')){ stopTyping(); return; }
     const talk = off.kind==='talk';
-    typedChain = typedChain.then(() => ownRespond(text, talk || settings.chatVoice, talk ? ()=>offListen() : null)).catch(() => {});
+    const ins = matchInstant(text);
+    typedChain = typedChain.then(() => ins ? runInstant(ins, text, talk || settings.chatVoice, talk ? ()=>offListen() : null) : ownRespond(text, talk || settings.chatVoice, talk ? ()=>offListen() : null)).catch(() => {});
     return;
   }
   if(off.active || (!convo && want==='offline')){ offlineChat(text); return; }

@@ -15,6 +15,9 @@ import android.provider.Settings
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.WindowManager
+import android.graphics.Color
+import android.graphics.drawable.GradientDrawable
+import android.widget.TextView
 
 /**
  * Foreground "voice call" service. While it runs, Android lets Maya keep using
@@ -96,24 +99,35 @@ class VoiceService : Service() {
         val view = OrbView(this)
         view.setSpeaking(speaking)
 
-        var downX = 0f; var downY = 0f; var startX = 0; var startY = 0; var moved = false
+        var downX = 0f; var downY = 0f; var startX = 0; var startY = 0; var moved = false; var overX = false
         view.setOnTouchListener { v, e ->
             when (e.action) {
                 MotionEvent.ACTION_DOWN -> {
-                    downX = e.rawX; downY = e.rawY; startX = p.x; startY = p.y; moved = false; true
+                    downX = e.rawX; downY = e.rawY; startX = p.x; startY = p.y; moved = false; overX = false; true
                 }
                 MotionEvent.ACTION_MOVE -> {
                     val dx = (e.rawX - downX).toInt(); val dy = (e.rawY - downY).toInt()
-                    if (kotlin.math.abs(dx) > 12 || kotlin.math.abs(dy) > 12) moved = true
+                    if (!moved && (kotlin.math.abs(dx) > 12 || kotlin.math.abs(dy) > 12)) { moved = true; showCloseTarget() }
                     if (moved) {
                         p.x = startX + dx; p.y = startY + dy
-                        savedX = p.x; savedY = p.y
+                        // near the ✕ at the bottom: snap onto it
+                        val now = nearClose(p.x + size / 2, p.y + size / 2)
+                        if (now != overX) { overX = now; highlightClose(now); if (now) buzz(25) }
+                        if (overX) { val (cx, cy) = closeCenter(); p.x = cx - size / 2; p.y = cy - size / 2 }
                         try { windowManager().updateViewLayout(v, p) } catch (_: Exception) { }
                     }
                     true
                 }
-                MotionEvent.ACTION_UP -> {
-                    if (!moved) {
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    hideCloseTarget()
+                    if (moved && overX) {
+                        buzz(60)
+                        savedX = null; savedY = null
+                        removeOrb()
+                        MainActivity.instance?.get()?.endChatFromNotification()   // dropped on ✕: close the circle and end the chat
+                    } else if (moved) {
+                        savedX = p.x; savedY = p.y
+                    } else if (e.action == MotionEvent.ACTION_UP) {
                         val i = Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                         try { startActivity(i) } catch (_: Exception) { }
                     }
@@ -130,12 +144,58 @@ class VoiceService : Service() {
 
     fun hideOrb() = main.post { removeOrb() }
 
+    // ---------- the ✕ that appears at the bottom while the circle is dragged ----------
+    private var closeView: TextView? = null
+    private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
+    private fun closeCenter(): Pair<Int, Int> {
+        val dm = resources.displayMetrics
+        return Pair(dm.widthPixels / 2, dm.heightPixels - dp(150))
+    }
+    private fun nearClose(x: Int, y: Int): Boolean {
+        val (cx, cy) = closeCenter()
+        val dx = (x - cx).toDouble(); val dy = (y - cy).toDouble()
+        return Math.sqrt(dx * dx + dy * dy) < dp(80)
+    }
+    private fun showCloseTarget() {
+        if (closeView != null) return
+        val sz = dp(64)
+        val tv = TextView(this).apply {
+            text = "✕"; textSize = 24f; setTextColor(Color.WHITE); gravity = Gravity.CENTER
+            background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(0xCC1B1733.toInt()); setStroke(dp(2), 0x99FFFFFF.toInt()) }
+            alpha = 0f
+        }
+        val (cx, cy) = closeCenter()
+        val lp = WindowManager.LayoutParams(sz, sz, WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+            PixelFormat.TRANSLUCENT).apply { gravity = Gravity.TOP or Gravity.START; x = cx - sz / 2; y = cy - sz / 2 }
+        try { windowManager().addView(tv, lp); closeView = tv; tv.animate().alpha(1f).setDuration(150).start() } catch (_: Exception) { }
+        // keep the circle above the ✕
+        orb?.let { o -> params?.let { pp -> try { windowManager().removeView(o); windowManager().addView(o, pp) } catch (_: Exception) { } } }
+    }
+    private fun highlightClose(on: Boolean) {
+        closeView?.let { v ->
+            v.animate().scaleX(if (on) 1.3f else 1f).scaleY(if (on) 1.3f else 1f).setDuration(120).start()
+            (v.background as? GradientDrawable)?.setColor(if (on) 0xEEE5484D.toInt() else 0xCC1B1733.toInt())
+        }
+    }
+    private fun hideCloseTarget() {
+        closeView?.let { try { windowManager().removeView(it) } catch (_: Exception) { } }
+        closeView = null
+    }
+    private fun buzz(ms: Long) {
+        try {
+            val vib = getSystemService(android.os.Vibrator::class.java)
+            vib?.vibrate(android.os.VibrationEffect.createOneShot(ms, android.os.VibrationEffect.DEFAULT_AMPLITUDE))
+        } catch (_: Exception) { }
+    }
+
     fun setSpeaking(on: Boolean) = main.post {
         speaking = on
         orb?.setSpeaking(on)
     }
 
     private fun removeOrb() {
+        hideCloseTarget()
         orb?.let { try { windowManager().removeView(it) } catch (_: Exception) { } }
         orb = null; params = null
     }

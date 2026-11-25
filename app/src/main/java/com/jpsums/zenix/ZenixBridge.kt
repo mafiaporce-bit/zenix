@@ -22,6 +22,10 @@ import java.util.TimeZone
 
 /** Everything Maya can do on the phone. Each method returns a JSON string {ok, message}. */
 class ZenixBridge(private val activity: MainActivity) {
+    companion object {
+        @Volatile private var appCache: List<Pair<String, String>>? = null
+        @Volatile private var appCacheAt = 0L
+    }
 
     private fun ok(msg: String) = JSONObject().put("ok", true).put("message", msg).toString()
     private fun fail(msg: String) = JSONObject().put("ok", false).put("message", msg).toString()
@@ -515,24 +519,38 @@ class ZenixBridge(private val activity: MainActivity) {
     }
 
     // ---------- apps & web ----------
+    /** The phone's app list (name -> package), kept for 10 minutes so "open X" is instant. */
+    private fun appList(fresh: Boolean = false): List<Pair<String, String>> {
+        val now = System.currentTimeMillis()
+        val c = appCache
+        if (!fresh && c != null && now - appCacheAt < 600_000) return c
+        val pm = activity.packageManager
+        val list = pm.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), 0)
+            .map { it.loadLabel(pm).toString().lowercase(Locale.ROOT).replace(" ", "") to it.activityInfo.packageName }
+        appCache = list; appCacheAt = now
+        return list
+    }
+    init { kotlin.concurrent.thread { try { appList() } catch (_: Exception) { } } }   // warm up in the background
+
     @JavascriptInterface
     fun openApp(name: String): String {
         val pm = activity.packageManager
-        val main = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
-        val apps = pm.queryIntentActivities(main, 0)
+        var apps = appList()
         // "the clock app" -> "clock" (but "WhatsApp" stays "whatsapp")
         val want = name.lowercase(Locale.ROOT).trim().removePrefix("the ").removePrefix("my ")
             .removeSuffix(" application").removeSuffix(" app").replace(" ", "")
         if (want.isEmpty()) return fail("Which app should I open?")
-        val labels = apps.map { it to it.loadLabel(pm).toString().lowercase(Locale.ROOT).replace(" ", "") }
-        val match = (labels.firstOrNull { it.second == want }
-            ?: labels.firstOrNull { it.second.startsWith(want) }
-            ?: labels.firstOrNull { it.second.contains(want) }
-            ?: labels.firstOrNull { it.second.length >= 4 && want.contains(it.second) })?.first
-            ?: return fail("I couldn't find an app called $name on this phone.")
-        val launchIntent = pm.getLaunchIntentForPackage(match.activityInfo.packageName)
+        fun find(l: List<Pair<String, String>>) = l.firstOrNull { it.first == want }
+            ?: l.firstOrNull { it.first.startsWith(want) }
+            ?: l.firstOrNull { it.first.contains(want) }
+            ?: l.firstOrNull { it.first.length >= 4 && want.contains(it.first) }
+        var match = find(apps)
+        if (match == null) { apps = appList(true); match = find(apps) }   // maybe just installed
+        if (match == null) return fail("I couldn't find an app called $name on this phone.")
+        val launchIntent = pm.getLaunchIntentForPackage(match.second)
             ?: return fail("That app can't be opened directly.")
-        return if (launch(launchIntent)) ok("Opened ${match.loadLabel(pm)}.") else fail("Couldn't open $name.")
+        val label = try { pm.getApplicationLabel(pm.getApplicationInfo(match.second, 0)).toString() } catch (_: Exception) { name }
+        return if (launch(launchIntent)) ok("Opened $label.") else fail("Couldn't open $name.")
     }
 
     @JavascriptInterface
