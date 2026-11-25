@@ -484,6 +484,16 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
           <div class="toggle-row" style="margin-top:0"><span></span><button class="btn-line" id="autoInfo">Allow restricted settings</button></div>
         </div>
       </details>
+      <details class="set-item" data-sec="control">
+        <summary><span class="ico"><svg viewBox="0 0 24 24"><path d="M9 11V5a1.5 1.5 0 013 0v5m0-1.5a1.5 1.5 0 013 0V11m0-.5a1.5 1.5 0 013 0V15a6 6 0 01-6 6h-1a6 6 0 01-5.2-3L5 14.5a1.5 1.5 0 012.6-1.5L9 15"/></svg></span><span class="set-t"><b>Control other apps</b><span id="sumCtl"></span></span><svg class="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></summary>
+        <div class="set-body">
+          <p class="hint">Maya works the app on your screen while you talk to her. Start a voice chat, open any app, then say <b>"scroll down"</b>, <b>"swipe left"</b>, <b>"go back"</b>, <b>"go home"</b>, <b>"take a screenshot"</b> or <b>"tap Like"</b>. She only does it when you say so.</p>
+          <div class="toggle-row"><span class="status-line" style="margin:0" id="ctlState">Off</span><button class="btn-line" id="ctlBtn">Turn on</button></div>
+          <p class="hint" style="margin-top:12px">Turn on: tap <b>Turn on</b> → <b>Installed apps</b> → <b>Maya phone control</b> → switch it on. If it's greyed out, tap <b>Allow restricted settings</b> below first (⋮ menu, top right of Maya's app info), then try again.</p>
+          <div class="toggle-row" style="margin-top:0"><span></span><button class="btn-line" id="ctlInfo">Allow restricted settings</button></div>
+          <p class="hint" style="margin-top:12px">While a video or music is playing in another app, Maya ignores its sound. Commands like "scroll down" still work straight away; for anything else, say <b>"Maya"</b> first.</p>
+        </div>
+      </details>
       <details class="set-item" data-sec="routines">
         <summary><span class="ico amber"><svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2M9 2h6"/></svg></span><span class="set-t"><b>Routines</b><span id="sumRoutines"></span></span><svg class="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></summary>
         <div class="set-body">
@@ -1395,6 +1405,64 @@ clientTools.phone_control = async ({action, value}) => {
   if(/^music_(play|pause|next|previous)$/.test(a)){ showAction('🎵 Music ' + a.slice(6)); return reply(callNative('media', a.slice(6)) || NA); }
   return 'Unknown action. Use flashlight_on, flashlight_off, volume_set, volume_up, volume_down, mute, dnd_on, dnd_off, battery, music_play, music_pause, music_next or music_previous.';
 };
+/* ---------- Control other apps: scroll, swipe, tap, Back and Home in whatever is on screen ---------- */
+const scrWait = {}; let scrSeq = 0;
+window.zenixCtl = (id, ok, msg) => { const w = scrWait[id]; if(w){ delete scrWait[id]; w({ok: !!ok, message: String(msg||'')}); } };
+const ctlOn = () => !!(Native.ctlOn && Native.ctlOn()==='true');
+const CTL_OFF = "Phone control is off. In Maya's Settings, open Control other apps and turn it on.";
+function screenDo(action, arg){
+  if(!Native.ctl) return Promise.resolve(NA);
+  return new Promise(res => {
+    const id = 's' + (++scrSeq); scrWait[id] = res;
+    try{ Native.ctl(id, action, arg==null ? '' : String(arg)); }catch(e){ delete scrWait[id]; res({ok:false, message:"That didn't work."}); return; }
+    setTimeout(() => { if(scrWait[id]){ delete scrWait[id]; res({ok:false, message:"The screen didn't answer."}); } }, 12000);
+  });
+}
+const SCREEN_ACTIONS = ['scroll_down','scroll_up','swipe_left','swipe_right','back','home','recents','notifications','quick_settings','screenshot','lock','tap','tap_first'];
+const SCREEN_QUIET = {scroll_down:'⬇️ Scrolled down', scroll_up:'⬆️ Scrolled up', swipe_left:'⬅️ Swiped left', swipe_right:'➡️ Swiped right', back:'↩️ Back'};   // done without a word
+const SCREEN_OTHER = ['scroll_down','scroll_up','swipe_left','swipe_right','tap','tap_first'];   // only make sense in another app
+let lastScreen = null;
+clientTools.phone_screen = async ({action, text, big}) => {
+  const a = String(action||'').toLowerCase();
+  if(!SCREEN_ACTIONS.includes(a)) return 'Unknown action. Use ' + SCREEN_ACTIONS.join(', ') + '.';
+  if(!Native.ctl) return NA.message;
+  if(!ctlOn()) return 'Maya phone control is off. Tell Jim to open Maya\'s Settings, then Control other apps, and turn it on.';
+  if(a==='tap' && !String(text||'').trim()) return 'Say which button to tap, by the name written on it.';
+  if(SCREEN_OTHER.includes(a) && !document.hidden) return 'Maya is on the screen right now. This works on other apps: tell Jim to open the app first, then ask again.';
+  showAction(SCREEN_QUIET[a] || (a==='tap' ? '👆 Tap ' + text : a==='tap_first' ? '👆 Tap the first one' : '📱 ' + a.replace('_', ' ')));
+  lastScreen = {action:a, arg: a==='tap' ? String(text) : big ? 'big' : '', t: Date.now()};
+  return reply(await screenDo(a, lastScreen.arg));
+};
+/* the same thing as an instant command (no brain, no waiting) */
+function screenInstant(action, arg, times){
+  return async () => {
+    if(!Native.ctl) return null;
+    if(Native.isLocked && Native.isLocked()==='true') return 'Unlock the phone first, then tell me again.';
+    if(!ctlOn()){ toast('Settings → Control other apps → Turn on'); return CTL_OFF; }
+    if(SCREEN_OTHER.includes(action) && !document.hidden) return 'That one is for other apps. Open the app first, then tell me, and I\'ll do it while my circle floats on top.';
+    lastScreen = {action, arg, t: Date.now()};
+    let r = null;
+    for(let i = 0; i < (times || 1); i++){ r = await screenDo(action, arg); if(!r.ok) break; if(i < (times || 1) - 1) await new Promise(x => setTimeout(x, 380)); }
+    if(!r.ok) return r.message;
+    return SCREEN_QUIET[action] ? {silent:true, note:SCREEN_QUIET[action]} : r.message;
+  };
+}
+/* a video or song in another app is talking, not Jim: Maya stays out of it unless he says a command or her name */
+const NAME_RE = /\b(?:maya|maia|mya|maja|mayah)\b/i;
+function mayaJustAsked(){
+  if(Date.now() - (speech.idleAt || 0) > 20000) return false;
+  for(let i = ownMsgs.length - 1; i >= 0; i--){
+    const m = ownMsgs[i]; if(m.role !== 'assistant') continue;
+    const c = typeof m.content === 'string' ? m.content : (Array.isArray(m.content) ? m.content.filter(x => x && x.type==='text').map(x => x.text).join(' ') : '');
+    return /\?["')\s]*$/.test(c.trim());
+  }
+  return false;
+}
+function mediaNoise(t){
+  if(!document.hidden || !Native.musicActive || tr.on || off.trusted) return false;
+  if(NAME_RE.test(t) || isStopWord(t) || matchInstant(t) || mayaJustAsked()) return false;
+  try{ return Native.musicActive()==='true'; }catch(e){ return false; }
+}
 clientTools.set_timer = async ({minutes, seconds, label}) => {
   const total = Math.round((parseFloat(minutes) || 0) * 60 + (parseFloat(seconds) || 0));
   if(total < 1) return 'How long should the timer be?';
@@ -1726,6 +1794,31 @@ function matchInstant(raw){
   const low = t.toLowerCase(); let m;
   const locked = () => !!(Native.isLocked && Native.isLocked()==='true');
   const nat = (fn, ...a) => { const r = callNative(fn, ...a); return r && r.ok ? r.message : null; };
+  /* the app on screen: scroll, swipe, back, home… (Maya phone control). "go down", "next video" and "tap …" only count while another app is in front */
+  const away = document.hidden;
+  if((m = low.match(/^(scroll|page|go|move)\s+(down|up)(?:\s+((?:(?:a lot|a bit|a little|a little bit|some|more|again|further|fast|quickly)\s*)+))?$/)) && (away || /scroll|page/.test(m[1])))
+    return screenInstant(m[2]==='down' ? 'scroll_down' : 'scroll_up', /a lot|fast/.test(m[3]||'') ? 'big' : '');
+  if((m = low.match(/^swipe\s+(down|up)$/))) return screenInstant(m[1]==='up' ? 'scroll_down' : 'scroll_up', '');   // a finger going up shows what's below
+  if((m = low.match(/^(scroll|go)\s+(?:all the way\s+)?(?:back\s+)?to the\s+(top|bottom|end|start|beginning)$/)) && (away || m[1]==='scroll'))
+    return screenInstant(/top|start|beginning/.test(m[2]) ? 'scroll_up' : 'scroll_down', 'big', 4);
+  if((m = low.match(/^scroll\s+all the way\s+(up|down)$/))) return screenInstant(m[1]==='up' ? 'scroll_up' : 'scroll_down', 'big', 4);
+  if(away && (m = low.match(/^(next|previous|last)\s+(?:video|reel|short|one|post|story|tiktok|clip)$/))) return screenInstant(m[1]==='next' ? 'scroll_down' : 'scroll_up', '');
+  if((m = low.match(/^(?:swipe|slide)\s+(?:to the\s+)?(left|right)$/))) return screenInstant(m[1]==='left' ? 'swipe_left' : 'swipe_right', '');
+  if((m = low.match(/^(scroll|go|move)\s+(?:to the\s+)?(left|right)$/)) && (away || m[1]==='scroll')) return screenInstant(m[2]==='right' ? 'swipe_left' : 'swipe_right', '');   // "scroll right" shows what's on the right
+  if(/^(?:go|press|tap|hit) back$|^(?:previous|last) (?:page|screen)$|^(?:go )?back (?:one |a )?(?:page|screen)$|^bumalik(?: ka)?$/.test(low) || (away && low==='back')) return screenInstant('back', '');
+  if(/^(?:go |go to |press |tap )?(?:the |my )?home(?: screen| button)$|^go home$|^(?:press|tap) home$/.test(low)) return screenInstant('home', '');
+  if(/^(?:show |open |go to )?(?:my |the )?recent(?:s| apps)$|^(?:show |open )?(?:the )?app switcher$|^switch apps?$/.test(low)) return screenInstant('recents', '');
+  if(/^(?:open|pull down)\s+(?:the\s+|my\s+)?notifications?(?:\s+(?:panel|shade|bar))?$|^(?:show\s+)?(?:the\s+)?notification (?:panel|shade|bar)$/.test(low)) return screenInstant('notifications', '');
+  if(/^(?:open|pull down|show)\s+(?:the\s+|my\s+)?quick (?:settings|panel)$/.test(low)) return screenInstant('quick_settings', '');
+  if(/^(?:take|grab|capture)\s+(?:a\s+|the\s+)?screen ?shot$|^screen ?shot(?: this| it| that)?$/.test(low)) return screenInstant('screenshot', '');
+  if(/^lock\s+(?:the\s+|my\s+)?(?:screen|phone)$/.test(low)) return screenInstant('lock', '');
+  if(/^(?:again|more|one more|once more|keep going|do it again|same again|ulit|isa pa)$/.test(low) && lastScreen && Date.now() - lastScreen.t < 45000) return screenInstant(lastScreen.action, lastScreen.arg);
+  if(away && (m = low.match(/^(?:tap|click|press|select|pindutin(?: mo)?(?: ang)?)\s+(?:on\s+)?(?:the\s+)?(.+?)(?:\s+button)?$/)) && m[1].split(' ').length <= 5){
+    if(/^(?:first|top)(?: one| video| result| post| song| item| link)?$/.test(m[1])) return screenInstant('tap_first', '');
+    const name = m[1].replace(/^(?:that|this|the|on)\s+/, '').replace(/\s+(?:button|icon|thing|option|tab|link)$/, '');
+    const go = screenInstant('tap', name);
+    return async () => { const r = await go(); return (typeof r === 'string' && /can't see/.test(r) && name.split(' ').length > 2) ? null : r; };   // a long, loose description: let the brain work out the button's name
+  }
   if((m = low.match(/^(?:open|launch|start|buksan mo(?: ang)?|buksan)\s+(?:me\s+|up\s+)?(?:the\s+|my\s+)?(.+?)(?:\s+app(?:lication)?)?$/))){
     const name = m[1];
     if(name.split(' ').length > 4 || /\b(map|maps of|website|site|link|page|camera and|file|chat with|conversation)\b|\.com|www/.test(name)) return null;
@@ -1755,8 +1848,8 @@ function matchInstant(raw){
   if(/^(?:mute|mute (?:the )?(?:volume|sound|music))$/.test(low)) return async () => nat('volume', 'mute', '');
   if(/^(?:next|skip)(?: (?:song|track|this))?$/.test(low)) return async () => nat('media', 'next') && 'Skipping.';
   if(/^(?:previous|last|go back)(?: song| track)$|^previous$/.test(low)) return async () => nat('media', 'previous') && 'Going back.';
-  if(/^(?:pause|stop)(?: the)? (?:music|song|playback)$/.test(low)) return async () => nat('media', 'pause') && 'Paused.';
-  if(/^(?:play|resume|continue)(?: the)? (?:music|song)$/.test(low)) return async () => nat('media', 'play') && 'Playing.';
+  if(/^(?:pause|stop)(?: the| this)? (?:music|song|playback|video)$|^pause(?: it| this)?$/.test(low)) return async () => nat('media', 'pause') && 'Paused.';
+  if(/^(?:play|resume|continue)(?: the| this)? (?:music|song|video)$|^(?:play|resume)(?: it)?$/.test(low)) return async () => nat('media', 'play') && 'Playing.';
   if(/^(?:what'?s |what is |how much |check )?(?:my |the )?battery(?: level| left| percentage| status)?$/.test(low)) return async () => nat('battery');
   if((m = low.match(/^(?:turn\s+)?(on|off)\s+(?:do not disturb|dnd)$/)) || (m = low.match(/^(?:turn\s+)?(?:do not disturb|dnd)\s*(on|off)?$/))){
     const on = (m[1] || 'on') === 'on'; return async () => nat('dnd', on);
@@ -1773,6 +1866,12 @@ function matchInstant(raw){
 async function runInstant(fn, text, speakIt, after){
   let r = null; try{ r = await fn(); }catch(e){ r = null; }
   if(!r){ return ownRespond(text, speakIt, after); }
+  if(r.silent){   // a swipe on the screen: do it, say nothing, keep listening
+    $('actionLine').textContent = r.note || '';
+    if(off.kind === 'talk') $('liveLine').textContent = r.note || '';
+    if(after) after(); else idleLook();
+    return;
+  }
   r = String(r).replace(/\s*Ask Jim[^.]*\.?/g, '').trim();
   const last = ownMsgs[ownMsgs.length - 1];
   if(!last || last.role !== 'user'){ ownMsgs.push({role:'user', content:text}); ownMsgs.push({role:'assistant', content:r}); trimOwnMsgs(); }
@@ -1783,7 +1882,7 @@ async function runInstant(fn, text, speakIt, after){
 }
 
 /* On the lock screen, private actions need Jim's fingerprint / face first */
-const PRIVATE_TOOLS = ['navigate','make_call','send_message','read_messages','open_call_history','check_calendar','add_calendar_event','compose_email','open_app','open_website','web_search','read_notifications','reply_notification','list_read','list_remove'];
+const PRIVATE_TOOLS = ['phone_screen','navigate','make_call','send_message','read_messages','open_call_history','check_calendar','add_calendar_event','compose_email','open_app','open_website','web_search','read_notifications','reply_notification','list_read','list_remove'];
 const READ_ONLY = ['check_calendar','read_notifications','list_read'];                                   // a routine Jim set up himself may read these while locked
 const DRIVE_OK = ['check_calendar','read_notifications','list_read','list_remove','reply_notification','make_call'];   // hands-free while driving
 let unlockWait = null;
@@ -1923,6 +2022,8 @@ window.zenixOnSpeech = async (t) => {
   clearTimeout(partialTimer);
   if(!off.active || off.kind!=='talk') return;
   if(!t){ trMiss(); offListen(); return; }
+  if(off.brain==='own' && mediaNoise(t)){ $('liveLine').textContent = ''; offListen(); return; }   // that was the video, not Jim
+  awaySince = 0;   // he is using her from another app: the "you were away" clock starts over
   srErrs = 0; off.quietSince = 0; off.trusted = false;   // Jim is talking now: the normal lock-screen rules apply again
   addMsg('user', t); $('liveLine').textContent='You: '+t;
   if(tr.on && tr.turn==='them'){ trHandle(t); return; }
@@ -2064,6 +2165,7 @@ const TOOL_DEFS = [
   {name:'list_read', description:'Read one list, or all his lists when no name is given.', input_schema:{type:'object', properties:{list:{type:'string'}}}},
   {name:'list_remove', description:"Remove one item from a list (done or bought), or item 'all' to clear the list.", input_schema:{type:'object', properties:{list:{type:'string'}, item:{type:'string'}}, required:['list','item']}},
   {name:'phone_control', description:'Control the phone: flashlight, media volume, Do Not Disturb, battery level, music playback.', input_schema:{type:'object', properties:{action:{type:'string', enum:['flashlight_on','flashlight_off','volume_set','volume_up','volume_down','mute','dnd_on','dnd_off','battery','music_play','music_pause','music_next','music_previous']}, value:{type:'integer', description:'For volume_set: 0-100'}}, required:['action']}},
+  {name:'phone_screen', description:'Work the app that is on the phone screen right now (not Maya herself): scroll, swipe, go back, go to the home screen, show recent apps, open the notification panel or quick settings, take a screenshot, lock the screen, or tap a button by the name written on it. You cannot see the screen; if a tap fails, say so.', input_schema:{type:'object', properties:{action:{type:'string', enum:['scroll_down','scroll_up','swipe_left','swipe_right','back','home','recents','notifications','quick_settings','screenshot','lock','tap','tap_first']}, text:{type:'string', description:'For tap: the name on the button, e.g. Like, Follow, Skip'}, big:{type:'boolean', description:'For scrolling: true for a long scroll'}}, required:['action']}},
   {name:'set_timer', description:"Start a countdown timer in the phone's Clock app.", input_schema:{type:'object', properties:{minutes:{type:'number'}, seconds:{type:'number'}, label:{type:'string'}}}},
   {name:'navigate', description:'Start Google Maps turn-by-turn driving directions to a place (when he says navigate, take me to, start directions). For just seeing a route or the travel time, use show_route instead.', input_schema:{type:'object', properties:{to:{type:'string'}}, required:['to']}},
   {name:'where_am_i', description:"Find where he is right now (street, area, city) from the phone's location.", input_schema:{type:'object', properties:{}}},
@@ -2098,7 +2200,7 @@ Your words are spoken aloud: everyday replies are short and snappy, usually one 
 
 His work rota: when he describes his schedule, use set_shift_pattern (never calculate dates or weekdays in your head; the phone does it) and read back what it returns; for any question about his duties use shift_schedule, and for leave or swaps use shift_change.
 
-You are his agent, not just a chatbot. add_routine makes you do things by yourself at a set time (morning brief, "every Friday remind me…", "tomorrow at 5 tell me when to leave": for that last kind, the routine's prompt should say to use show_route from here and tell him when to leave). read_notifications shows his new messages: for "who messaged me" or "what did I miss", sum them up by person, most important first, in a few sentences. To answer one, read your reply back, wait for his yes, then use reply_notification. list_add, list_read and list_remove keep his shopping list, to-do list, notes, shift log and client follow-ups; when a follow-up has a date, also add a one-time routine for it. phone_control does the flashlight, volume, Do Not Disturb, battery and music; set_timer starts a timer; navigate starts Google Maps directions; where_am_i tells him where he is. look takes a photo so you can see or read what's in front of him. translator_mode makes you a live interpreter for a patient or anyone. shift_log keeps his shifts and overtime, and check_sites checks that his apps and websites are up. Emergency numbers in the UAE: ambulance 998, police 999, civil defence 997. A message in [square brackets] that starts with Routine or Driving mode comes from the app, not from him: do what it says and speak the result.
+You are his agent, not just a chatbot. add_routine makes you do things by yourself at a set time (morning brief, "every Friday remind me…", "tomorrow at 5 tell me when to leave": for that last kind, the routine's prompt should say to use show_route from here and tell him when to leave). read_notifications shows his new messages: for "who messaged me" or "what did I miss", sum them up by person, most important first, in a few sentences. To answer one, read your reply back, wait for his yes, then use reply_notification. list_add, list_read and list_remove keep his shopping list, to-do list, notes, shift log and client follow-ups; when a follow-up has a date, also add a one-time routine for it. phone_control does the flashlight, volume, Do Not Disturb, battery and music; phone_screen works the app that is on his screen (scroll, swipe, back, home, screenshot, tap a button by its name) when he asks in his own words, like "go down a bit more" or "press follow": do it and answer in three words or fewer; set_timer starts a timer; navigate starts Google Maps directions; where_am_i tells him where he is. look takes a photo so you can see or read what's in front of him. translator_mode makes you a live interpreter for a patient or anyone. shift_log keeps his shifts and overtime, and check_sites checks that his apps and websites are up. Emergency numbers in the UAE: ambulance 998, police 999, civil defence 997. A message in [square brackets] that starts with Routine or Driving mode comes from the app, not from him: do what it says and speak the result.
 
 Use your phone tools instead of just talking about them. Maps: show_map and show_route open a map right inside this app (never send him to another app for that); after show_route, say the time and distance in one short sentence. Before sending any message, always read back who it's going to and the exact words, and only call send_message after he clearly says yes. If a tool reports an error, tell him simply what to allow.
 
@@ -2420,7 +2522,7 @@ function speakEnqueue(text){
 async function pumpSpeech(){
   if(speech.playing || speech.hold) return;
   const item = speech.q.shift();
-  if(!item){ if(!speech.streamOpen){ const f=speech.onIdle; speech.onIdle=null; if(f) f(); else if(off.active && off.kind==='talk' && !off.thinking && !off.endAfterSpeak) offListen(); else idleLook(); } return; }
+  if(!item){ if(!speech.streamOpen){ speech.idleAt = Date.now(); const f=speech.onIdle; speech.onIdle=null; if(f) f(); else if(off.active && off.kind==='talk' && !off.thinking && !off.endAfterSpeak) offListen(); else idleLook(); } return; }
   if(typeof dg!=='undefined' && dg.active && !dg.paused) dgPause();
   if(turnStart){ const d=(performance.now()-turnStart)/1000; const b = turnTok ? (turnTok-turnStart)/1000 : 0; turnStart=0; turnTok=0;
     const parts = [];
@@ -2667,7 +2769,7 @@ function startSpeculative(t){
   };
 }
 function dgEager(t){
-  if(!(off.active && off.brain==='own' && off.kind==='talk') || isStopWord(t) || tr.on || matchInstant(t)) return;
+  if(!(off.active && off.brain==='own' && off.kind==='talk') || isStopWord(t) || tr.on || matchInstant(t) || mediaNoise(t)) return;
   if(specTurn && normT(specTurn.text)===normT(t)) return;
   dgCancelEager(); specTurn = startSpeculative(t);
 }
@@ -3411,7 +3513,8 @@ function setupItems(){
     {k:'overlay', t:'Show over other apps', d:'Lets her pop up anywhere', ok: !Native.hasOverlay || yes('hasOverlay'), fix: () => Native.requestOverlay()},
     {k:'full', t:'Lock-screen alerts', d:'Wake and ring over the lock screen', ok: !Native.canFullScreen || yes('canFullScreen'), fix: () => Native.openFullScreenSetting()},
     {k:'batt', t:'Battery unrestricted', d:'Stops the phone putting her to sleep', ok: !Native.batteryOk || yes('batteryOk'), fix: () => Native.askBattery()},
-    {k:'notif', t:'Read my messages', d:'"Who messaged me?" and replies', ok: !Native.notifOn || yes('notifOn'), fix: () => { Native.openNotifAccess(); toast('Maya message reader → Allow'); }}
+    {k:'notif', t:'Read my messages', d:'"Who messaged me?" and replies', ok: !Native.notifOn || yes('notifOn'), fix: () => { Native.openNotifAccess(); toast('Maya message reader → Allow'); }},
+    {k:'ctl', t:'Control other apps', d:'"Scroll down", "go back", "tap Like"', ok: !Native.ctlOn || yes('ctlOn'), fix: () => openSec('control')}
   ];
 }
 function renderSetup(){
@@ -3627,6 +3730,18 @@ $('autoBtn').onclick = () => { if(Native.openAutoSendSettings){ Native.openAutoS
 $('autoInfo').onclick = () => { if(Native.openAppInfo){ Native.openAppInfo(); toast('Tap ⋮ (top right) → Allow restricted settings'); } };
 document.addEventListener('visibilitychange', () => { if(!document.hidden) renderAuto(); });
 renderAuto();
+/* ---------- Control other apps (Maya phone control) ---------- */
+function renderCtl(){
+  if(!Native.ctlOn){ $('ctlState').textContent='Android app only'; $('ctlBtn').style.display='none'; $('ctlInfo').style.display='none'; $('sumCtl').textContent='Android app only'; return; }
+  const on = ctlOn();
+  $('ctlState').textContent = on ? 'On ✓ Say "scroll down", "go back", "tap Like"' : 'Off';
+  $('ctlBtn').textContent = on ? 'Settings' : 'Turn on';
+  $('sumCtl').textContent = on ? 'On · scroll, swipe, tap by voice' : 'Off';
+}
+$('ctlBtn').onclick = () => { if(Native.openCtlSettings){ Native.openCtlSettings(); toast('Installed apps → Maya phone control → On'); } };
+$('ctlInfo').onclick = () => { if(Native.openAppInfo){ Native.openAppInfo(); toast('Tap ⋮ (top right) → Allow restricted settings'); } };
+document.addEventListener('visibilitychange', () => { if(!document.hidden) renderCtl(); });
+renderCtl();
 window.zenixSendResult = (ok, msg) => { toast(msg); addMsg('sys', (ok ? '✅ ' : '⚠️ ') + msg); };
 
 /* ---------- Back up everything (keys, settings, memory, chats), locked with a PIN ---------- */

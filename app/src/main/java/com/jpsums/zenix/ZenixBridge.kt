@@ -140,6 +140,45 @@ class ZenixBridge(private val activity: MainActivity) {
     @JavascriptInterface fun pickRingSound(): String { activity.runOnUiThread { activity.pickRingSound() }; return ok("ok") }
     @JavascriptInterface fun testRing(): String { AlarmRinger.start(activity, "Test reminder", "This is how Maya's reminders will ring", null); return ok("Ringing now.") }
 
+    // ---------- control other apps (scroll, swipe, tap, search) ----------
+    @JavascriptInterface fun ctlOn(): String = ControlService.isOn(activity).toString()
+    @JavascriptInterface fun ctlFront(): String = ControlService.instance?.frontPackage() ?: ""
+    @JavascriptInterface fun musicActive(): String = try { activity.getSystemService(android.media.AudioManager::class.java).isMusicActive.toString() } catch (_: Exception) { "false" }
+    /** One screen command; the answer goes to window.zenixCtl(id, ok, message). */
+    @JavascriptInterface fun ctl(id: String, action: String, arg: String): String {
+        val back = { okk: Boolean, msg: String -> activity.runJs("window.zenixCtl && window.zenixCtl(${JSONObject.quote(id)}, $okk, ${JSONObject.quote(msg)})") }
+        val svc = ControlService.instance
+        if (svc == null) { back(false, if (ControlService.isOn(activity)) "Phone control is still starting. Try again in a moment." else "Maya phone control is off. It can be turned on in Maya's Settings under Control other apps."); return ok("off") }
+        when (action) {
+            "play_youtube" -> {   // YouTube's own search, then start the first video
+                val i = Intent(Intent.ACTION_SEARCH).setPackage("com.google.android.youtube").putExtra("query", arg)
+                if (!launch(i) && !launch(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.youtube.com/results?search_query=" + Uri.encode(arg))))) { back(false, "YouTube isn't installed."); return ok("no") }
+                android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({ svc.run("youtube_first", "", back) }, 2200)
+            }
+            "search_youtube" -> {
+                val i = Intent(Intent.ACTION_SEARCH).setPackage("com.google.android.youtube").putExtra("query", arg)
+                back(launch(i), "YouTube is showing results for $arg.")
+            }
+            "play_music" -> {     // the music app plays it straight away
+                val pm = activity.packageManager
+                val pkg = listOf("com.spotify.music", "com.google.android.apps.youtube.music").firstOrNull { try { pm.getPackageInfo(it, 0); true } catch (_: Exception) { false } }
+                val i = Intent(android.provider.MediaStore.INTENT_ACTION_MEDIA_PLAY_FROM_SEARCH)
+                    .putExtra(android.provider.MediaStore.EXTRA_MEDIA_FOCUS, "vnd.android.cursor.item/*").putExtra(android.app.SearchManager.QUERY, arg)
+                if (pkg != null) i.setPackage(pkg)
+                if (pkg != null && launch(i)) back(true, "Playing $arg.")
+                else {   // no music app: use YouTube
+                    val y = Intent(Intent.ACTION_SEARCH).setPackage("com.google.android.youtube").putExtra("query", arg)
+                    if (launch(y)) android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({ svc.run("youtube_first", "", back) }, 2200)
+                    else back(false, "I couldn't find a music app or YouTube.")
+                }
+            }
+            else -> svc.run(action, arg, back)
+        }
+        return ok("running")
+    }
+    @JavascriptInterface fun openCtlSettings(): String =
+        if (launch(Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS))) ok("ok") else fail("Couldn't open Accessibility settings.")
+
     // ---------- phone controls ----------
     @JavascriptInterface fun flashlight(on: String): String = try {
         val cm = activity.getSystemService(android.hardware.camera2.CameraManager::class.java)

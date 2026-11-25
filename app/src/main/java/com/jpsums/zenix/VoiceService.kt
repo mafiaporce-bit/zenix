@@ -208,5 +208,13 @@ class VoiceService : Service() {
         @Volatile var current: VoiceService? = null
         private var savedX: Int? = null
         private var savedY: Int? = null
+
+        /** Where the floating circle is on the screen right now (null when it isn't showing). */
+        fun orbBounds(): android.graphics.Rect? {
+            val s = current ?: return null
+            val p = s.params ?: return null
+            if (s.orb == null) return null
+            return android.graphics.Rect(p.x, p.y, p.x + p.width, p.y + p.height)
+        }
     }
 }
