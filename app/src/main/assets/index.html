@@ -957,10 +957,33 @@ function emergencyNumber(c){
   if(/^(112|911)$/.test(t)) return '112';
   return '';
 }
+/* Alarms: with no day → the Clock app (next time it comes up). With a day or date → Zenix rings it herself on
+   exactly that day (the Clock app can't be given a day). "Every Monday" → a repeating Clock app alarm. */
+const WEEKDAYS = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+function dayIndex(w){ w = String(w||'').toLowerCase().trim(); return WEEKDAYS.findIndex(d => w && (d === w || d.startsWith(w.slice(0,3)))); }
+function alarmFor(h, mi, label, {date, weekday, every}={}){
+  const hm = `${String(h).padStart(2,'0')}:${String(mi).padStart(2,'0')}`;
+  const days = String(every||'').split(/[,\s]+|and/).map(dayIndex).filter(i => i >= 0);
+  if(every && /day|daily|everyday/i.test(String(every)) && !days.length) for(let i=0;i<7;i++) days.push(i);
+  if(days.length){ showAction(`⏰ Alarm ${hm} every ${days.map(i => WEEKDAYS[i].slice(0,3)).join(', ')}`); return callNative('setAlarmRepeat', h, mi, label, days.map(i => i+1).join(',')); }
+  let at = null;
+  if(date && /^\d{4}-\d{2}-\d{2}$/.test(date)){ const [y,m,d] = date.split('-').map(Number); at = new Date(y, m-1, d, h, mi, 0, 0); }
+  else if(weekday !== undefined && weekday !== null && weekday !== ''){
+    const wi = typeof weekday === 'number' ? weekday : (/^tomorrow$/i.test(weekday) ? (new Date().getDay()+1)%7 : /^today$/i.test(weekday) ? new Date().getDay() : dayIndex(weekday));
+    if(wi >= 0){ at = new Date(); at.setHours(h, mi, 0, 0); let add = (wi - at.getDay() + 7) % 7; if(add === 0 && at <= new Date()) add = 7; at.setDate(at.getDate() + add); }
+  }
+  if(at){
+    if(at <= new Date()) return {ok:false, message:'That time has already passed.'};
+    showAction(`⏰ Alarm ${at.toLocaleDateString('en-GB', {weekday:'short', day:'numeric', month:'short'})} ${hm}`);
+    return callNative('setAlarmAt', label, at.getTime());
+  }
+  showAction(`⏰ Alarm ${hm}`);
+  return callNative('setAlarm', h, mi, label);
+}
 const clientTools = {
-  set_alarm: async ({hour, minute, label}) => {
-    showAction(`⏰ Alarm ${String(hour).padStart(2,'0')}:${String(minute).padStart(2,'0')}`);
-    return reply(callNative('setAlarm', hour, minute, label||'Zenix alarm') || {ok:false, message:'Alarms only work in the Android app.'});
+  set_alarm: async ({hour, minute, label, date, weekday, every}) => {
+    const r = alarmFor(+hour, +minute||0, label||'Zenix alarm', {date, weekday, every});
+    return reply(r || {ok:false, message:'Alarms only work in the Android app.'});
   },
   set_reminder: async ({text, minutes_from_now}) => {
     showAction(`⏰ Reminder in ${minutes_from_now} min: ${text}`);
@@ -1898,9 +1921,23 @@ function matchInstant(raw){
     if(name.split(' ').length > 4 || /\b(map|maps of|website|site|link|page|camera and|file|chat with|conversation)\b|\.com|www/.test(name)) return null;
     return async () => locked() ? null : (showAction('📱 Opening ' + name), nat('openApp', name));
   }
-  if((m = low.match(/^(?:set|make|create|put)?\s*(?:an?|my)?\s*alarm\s*(?:for|at|on)?\s+(.+)$/)) || (m = low.match(/^wake me(?: up)? (?:at|by) (.+)$/))){
-    const tm = timeOfDay(m[1]); if(!tm) return null;
-    return async () => { showAction(`⏰ Alarm ${String(tm.h).padStart(2,'0')}:${String(tm.mi).padStart(2,'0')}`); return nat('setAlarm', tm.h, tm.mi, 'Zenix alarm'); };
+  if((m = low.match(/^(?:(?:set|make|create|put|turn on)\s+)?(?:an?\s+|my\s+|the\s+)?alarm\s*(?:for|at|on)?\s+(.+)$/)) || (m = low.match(/^wake me(?: up)? (?:at|by|on) (.+)$/))){
+    // the day, if he said one: "on monday", "monday", "tomorrow", "every monday", "every day"
+    let rest = m[1], day = null, every = null;
+    const dw = '(sunday|monday|tuesday|wednesday|thursday|friday|saturday|tomorrow|today)';
+    let d;
+    if((d = rest.match(/\s*(?:on\s+)?every\s*(day|weekday|(?:(?:sunday|monday|tuesday|wednesday|thursday|friday|saturday)(?:\s*(?:,|and)\s*)?)+)\s*/))){ every = d[1]==='weekday' ? 'monday,tuesday,wednesday,thursday,friday' : d[1]; rest = rest.replace(d[0], ' '); }
+    else if((d = rest.match(new RegExp('\\s*(?:on\\s+|this\\s+|next\\s+)?' + dw + '(?:\\s+(?:morning|evening|night))?\\s*')))){ day = d[1]; rest = rest.replace(d[0], ' '); }
+    rest = rest.replace(/^\s*(?:for|at|on)\s+/, '').replace(/\s+(?:for|at|on)\s*$/, '').trim();
+    if(d && /morning/.test(d[0]) && /^\d{1,2}(?:[:.\s]\d{2})?$/.test(rest)) rest += ' am';
+    if(d && /evening|night/.test(d[0]) && /^\d{1,2}(?:[:.\s]\d{2})?$/.test(rest)) rest += ' pm';
+    const NUM = {one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,eleven:11,twelve:12};
+    rest = rest.replace(/\b(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\b/g, w => NUM[w]).replace(/\bo'?\s?clock\b/, '').replace(/\ba\.?\s?m\.?\b/, 'am').replace(/\bp\.?\s?m\.?\b/, 'pm').replace(/\s+/g, ' ').trim();
+    const tm = timeOfDay(rest); if(!tm) return null;
+    // a day but no AM/PM: an alarm at 4–11 is the morning, 1–3 the afternoon (not "whichever comes next")
+    const hm = rest.match(/^(\d{1,2})(?:[:.\s](\d{2}))?$/);
+    if((day || every) && hm){ const h0 = +hm[1]; tm.h = h0 === 12 ? 12 : (h0 >= 4 && h0 <= 11 ? h0 : (h0 < 4 ? h0 + 12 : h0)); }
+    return async () => { const r = alarmFor(tm.h, tm.mi, 'Zenix alarm', {weekday: day, every}); return r && r.ok ? r.message : (r ? r.message : null); };
   }
   if((m = low.match(/^(?:set|start|put)?\s*(?:an?\s+)?timer\s+(?:for\s+)?(.+)$/)) || (m = low.match(/^(?:set|start)?\s*(?:an?\s+)?(.+?)\s+timer$/))){
     const min = durMinutes(m[1]); if(!min || min > 1440) return null;
@@ -2274,7 +2311,7 @@ const brainKey = () => settings.provider==='openrouter' ? orKey() : getKey();
 let ownMsgs = [];
 
 const TOOL_DEFS = [
-  {name:'set_alarm', description:"Set a real alarm in the phone's Clock app (24-hour time, Dubai).", input_schema:{type:'object', properties:{hour:{type:'integer'}, minute:{type:'integer'}, label:{type:'string'}}, required:['hour','minute']}},
+  {name:'set_alarm', description:"Set an alarm (24-hour time, Dubai). With no day it goes in the Clock app for the next time it comes up. For a specific day give weekday (e.g. 'monday', 'tomorrow') or date (YYYY-MM-DD): Zenix then rings it on exactly that day. For a weekly repeat give every (e.g. 'monday' or 'monday,wednesday' or 'day'). Always tell him the day and date from the result, never a day you didn't set.", input_schema:{type:'object', properties:{hour:{type:'integer'}, minute:{type:'integer'}, label:{type:'string'}, weekday:{type:'string'}, date:{type:'string', description:'YYYY-MM-DD'}, every:{type:'string'}}, required:['hour','minute']}},
   {name:'set_reminder', description:'Schedule a reminder notification. Convert relative times to minutes from now.', input_schema:{type:'object', properties:{text:{type:'string'}, minutes_from_now:{type:'integer'}}, required:['text','minutes_from_now']}},
   {name:'open_app', description:'Open an app on the phone by name (Facebook, Claude, Gemini, YouTube, Maps...).', input_schema:{type:'object', properties:{app_name:{type:'string'}}, required:['app_name']}},
   {name:'make_call', description:'Call a contact name or phone number. If it returns close matches, ask Jim which one.', input_schema:{type:'object', properties:{contact:{type:'string'}}, required:['contact']}},

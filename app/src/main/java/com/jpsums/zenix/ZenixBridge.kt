@@ -571,6 +571,41 @@ class ZenixBridge(private val activity: MainActivity) {
         return if (launch(i)) ok("Alarm set for %02d:%02d.".format(h, m)) else fail("The Clock app didn't accept the alarm.")
     }
 
+    /** An alarm on an exact day and time (the Clock app can't take a day, so Zenix rings it herself). */
+    @JavascriptInterface
+    fun setAlarmAt(label: String, atMs: String): String {
+        val at = atMs.toLongOrNull() ?: return fail("I didn't get when.")
+        if (at <= System.currentTimeMillis()) return fail("That time has already passed.")
+        val id = (at / 1000 % Int.MAX_VALUE).toInt()
+        val intent = Intent(activity, ReminderReceiver::class.java)
+            .putExtra("text", label.ifBlank { "Alarm" }).putExtra("title", "⏰ Zenix alarm").putExtra("id", id).putExtra("alarm", true)
+        val pi = PendingIntent.getBroadcast(activity, id, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        val am = activity.getSystemService(AlarmManager::class.java)
+        return try {
+            // shown as a real alarm (clock icon in the status bar) and allowed to fire on time even in battery saving
+            val show = PendingIntent.getActivity(activity, id, Intent(activity, MainActivity::class.java), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+            if (Build.VERSION.SDK_INT >= 31 && !am.canScheduleExactAlarms()) am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pi)
+            else am.setAlarmClock(AlarmManager.AlarmClockInfo(at, show), pi)
+            val day = SimpleDateFormat("EEEE d MMMM, h:mm a", Locale.ENGLISH).format(Date(at))
+            ok("Alarm set for $day.")
+        } catch (e: Exception) { fail("Couldn't set the alarm: ${e.message}") }
+    }
+
+    /** A Clock app alarm that repeats on weekdays (days: 1=Sunday … 7=Saturday, comma separated). */
+    @JavascriptInterface
+    fun setAlarmRepeat(hour: String, minute: String, label: String, days: String): String {
+        val h = hour.toIntOrNull() ?: return fail("I didn't get the hour.")
+        val m = minute.toIntOrNull() ?: 0
+        val list = ArrayList(days.split(",").mapNotNull { it.trim().toIntOrNull() }.filter { it in 1..7 })
+        if (list.isEmpty()) return fail("Which days?")
+        val i = Intent(AlarmClock.ACTION_SET_ALARM)
+            .putExtra(AlarmClock.EXTRA_HOUR, h).putExtra(AlarmClock.EXTRA_MINUTES, m)
+            .putExtra(AlarmClock.EXTRA_MESSAGE, label).putExtra(AlarmClock.EXTRA_DAYS, list)
+            .putExtra(AlarmClock.EXTRA_SKIP_UI, true)
+        val names = list.map { arrayOf("", "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday")[it] }
+        return if (launch(i)) ok("Alarm set for %02d:%02d every %s.".format(h, m, names.joinToString(", "))) else fail("The Clock app didn't accept the alarm.")
+    }
+
     @JavascriptInterface
     fun setReminder(text: String, minutes: String): String {
         val mins = minutes.toLongOrNull() ?: return fail("I didn't get when to remind you.")
