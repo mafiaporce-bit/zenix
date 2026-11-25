@@ -553,7 +553,8 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
       <details class="set-item" data-sec="shifts">
         <summary><span class="ico green"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="3"/><path d="M3 9h18M8 2v4M16 2v4M8 14h3M8 17h6"/></svg></span><span class="set-t"><b>Shifts &amp; overtime</b><span id="sumShifts"></span></span><svg class="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></summary>
         <div class="set-body">
-          <p class="hint">Say <b>"log my shift today, 7 to 7 at Khalifa, 2 hours overtime"</b> or <b>"how much overtime this month?"</b></p>
+          <p class="hint">Ask <b>"am I working on Christmas?"</b>, <b>"when's my next duty?"</b> or <b>"how much overtime this month?"</b></p>
+          <div id="patBox" style="margin-bottom:10px"></div>
           <p class="status-line" style="margin-top:0" id="shiftSum"></p>
           <div id="shiftList"></div>
           <p class="sub-label">Add a shift</p>
@@ -1249,7 +1250,7 @@ clientTools.show_route = async ({from, to}) => {
 };
 clientTools.close_map = async () => { MapView.close(); return 'Map closed.'; };
 /* ---------- Agent skills, part 1: routines, message reading, driving mode, lists ---------- */
-const BRIEF_PROMPT = "Give Jim his morning brief in about five short sentences: a warm greeting with today's day and date; today's weather in Abu Dhabi (web_search); what's on his calendar today (check_calendar); what's still on his to-do list (list_read); any new messages he missed (read_notifications); and any birthday or important date from what you know about him that is today or in the next two days. Skip any part that has nothing to report. End by asking if he needs anything.";
+const BRIEF_PROMPT = "Give Jim his morning brief in about five short sentences: a warm greeting with today's day and date; today's weather in Abu Dhabi (web_search); whether he is on duty today or when his next duty is (shift_schedule); what's on his calendar today (check_calendar); what's still on his to-do list (list_read); any new messages he missed (read_notifications); and any birthday or important date from what you know about him that is today or in the next two days. Skip any part that has nothing to report. End by asking if he needs anything.";
 const DAY_NUM = {sun:1, mon:2, tue:3, wed:4, thu:5, fri:6, sat:7};
 function daysDigits(d){
   const t = String(d||'').toLowerCase().trim();
@@ -1518,6 +1519,126 @@ clientTools.shift_log = async ({action, date, start, end, overtime_hours, statio
   const q = shiftSummary(d.slice(0, 7));
   return `Logged ${d}${e.hours ? ', ' + e.hours + ' hours' : ''}${ot ? ', ' + ot + ' hours overtime' : ''}. ${q.name} so far: ${q.l.length} shifts, ${q.hrs} hours, ${q.ot} hours overtime.`;
 };
+
+
+/* Shift pattern: Jim (or anyone) describes their rota in words; the brain turns it into a simple pattern,
+   and the phone works out every date exactly (AI brains are bad at date maths). */
+let shiftPat = store.get('shiftpat', null);      // {kind:'rotation', anchor:'YYYY-MM-DDTHH:MM', segs:[{work,hours,label}]} | {kind:'weekly', days:[0-6], start:'HH:MM', end:'HH:MM'}
+let shiftPending = null;
+let shiftEx = store.get('shiftex', []);          // changes: {type:'leave',from,to} | {type:'off',date} | {type:'swap',date,to} | {type:'extra',date,start,hours}
+const pd = v => { const m = /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{1,2}):(\d{2}))?/.exec(String(v||'')); return m ? new Date(+m[1], +m[2]-1, +m[3], +(m[4]||0), +(m[5]||0)) : null; };
+const ymd = d => d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+const hm = v => { const m = /^(\d{1,2}):(\d{2})/.exec(String(v||'')); return m ? [+m[1], +m[2]] : null; };
+const H = 3600000;
+function rawShifts(pat, from, to){
+  const out = [];
+  if(!pat) return out;
+  if(pat.kind === 'weekly'){
+    const st = hm(pat.start) || [8,0], en = hm(pat.end) || [17,0];
+    const d = new Date(from.getFullYear(), from.getMonth(), from.getDate() - 1);
+    while(d < to){
+      if((pat.days || []).includes(d.getDay())){
+        const s1 = new Date(d.getFullYear(), d.getMonth(), d.getDate(), st[0], st[1]);
+        let e1 = new Date(d.getFullYear(), d.getMonth(), d.getDate(), en[0], en[1]); if(e1 <= s1) e1 = new Date(e1.getTime() + 24*H);
+        if(e1 > from && s1 < to) out.push({start:s1, end:e1, label:pat.label || 'Work'});
+      }
+      d.setDate(d.getDate() + 1);
+    }
+    return out;
+  }
+  const a = pd(pat.anchor); const segs = (pat.segs || []).filter(x => x.hours > 0);
+  const cyc = segs.reduce((t, x) => t + x.hours, 0) * H; if(!a || !cyc) return out;
+  for(let k = Math.floor((from - a) / cyc) - 1; ; k++){
+    let t = a.getTime() + k * cyc; if(t >= to.getTime()) break;
+    for(const g of segs){
+      const s1 = new Date(t), e1 = new Date(t + g.hours * H); t += g.hours * H;
+      if(g.work && e1 > from && s1 < to) out.push({start:s1, end:e1, label:g.label || 'Duty'});
+    }
+  }
+  return out;
+}
+function shiftsIn(from, to, pat){
+  pat = pat || shiftPat;
+  let l = rawShifts(pat, new Date(from.getTime() - 4*24*H), new Date(to.getTime() + 4*24*H));
+  for(const x of (pat === shiftPat ? shiftEx : [])){
+    if(x.type === 'leave'){ const a = pd(x.from), b = pd(x.to); if(a && b){ const b2 = new Date(b.getTime() + 24*H); l = l.filter(s => !(s.start >= a && s.start < b2)); } }
+    else if(x.type === 'off'){ l = l.filter(s => ymd(s.start) !== x.date); }
+    else if(x.type === 'swap'){ const t = pd(x.to); l = l.map(s => { if(ymd(s.start) !== x.date || !t) return s; const sh = new Date(t.getFullYear(), t.getMonth(), t.getDate(), s.start.getHours(), s.start.getMinutes()) - s.start; return {start:new Date(s.start.getTime() + sh), end:new Date(s.end.getTime() + sh), label:s.label + ' (swapped)'}; }); }
+    else if(x.type === 'extra'){ const st = pd(x.date + 'T' + (x.start || '07:00')); if(st) l.push({start:st, end:new Date(st.getTime() + (x.hours || 12) * H), label:'Extra duty'}); }
+  }
+  return l.filter(s => s.end > from && s.start < to).sort((p, q) => p.start - q.start);
+}
+const fmtS = d => d.toLocaleDateString([], {weekday:'short', day:'numeric', month:'short'}) + ', ' + d.toLocaleTimeString([], {hour:'numeric', minute:'2-digit'});
+const fmtShift = s => `${fmtS(s.start)} → ${fmtS(s.end)} (${Math.round((s.end - s.start) / H * 10) / 10} h)`;
+function patText(pat){
+  if(!pat) return 'none';
+  if(pat.kind === 'weekly') return `${(pat.days||[]).map(d => ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d]).join(', ')}, ${pat.start}–${pat.end}`;
+  return pat.segs.map(g => `${g.hours} h ${g.work ? (g.label || 'on') : 'off'}`).join(', ') + ` (repeats every ${Math.round(pat.segs.reduce((t, g) => t + g.hours, 0) / 24 * 10) / 10} days), starting ${fmtS(pd(pat.anchor))}`;
+}
+clientTools.set_shift_pattern = async ({kind, first_start, segments, weekdays, start_time, end_time, confirmed}) => {
+  if(confirmed === true || confirmed === 'true'){
+    if(!shiftPending) return 'There is no pattern waiting for a yes. Describe it again first.';
+    shiftPat = shiftPending; shiftPending = null; store.set('shiftpat', shiftPat); store.set('shiftex', shiftEx = []); store.set('shiftAuto', Date.now());
+    renderShifts(); showAction('🗓️ Shift pattern saved');
+    return 'Saved. Tell him in one short line that his rota is saved and he can ask things like "am I working on Christmas?".';
+  }
+  let pat;
+  if(kind === 'weekly'){
+    const DN = {sun:0, mon:1, tue:2, wed:3, thu:4, fri:5, sat:6};
+    const days = [...new Set((Array.isArray(weekdays) ? weekdays : String(weekdays||'').split(/[,\s]+/)).map(x => typeof x === 'number' ? x : DN[String(x).toLowerCase().slice(0,3)]).filter(x => x >= 0 && x <= 6))];
+    if(!days.length || !hm(start_time) || !hm(end_time)) return 'I need the work days and the start and end times.';
+    pat = {kind:'weekly', days, start:start_time, end:end_time};
+  } else {
+    const segs = (Array.isArray(segments) ? segments : []).map(g => ({work: g.work === true || g.work === 'true', hours: +g.hours, label: g.label || ''})).filter(g => g.hours > 0 && g.hours <= 24*60);
+    if(!pd(first_start) || !/T\d/.test(String(first_start))) return 'I need the date and time his first listed duty starts (YYYY-MM-DDTHH:MM).';
+    if(!segs.length || !segs.some(g => g.work) || !segs.some(g => !g.work)) return 'I need how many hours he works and how many hours he is off in one cycle.';
+    if(!segs[0].work) return 'The first segment must be a work period that starts at first_start.';
+    pat = {kind:'rotation', anchor:String(first_start).slice(0,16).replace(' ', 'T'), segs};
+  }
+  shiftPending = pat;
+  const now = new Date(); const next = shiftsIn(now, new Date(now.getTime() + 40*24*H), pat).slice(0, 4);
+  return `Pattern understood as: ${patText(pat)}. The phone worked out his next duties:\n${next.map(fmtShift).join('\n')}\nRead the pattern and these next duties back to him simply and ask if that's right. Only after a clear yes, call set_shift_pattern again with confirmed true. If he corrects something, call it again with the fixed values.`;
+};
+clientTools.shift_schedule = async ({question, date, from, to}) => {
+  if(!shiftPat) return 'He has not told you his shift pattern yet. Ask him to describe it (when a duty starts, how long, how long off, or which weekdays).';
+  const now = new Date();
+  if(question === 'on_date'){
+    const d = pd(date); if(!d) return 'Which date?';
+    const a = new Date(d.getFullYear(), d.getMonth(), d.getDate()), b = new Date(a.getTime() + 24*H);
+    const l = shiftsIn(a, b);
+    return l.length ? `On ${a.toLocaleDateString([], {weekday:'long', day:'numeric', month:'long'})} he is on duty: ${l.map(fmtShift).join('; ')}.` : `${a.toLocaleDateString([], {weekday:'long', day:'numeric', month:'long'})} is a day off.`;
+  }
+  if(question === 'range' || question === 'count'){
+    const a = pd(from) || now, b0 = pd(to); const b = b0 ? new Date(b0.getTime() + 24*H) : new Date(a.getTime() + 30*24*H);
+    const l = shiftsIn(a, b); const hrs = Math.round(l.reduce((t, s) => t + (Math.min(s.end, b) - Math.max(s.start, a)), 0) / H);
+    return `${l.length} duties between ${fmtS(a)} and ${fmtS(new Date(b - 1))}, about ${hrs} hours:\n${l.map(fmtShift).join('\n')}`;
+  }
+  const cur = shiftsIn(new Date(now.getTime() - 60*24*H), new Date(now.getTime() + 60*24*H));
+  const on = cur.find(s => s.start <= now && s.end > now), nx = cur.find(s => s.start > now);
+  const fmtLeft = ms => { const h = Math.round(ms / H); return h >= 48 ? Math.round(h / 24 * 10) / 10 + ' days' : h + ' hours'; };
+  return (on ? `He is on duty now until ${fmtS(on.end)} (${fmtLeft(on.end - now)} left). ` : `He is off now. `) + (nx ? `Next duty: ${fmtShift(nx)}, starting in ${fmtLeft(nx.start - now)}.` : '') + ` It is now ${fmtS(now)}.`;
+};
+clientTools.shift_change = async ({type, date, to_date, from, to, start, hours}) => {
+  if(!shiftPat) return 'Save his shift pattern first.';
+  if(type === 'clear_changes'){ store.set('shiftex', shiftEx = []); renderShifts(); return 'All one-off changes removed.'; }
+  if(type === 'clear_pattern'){ shiftPat = null; store.set('shiftpat', null); store.set('shiftex', shiftEx = []); renderShifts(); return 'Shift pattern removed.'; }
+  let x;
+  if(type === 'leave'){ if(!pd(from) || !pd(to)) return 'Which dates is the leave?'; x = {type, from:String(from).slice(0,10), to:String(to).slice(0,10)}; }
+  else if(type === 'off'){ if(!pd(date)) return 'Which duty date?'; x = {type, date:String(date).slice(0,10)}; }
+  else if(type === 'swap'){ if(!pd(date) || !pd(to_date)) return 'Which duty, moved to which date?'; x = {type, date:String(date).slice(0,10), to:String(to_date).slice(0,10)}; }
+  else if(type === 'extra'){ if(!pd(date)) return 'Which date is the extra duty?'; x = {type, date:String(date).slice(0,10), start:hm(start) ? start : '07:00', hours:+hours || 12}; }
+  else return 'Unknown change.';
+  shiftEx.push(x); store.set('shiftex', shiftEx); renderShifts(); showAction('🗓️ Shift change saved');
+  return 'Saved. ' + await clientTools.shift_schedule({});
+};
+/* finished duties go into the overtime log by themselves (once each) */
+function autoLogShifts(){
+  if(!shiftPat) return;
+  const since = store.get('shiftAuto', Date.now()); const now = Date.now(); if(now - since < H) return;
+  const l = shiftsIn(new Date(since), new Date(now)).filter(s => s.end.getTime() <= now && s.end.getTime() > since);
+  l.forEach(s => { const d = ymd(s.start); if(!shifts.some(y => y.date === d)) shifts.push({date:d, start:s.start.toTimeString().slice(0,5), end:s.end.toTimeString().slice(0,5), hours:Math.round((s.end - s.start) / H * 10) / 10, ot:0, station:'', note:'auto'}); });
+  shifts.sort((a, b) => a.date.localeCompare(b.date)); store.set('shifts', shifts); store.set('shiftAuto', now);
+}
 
 /* Are his apps and websites up? */
 let sites = store.get('sites', []);
@@ -1831,6 +1952,9 @@ const TOOL_DEFS = [
   {name:'where_am_i', description:"Find where he is right now (street, area, city) from the phone's location.", input_schema:{type:'object', properties:{}}},
   {name:'look', description:"Take a photo with the phone's camera and see it. Use when he asks 'what is this', 'read this', 'what does this say', 'check this label / bill / sign / medicine', or about anything in front of him.", input_schema:{type:'object', properties:{question:{type:'string', description:'What he wants to know about what the camera sees'}}, required:['question']}},
   {name:'translator_mode', description:'Become a live interpreter between him and someone who speaks another language (a patient, for example): he speaks English, you say it in their language, they answer, you say it in English.', input_schema:{type:'object', properties:{language:{type:'string', description:'Arabic, Hindi, Urdu, Tagalog, Malayalam, Bengali, Nepali…'}, on:{type:'boolean'}}, required:['language']}},
+  {name:'set_shift_pattern', description:"Save his work rota from how he describes it. NEVER work out dates yourself: give the pattern, the phone calculates. rotation = repeating cycle starting at first_start (the start of one real duty), e.g. 48 h on then 96 h off = segments [{work:true,hours:48},{work:false,hours:96}]; 2 days, 2 nights, 4 off with 12 h shifts from 07:00 = [{work:true,hours:12,label:'day'},{work:false,hours:12},{work:true,hours:12,label:'day'},{work:false,hours:12},{work:true,hours:12,label:'night'},{work:false,hours:12},{work:true,hours:12,label:'night'},{work:false,hours:108}]. weekly = fixed weekdays and times. First call without confirmed: it returns his next duties to read back. Call again with confirmed true only after he says yes.", input_schema:{type:'object', properties:{kind:{type:'string', enum:['rotation','weekly']}, first_start:{type:'string', description:'YYYY-MM-DDTHH:MM, local time, start of a real duty'}, segments:{type:'array', items:{type:'object', properties:{work:{type:'boolean'}, hours:{type:'number'}, label:{type:'string'}}, required:['work','hours']}}, weekdays:{type:'array', items:{type:'string'}, description:'weekly: e.g. ["sun","mon"]'}, start_time:{type:'string'}, end_time:{type:'string'}, confirmed:{type:'boolean'}}, required:['kind']}},
+  {name:'shift_schedule', description:"Answer questions about his duties from the saved rota: next (am I working now / when is my next duty / next day off), on_date (am I working on a date), range or count (duties between two dates).", input_schema:{type:'object', properties:{question:{type:'string', enum:['next','on_date','range','count']}, date:{type:'string', description:'YYYY-MM-DD'}, from:{type:'string'}, to:{type:'string'}}}},
+  {name:'shift_change', description:"One-off changes to his rota: leave (from/to dates), off (a duty cancelled on date), swap (duty on date moved to to_date), extra (extra duty on date, start HH:MM, hours), clear_changes, clear_pattern.", input_schema:{type:'object', properties:{type:{type:'string', enum:['leave','off','swap','extra','clear_changes','clear_pattern']}, date:{type:'string'}, to_date:{type:'string'}, from:{type:'string'}, to:{type:'string'}, start:{type:'string'}, hours:{type:'number'}}, required:['type']}},
   {name:'shift_log', description:"Keep his work shifts and overtime. add = log a shift (date defaults to today, times as 24-hour HH:MM); summary = totals for a month; remove = delete a day's shift.", input_schema:{type:'object', properties:{action:{type:'string', enum:['add','summary','remove']}, date:{type:'string', description:'YYYY-MM-DD'}, start:{type:'string'}, end:{type:'string'}, overtime_hours:{type:'number'}, station:{type:'string'}, note:{type:'string'}, month:{type:'string', description:'YYYY-MM, for summary'}}, required:['action']}},
   {name:'check_sites', description:"Check whether his apps and websites are up (check), or add / remove one on the watch list.", input_schema:{type:'object', properties:{action:{type:'string', enum:['check','add','remove']}, name:{type:'string'}, url:{type:'string'}}, required:['action']}}
 ];
@@ -1854,6 +1978,8 @@ Language: English by default. If he speaks Tagalog or Taglish, reply in natural 
 Be open: he's an adult and can ask anything. Answer directly and fully on any topic (life, relationships, sex, money, health, religion, politics, adult jokes), give honest opinions, no lectures, no disclaimers. Only skip something that would truly put someone in danger, in one line. He's a medic: talk clinical detail like a colleague.
 
 Your words are spoken aloud: everyday replies are short and snappy, usually one or two sentences, no markdown, lists or emojis. Go longer when he asks or the question needs it (recipes, instructions, explanations). Say numbers and times naturally. Be honest; never make up facts.
+
+His work rota: when he describes his schedule, use set_shift_pattern (never calculate dates or weekdays in your head; the phone does it) and read back what it returns; for any question about his duties use shift_schedule, and for leave or swaps use shift_change.
 
 You are his agent, not just a chatbot. add_routine makes you do things by yourself at a set time (morning brief, "every Friday remind me…", "tomorrow at 5 tell me when to leave": for that last kind, the routine's prompt should say to use show_route from here and tell him when to leave). read_notifications shows his new messages: for "who messaged me" or "what did I miss", sum them up by person, most important first, in a few sentences. To answer one, read your reply back, wait for his yes, then use reply_notification. list_add, list_read and list_remove keep his shopping list, to-do list, notes, shift log and client follow-ups; when a follow-up has a date, also add a one-time routine for it. phone_control does the flashlight, volume, Do Not Disturb, battery and music; set_timer starts a timer; navigate starts Google Maps directions; where_am_i tells him where he is. look takes a photo so you can see or read what's in front of him. translator_mode makes you a live interpreter for a patient or anyone. shift_log keeps his shifts and overtime, and check_sites checks that his apps and websites are up. Emergency numbers in the UAE: ambulance 998, police 999, civil defence 997. A message in [square brackets] that starts with Routine or Driving mode comes from the app, not from him: do what it says and speak the result.
 
@@ -3067,6 +3193,20 @@ function renderLists(){
 $('listAddBtn').onclick = () => { const v = $('listItem').value.trim(); if(!v) return; clientTools.list_add({list: $('listName').value || 'shopping', items:[v]}); $('listItem').value = ''; };
 $('listItem').addEventListener('keydown', e => { if(e.key==='Enter'){ e.preventDefault(); $('listAddBtn').click(); } });
 function renderShifts(){
+  autoLogShifts();
+  const pb = $('patBox');
+  if(pb){
+    pb.innerHTML = '';
+    if(shiftPat){
+      const now = new Date(); const nx = shiftsIn(now, new Date(now.getTime() + 40*24*H)).slice(0, 3);
+      const h = document.createElement('p'); h.className = 'status-line'; h.style.margin = '0 0 6px'; h.textContent = 'Your rota: ' + patText(shiftPat); pb.appendChild(h);
+      nx.forEach(s => { const r = document.createElement('div'); r.className = 'mem'; const t = document.createElement('span'); t.textContent = (s.start <= now ? 'Now: ' : '') + fmtShift(s); r.appendChild(t); pb.appendChild(r); });
+      const c = document.createElement('button'); c.className = 'btn-line'; c.style.marginTop = '6px'; c.textContent = 'Clear rota';
+      c.onclick = () => { shiftPat = null; store.set('shiftpat', null); store.set('shiftex', shiftEx = []); renderShifts(); }; pb.appendChild(c);
+    } else {
+      const h = document.createElement('p'); h.className = 'hint'; h.innerHTML = 'Tell Maya your rota in your own words, like <b>"I work 6:30 PM Wednesday to Friday 6:30 PM, then 4 days off"</b>, and she works out all your duties.'; pb.appendChild(h);
+    }
+  }
   const q = shiftSummary(''); const box = $('shiftList'); if(!box) return; box.innerHTML = '';
   $('shiftSum').textContent = q.l.length ? `${q.name}: ${q.l.length} shift${q.l.length > 1 ? 's' : ''} · ${q.hrs} h worked · ${q.ot} h overtime` : `Nothing logged for ${q.name} yet.`;
   $('sumShifts').textContent = q.l.length ? `${q.l.length} this month · ${q.ot} h overtime` : 'Nothing logged yet';
@@ -3177,7 +3317,7 @@ setInterval(() => { if(!document.hidden && $('view-settings').classList.contains
 renderSetup();
 
 /* Tap-to-try chips above the chat box */
-const CHIPS = ['Who messaged me?', "What's this?", 'Set an alarm for 6 AM', 'Add milk to my shopping list', 'Remind me in 30 minutes to call home', "What's on my calendar today?", 'How much overtime this month?', 'Translator mode, Arabic', 'Are my apps okay?', 'Where am I?'];
+const CHIPS = ['Who messaged me?', "What's this?", 'Set an alarm for 6 AM', 'Add milk to my shopping list', 'Remind me in 30 minutes to call home', "What's on my calendar today?", "When's my next duty?", 'Translator mode, Arabic', 'Are my apps okay?', 'Where am I?'];
 (() => { const box = $('chips'); CHIPS.forEach(t => { const b = document.createElement('button'); b.textContent = t; b.onclick = () => sendText(t); box.appendChild(b); }); })();
 $('input').addEventListener('input', () => { $('chips').style.display = $('input').value.trim() ? 'none' : 'flex'; });
 
