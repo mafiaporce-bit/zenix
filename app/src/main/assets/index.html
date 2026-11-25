@@ -1118,6 +1118,7 @@ setInterval(() => {
     // ears that died silently (it happens behind other apps): start them again
     const dgOn = typeof dg!=='undefined' && dg.active;
     if(!dgOn && off.brain==='own' && !nativeSpeakResolve && off.earsAt && now - off.earsAt > 15000){ off.earsAt = now; try{ Native.stopListening(); }catch(e){} offListen(); }
+    if(off.fromWake && !off.heard && off.wakeAt && now - off.wakeAt > 12000 && !off.thinking){ endOffline(true); addMsg('sys', 'Voice chat ended (nobody spoke)'); idleLook(); return; }
     if(!off.quietSince) return;
     if(away){
       off.quietSince = now;   // the quiet clock waits while he's elsewhere
@@ -1513,7 +1514,7 @@ function mayaJustAsked(){
   return false;
 }
 function mediaNoise(t){
-  if(!document.hidden || !Native.musicActive || tr.on || off.trusted) return false;
+  if(!(document.hidden || (off.wakeMedia && !off.heard)) || !Native.musicActive || tr.on || off.trusted) return false;
   if(NAME_RE.test(t) || isStopWord(t) || mayaJustAsked()) return false;
   const ins = matchInstant(t); if(ins && !ins.loose) return false;
   try{ return Native.musicActive()==='true'; }catch(e){ return false; }
@@ -2095,6 +2096,7 @@ window.zenixOnSpeech = async (t) => {
   if(!t){ trMiss(); offListen(); return; }
   if(off.brain==='own' && mediaNoise(t)){ $('liveLine').textContent = ''; offListen(); return; }   // that was the video, not Jim
   awaySince = 0;   // he is using her from another app: the "you were away" clock starts over
+  off.heard = true;
   srErrs = 0; off.quietSince = 0; off.trusted = false;   // Jim is talking now: the normal lock-screen rules apply again
   addMsg('user', t); $('liveLine').textContent='You: '+t;
   if(tr.on && tr.turn==='them'){ trHandle(t); return; }
@@ -2138,7 +2140,7 @@ function startOffline(kind, brain='offline'){
   else { $('dot').className='dot busy'; $('statusText').textContent='Offline'; }
   if(kind==='talk') addMsg('sys', brain==='own' ? 'Voice chat started' : 'Offline voice chat started');
   else if(brain!=='own') addMsg('sys', 'Offline chat');
-  off.fromWake = kind==='talk' && wakeGreeting;
+  off.fromWake = kind==='talk' && wakeGreeting; off.wakeAt = off.fromWake ? Date.now() : 0; off.heard = false; off.wakeMedia = off.fromWake && wakeMedia; wakeMedia = false;
   if(kind==='talk'){
     if(settings.wake && Native.wakePause) Native.wakePause();
     $('talkBtn').classList.add('end'); $('talkLabel').textContent='End chat';
@@ -2147,6 +2149,7 @@ function startOffline(kind, brain='offline'){
       if(settings.voice!=='phone' && !/^(dg|el):/.test(settings.voice)) loadKokoro().catch(()=>{});
       const intro = off.intro; off.intro = null;
       if(intro && intro.ask) ownRespond(intro.ask, true, () => offListen());   // a routine: she does it and says the result
+      else if(wakeGreeting && off.wakeMedia && !(intro && intro.say)){ offListen(); }   // a video is playing: no greeting, she just listens (it may have been the video)
       else { speech.onIdle = () => offListen(); speakEnqueue(intro && intro.say ? intro.say : (wakeGreeting ? 'Yes bro?' : `Hey ${settings.name||'Jim'}! What's up?`)); }
       wakeGreeting = false;
     } else { wakeGreeting = false; offlineSay(`Hey ${settings.name||'Jim'}, offline Maya here. What's up?`, true); }
@@ -3238,8 +3241,10 @@ function wakeResumeLater(){
   if(Native.wakeChatEnded) setTimeout(()=>{ if(!inVoiceChat()) Native.wakeChatEnded(); }, 1200);
   if(settings.wake && Native && Native.wakeResume) setTimeout(()=>{ if(!inVoiceChat()){ Native.wakeResume(); waitWakeReady(); } renderWake(); }, 900);
 }
+let wakeMedia = false;
 window.zenixWake = () => {
   if(connecting || (convo && session==='talk') || (off.active && off.kind==='talk')) return;   // already talking; the listener comes back when that chat ends
+  try{ wakeMedia = !!(Native.musicActive && Native.musicActive()==='true'); }catch(e){ wakeMedia = false; }
   document.querySelector('nav button[data-view="talk"]').click();
   wakeGreeting = true;
   $('talkBtn').click();   // (this also closes a typed chat that was left open)

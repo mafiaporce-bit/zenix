@@ -213,6 +213,7 @@ class WakeWordService : Service() {
             try {
                 if (model == null) model = Model(modelDir(this).absolutePath)
                 val rec = Recognizer(model!!, 16000.0f, grammarFor(model!!))
+                try { rec.setWords(true) } catch (_: Throwable) { }   // gives a confidence score per word
                 main.post {
                     if (paused || speech != null) { rec.close(); return@post }
                     try {
@@ -241,6 +242,19 @@ class WakeWordService : Service() {
         if (clean.isNotEmpty()) { lastHeard = clean; lastHeardAt = now }   // shown in Settings, to check she can hear you
         if (!wakeRegex.containsMatchIn(text)) return
         if (now - lastTrigger < 3000) return
+        if (now < quietUntil) return   // just after a chat ended: that was the tail of it, not a new "Hey Maya"
+        // a video or song is playing: its sound is easily mistaken for "Hey Maya", so only a clear, finished
+        // phrase counts (no half-heard guesses) and the listener must be sure of every word
+        val media = try { getSystemService(android.media.AudioManager::class.java).isMusicActive } catch (_: Exception) { false }
+        if (media) {
+            if (key != "text") return
+            val words = try { JSONObject(hyp ?: "{}").optJSONArray("result") } catch (_: Exception) { null }
+            if (words != null && words.length() > 0) {
+                var low = 1.0
+                for (i in 0 until words.length()) low = minOf(low, words.optJSONObject(i)?.optDouble("conf", 1.0) ?: 1.0)
+                if (low < 0.93) return
+            }
+        }
         lastTrigger = now
         triggered()
     }
@@ -290,7 +304,8 @@ class WakeWordService : Service() {
     }
 
     fun pause() { paused = true; stopEngine() }
-    fun resume() { if (!paused) return; paused = false; main.postDelayed({ startListening() }, 400) }
+    fun resume() { if (!paused) return; paused = false; quietUntil = System.currentTimeMillis() + 8000; main.postDelayed({ startListening() }, 400) }
+    @Volatile private var quietUntil = 0L
 
     override fun onDestroy() {
         main.removeCallbacksAndMessages(null)
