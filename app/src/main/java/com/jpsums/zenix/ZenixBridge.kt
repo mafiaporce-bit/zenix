@@ -473,13 +473,14 @@ class ZenixBridge(private val activity: MainActivity) {
     @JavascriptInterface fun setOrbMode(mode: String): String { VoiceService.current?.setSpeaking(mode == "speaking"); return ok("ok") }
 
     // ---------- contacts ----------
-    private data class Contact(val name: String, val number: String)
-
+    /** sure = the name he said really matches; false = only one word of it matched (could be the wrong person). */
+    private data class Contact(val name: String, val number: String, val sure: Boolean = true)
     private fun findContact(query: String): Contact? {
-        val q = query.trim()
+        // "my wife" -> "wife", so it finds a contact saved as "My Lov WIFE"
+        val q = query.trim().replace(Regex("^(?:my|the|si|kay|ang)\\s+", RegexOption.IGNORE_CASE), "").trim()
         val digits = q.filter { it.isDigit() || it == '+' }
         if (digits.length >= 6 && digits.length >= q.replace(" ", "").length - 2) return Contact(q, digits)
-        if (!has(Manifest.permission.READ_CONTACTS)) return null
+        if (q.isEmpty() || !has(Manifest.permission.READ_CONTACTS)) return null
         val uri = ContactsContract.CommonDataKinds.Phone.CONTENT_URI
         val proj = arrayOf(ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME, ContactsContract.CommonDataKinds.Phone.NUMBER)
         var best: Contact? = null
@@ -493,18 +494,21 @@ class ZenixBridge(private val activity: MainActivity) {
             }
         }
         if (best != null) return best
-        // Try each word on its own ("call Mark from work" -> "Mark")
+        // only one word of it matches ("Jennylene Tabora" -> a "… Tabora"): maybe, but not sure
         for (word in q.split(" ").filter { it.length >= 3 }) {
             activity.contentResolver.query(uri, proj,
                 "${ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME} LIKE ?", arrayOf("%$word%"), null)?.use { c ->
                 if (c.moveToFirst()) {
                     val name = c.getString(0); val num = c.getString(1)
-                    if (name != null && num != null && c.count == 1) return Contact(name, num)
+                    if (name != null && num != null && c.count == 1) return Contact(name, num, sure = q.split(" ").size == 1)
                 }
             }
         }
         return null
     }
+    /** Never call or message the wrong person: a half match is asked about first. */
+    private fun unsure(c: Contact, said: String): String? =
+        if (c.sure) null else fail("I'm not sure who \"$said\" is. The closest contact is ${c.name}. Ask Jim: \"Did you mean ${c.name}?\" Only if he says yes, try again with exactly \"${c.name}\".")
 
     /** Close-match contact names, so Zenix can ask "did you mean…". */
     private fun suggestContacts(query: String): List<String> {
@@ -668,6 +672,7 @@ class ZenixBridge(private val activity: MainActivity) {
     @JavascriptInterface
     fun makeCall(contact: String): String {
         val c = findContact(contact) ?: return notFound(contact)
+        unsure(c, contact)?.let { return it }
         val uri = Uri.parse("tel:" + Uri.encode(c.number))
         val i = if (has(Manifest.permission.CALL_PHONE)) Intent(Intent.ACTION_CALL, uri) else Intent(Intent.ACTION_DIAL, uri)
         return if (launch(i)) ok("Calling ${c.name}.") else fail("Couldn't start the call.")
@@ -694,6 +699,7 @@ class ZenixBridge(private val activity: MainActivity) {
             }
             "whatsapp" -> {
                 val c = findContact(contact) ?: return notFound(contact)
+                unsure(c, contact)?.let { return it }
                 val url = "https://api.whatsapp.com/send?phone=${intlDigits(c.number)}&text=${Uri.encode(message)}"
                 val i = Intent(Intent.ACTION_VIEW, Uri.parse(url)).setPackage("com.whatsapp")
                 val auto = SendHelperService.arm(activity, "whatsapp", c.name, message)
@@ -703,6 +709,7 @@ class ZenixBridge(private val activity: MainActivity) {
             }
             else -> {
                 val c = findContact(contact) ?: return notFound(contact)
+                unsure(c, contact)?.let { return it }
                 if (has(Manifest.permission.SEND_SMS)) {
                     return try {
                         val sms: SmsManager = if (Build.VERSION.SDK_INT >= 31) activity.getSystemService(SmsManager::class.java)
