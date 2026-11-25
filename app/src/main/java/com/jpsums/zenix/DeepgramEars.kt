@@ -80,18 +80,27 @@ class DeepgramEars(private val activity: MainActivity) {
                 val buf = ByteArray(if (flux) 2560 else 3200) // 80 ms (Flux) or 100 ms of audio
                 val silence = ByteArray(buf.size)
                 var lastKeepAlive = System.currentTimeMillis()
+                var lp1 = 0.0; var lp2 = 0.0
                 while (rec === r) {
                     val n = try { r.read(buf, 0, buf.size) } catch (_: Exception) { -1 }
                     if (n < 0) break
                     val socket = ws ?: break
                     if (sending && n > 0) {
                         socket.send(buf.toByteString(0, n))
-                        var sum = 0.0
+                        // loudness, and how much of it is low / middle / high notes (the orb moves differently for each)
+                        var sum = 0.0; var lo = 0.0; var mi = 0.0; var hi = 0.0
                         var k = 0
-                        while (k + 1 < n) { val v = ((buf[k + 1].toInt() shl 8) or (buf[k].toInt() and 0xff)).toShort().toDouble(); sum += v * v; k += 2 }
-                        val rms = Math.sqrt(sum / (n / 2).coerceAtLeast(1)) / 32768.0
-                        val lvl = (rms * 9).coerceIn(0.0, 1.0)
-                        js("window.zenixRms && window.zenixRms(${"%.2f".format(java.util.Locale.US, lvl)})")
+                        while (k + 1 < n) {
+                            val v = ((buf[k + 1].toInt() shl 8) or (buf[k].toInt() and 0xff)).toShort().toDouble()
+                            lp1 += 0.145 * (v - lp1)      // below about 400 Hz
+                            lp2 += 0.544 * (v - lp2)      // below about 2 kHz
+                            val m = lp2 - lp1; val h = v - lp2
+                            sum += v * v; lo += lp1 * lp1; mi += m * m; hi += h * h
+                            k += 2
+                        }
+                        val cnt = (n / 2).coerceAtLeast(1)
+                        fun lv(x: Double, gain: Double) = "%.2f".format(java.util.Locale.US, (Math.sqrt(x / cnt) / 32768.0 * gain).coerceIn(0.0, 1.0))
+                        js("window.zenixRms && window.zenixRms(${lv(sum, 9.0)}, ${lv(lo, 12.0)}, ${lv(mi, 15.0)}, ${lv(hi, 30.0)})")
                     } else if (flux && n > 0) {
                         socket.send(silence.toByteString(0, n))   // Flux likes a continuous stream; send silence while Zenix talks
                     } else if (System.currentTimeMillis() - lastKeepAlive > 4000) {

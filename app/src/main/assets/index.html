@@ -39,9 +39,9 @@ main{flex:1;display:flex;flex-direction:column;padding:0 16px;min-height:0}
 .hero{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:10px 0 4px;text-align:center}
 .greet{font:600 22px/1.25 'Space Grotesk',sans-serif;margin:0}
 .sub{color:var(--muted);margin:0;font-size:14px}
-.orb-wrap{position:relative;width:300px;height:300px;max-width:86vw;max-height:86vw;display:grid;place-items:center;cursor:pointer}
-#mayaOrb{width:100%;height:100%;display:block}
-body{background:radial-gradient(120% 80% at 50% 35%,#12102A 0%,#06050C 60%)}
+.orb-wrap{position:relative;width:340px;height:340px;max-width:92vw;max-height:92vw;display:grid;place-items:center;cursor:pointer}
+#zenixOrb{width:100%;height:100%;display:block}
+body{background:#000}
 .orb-glow{position:absolute;inset:2px;border-radius:50%;background:radial-gradient(circle,rgba(236,72,153,.35),rgba(139,92,246,.18) 45%,transparent 70%);filter:blur(14px);animation:zg 4s ease-in-out infinite}
 .orb{position:relative;width:184px;height:184px;border-radius:50%;overflow:hidden;background:#1A0F3D;box-shadow:inset 0 0 40px rgba(255,255,255,.08),0 20px 60px rgba(139,92,246,.35)}
 .orb-aur{position:absolute;inset:-30%;background:conic-gradient(from 0deg,#8B5CF6,#EC4899,#F9A8D4,#6366F1,#22D3EE,#8B5CF6);filter:blur(22px);animation:spin 9s linear infinite;opacity:.9}
@@ -329,7 +329,7 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
     <div class="hero">
       <p class="greet" id="greet" hidden></p>
       <div class="orb-wrap idle" id="orbWrap">
-        <canvas id="mayaOrb" aria-label="Zenix"></canvas>
+        <canvas id="zenixOrb" aria-label="Zenix"></canvas>
       </div>
       <canvas id="wave" aria-hidden="true"></canvas>
       <div class="mode-label" id="modeLabel"></div>
@@ -693,6 +693,9 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
         <div class="set-body">
           <p class="hint" id="aboutText">Zenix runs on the brain you pick: Claude, the Open brain (Grok) or ElevenLabs. Needs internet, or the offline brain.</p>
           <div class="toggle-row"><span class="status-line" style="margin:0" id="verText">Version …</span><button class="btn-line" id="updCheck">Check for updates</button></div>
+          <p class="sub-label">Orb quality</p>
+          <div class="seg small" id="orbQ"><button data-orbq="auto">Auto</button><button data-orbq="2">High</button><button data-orbq="1">Medium</button><button data-orbq="0">Low</button></div>
+          <p class="hint" style="margin:6px 0 0">Auto lowers the detail by itself if the phone can't keep it smooth. Lower uses less battery.</p>
           <div class="toggle-row" id="updAlt"><span class="status-line" style="margin:0">Update not installing?</span><button class="btn-line" id="updBrowser">Download in browser</button></div>
         </div>
       </details>
@@ -980,7 +983,7 @@ function callNative(method, ...args){
   catch(e){ return { ok:false, message:'Phone action failed: '+e.message }; }
 }
 function webFallback(url){ try{ window.open(url, '_blank'); return {ok:true, message:'Opened on the phone.'}; }catch(e){ return {ok:false,message:'Could not open it.'}; } }
-function showAction(t){ $('actionLine').textContent = t; addMsg('sys', t); }
+function showAction(t){ $('actionLine').textContent = t; addMsg('sys', t); if(window.ZenixOrb && window.ZenixOrb.task) window.ZenixOrb.task(1600); }
 const reply = r => (r && r.message) ? r.message : JSON.stringify(r);
 
 /* UAE emergency lines: these can always be called, even with the phone locked */
@@ -2018,6 +2021,7 @@ async function runInstant(fn, text, speakIt, after){
   speech.muted = false;
   let r = null; try{ r = await fn(); }catch(e){ r = null; logEv('error', 'instant command failed: ' + e.message); }
   logEv('quick', r ? (r.silent ? r.note : r) : 'not handled here, passed to the brain');
+  if(r && window.ZenixOrb && window.ZenixOrb.done) window.ZenixOrb.done();
   if(!r){ return ownRespond(text, speakIt, after); }
   if(r.silent){   // a swipe on the screen: do it, say nothing, keep listening
     $('actionLine').textContent = r.note || '';
@@ -3272,166 +3276,238 @@ vt.onclick = () => { settings.chatVoice=!settings.chatVoice; vt.classList.toggle
 $('clearBtn').onclick = () => { if(confirm('Clear all chat history?')){ history=[]; store.set('history',history); renderChat(); toast('History cleared'); } };
 
 /* ---------- Zenix neon ring orb (reacts to voices) ---------- */
+/* ---------- ZENIX orb: a living glass sphere of liquid-silver energy, drawn live on the graphics chip ----------
+   One continuous presence that eases between states: sleep, standby, waking, listening, thinking, speaking,
+   performing a task, task done. Everything inside it is generated every frame from maths (no images, no video),
+   and it moves with the real sound: his voice while she listens, her own voice while she talks. */
 const ZenixOrb = (() => {
-  const cv = document.getElementById('mayaOrb'); if(!cv) return null;
-  const ctx = cv.getContext('2d');
-  let S = 280, DPR = 1;
-  function resize(){ DPR = Math.min(window.devicePixelRatio||1, 2); S = cv.clientWidth || 280; cv.width = Math.round(S*DPR); cv.height = Math.round(S*DPR); }
-  resize(); window.addEventListener('resize', resize);
-  const N = 84; const bars = new Float32Array(N).fill(0.1);
-  let state = 'idle', level = 0, target = 0, flash = 0.6, hot = Math.PI/2, spec = null, lastBlink = 0, prev = 0;
-  const t0 = performance.now();
-  const TAU = Math.PI*2;
-  const noise = x => (Math.sin(x*1.7) + Math.sin(x*2.9+1.3) + Math.sin(x*4.3+2.1)) / 3;
-  const angDiff = (a,b) => { let d = (a-b) % TAU; if(d > Math.PI) d -= TAU; if(d < -Math.PI) d += TAU; return d; };
-  function setState(s){ if(s !== state){ state = s; flash = Math.max(flash, 0.7); } }
-  function feed(l){ if(!(l >= 0)) return; target = Math.max(target, Math.min(1, l)); if(window.ZenixWave) window.ZenixWave.feed(l); }
-  function feedSpectrum(a){ spec = a; }
+  const cv = document.getElementById('zenixOrb'); if(!cv) return null;
+  const reduce = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  const VERT = 'attribute vec2 p; void main(){ gl_Position = vec4(p, 0., 1.); }';
+  const FRAG = `
+precision highp float;
+uniform vec2 uRes; uniform float uT, uSpin, uLevel, uBass, uMid, uTreb, uListen, uThink, uSpeak, uTask, uAwake, uPulse, uWake, uQ;
+const float TAU = 6.28318530718;
+float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float vnoise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3. - 2.*f);
+  return mix(mix(hash(i), hash(i + vec2(1., 0.)), f.x), mix(hash(i + vec2(0., 1.)), hash(i + vec2(1., 1.)), f.x), f.y); }
+mat2 rot(float a){ float c = cos(a), s = sin(a); return mat2(c, -s, s, c); }
 
-  const gcv = document.createElement('canvas'); const gctx = gcv.getContext('2d');
-  function sizeGlow(){ gcv.width = Math.round(S*DPR*0.5); gcv.height = gcv.width; }
-  sizeGlow(); window.addEventListener('resize', sizeGlow);
+/* a ribbon of liquid silver flowing across the inside of the sphere, pinched where it meets the glass */
+float wave(vec2 q, float seed, float amp, float k, float thick){
+  q *= rot(seed*1.9 + 0.45*sin(uT*0.11 + seed*2.) + uT*0.04*(mod(seed, 2.) > 1. ? -1. : 1.));
+  float x = q.x, env = sqrt(max(0., 1. - x*x));
+  float c = amp*env*(sin(k*x + uT*1.05 + seed*4.) + 0.38*sin(1.9*k*x - uT*0.75 + seed*7.))
+          + uTreb*0.022*env*sin(x*30. + uT*9. + seed);                      // high notes: fine, quick ripples
+  float th = thick*env*(0.60 + 0.40*sin(x*1.8 + uT*0.5 + seed*3.));        // it thickens and thins as it flows
+  float d = q.y - c;
+  float edge = exp(-pow(d/0.013, 2.));                                       // the bright upper edge
+  float body = smoothstep(-th, 0., d)*(1. - smoothstep(0., 0.012, d));      // the translucent sheet hanging below it
+  float silk = 0.86 + 0.14*sin(d*210. + x*7.);                               // faint silk lines
+  float glint = 0.45 + 1.1*pow(0.5 + 0.5*sin(x*2.1 - uT*0.8 + seed*2.3), 3.);   // light sliding along the ribbon
+  return (edge*0.8 + pow(body, 1.6)*0.62*silk)*glint*smoothstep(0., 0.3, env);
+}
+/* a broad loop of light turning inside the glass, like a tilted ring seen at an angle */
+float loop(vec2 q, float seed, float wob){
+  q *= rot(seed*2.3 + uT*0.10*(mod(seed, 2.) > 1. ? -1. : 1.));
+  float squash = mix(0.34, 0.97, 0.5 + 0.5*sin(uT*0.21 + seed*3.1));
+  vec2 e2 = vec2(q.x, q.y/squash);
+  float a = atan(e2.y, e2.x);
+  float e = length(e2)/0.94*(1. + wob*0.05*sin(3.*a + uT*1.7 + seed) + wob*0.025*sin(5.*a - uT*2.6));
+  float line = exp(-pow((e - 1.)/0.026, 2.));
+  float film = pow(smoothstep(0.35, 1., e), 2.)*(1. - smoothstep(1., 1.025, e))*0.34;   // a soap-film glow inside the loop
+  float side = 0.10 + 1.25*pow(0.5 + 0.5*sin(a + seed*4. + uT*0.33), 3.);     // one bright crescent, the rest nearly dark
+  return (line*0.8 + film)*side;
+}
 
-  function ring(c, rad, dx, dy, t, L){
-    c.beginPath();
-    for(let i=0;i<=120;i++){
-      const th = i/120*TAU;
-      const r = rad*(1 + 0.015*Math.sin(3*th + t*1.3) + 0.012*L*Math.sin(5*th - t*4));
-      const x = dx + r*Math.cos(th), y = dy + r*Math.sin(th);
-      i ? c.lineTo(x,y) : c.moveTo(x,y);
-    }
-    c.closePath();
-  }
-  // shared transform for the wobbling, tilted ring
-  function tilt(c, scale, t){
-    c.setTransform(scale,0,0,scale,0,0);
-    c.translate(S/2, S/2);
-    c.rotate(Math.sin(t*0.4)*0.2);
-    c.scale(1, 0.92 + 0.05*Math.sin(t*0.8));
-  }
-  const barColor = (w, s, i, alpha) => w > 0.22
-    ? `hsla(${10 + 28*(1-w)},100%,${60 + 12*(s===0)}%,${alpha})`
-    : `hsla(${(285 + (i%6)*8 - s*7 + 360)%360},100%,${86 - s*4}%,${alpha*0.9})`;
+void main(){
+  vec2 uv = (gl_FragCoord.xy - 0.5*uRes)/(0.5*min(uRes.x, uRes.y));
+  float ang = atan(uv.y, uv.x);
+  float energy = clamp(uLevel, 0., 1.);
+  // the shell breathes, and its boundary ripples with the voice
+  float breath = 0.012*sin(uT*0.9);
+  float R = 0.56*(1. + breath + energy*0.035*(uSpeak + uListen*0.6))
+          *(1. + 0.006*sin(3.*ang + uT*0.8) + energy*(uListen + uSpeak)*0.018*sin(5.*ang - uT*3.) + uTreb*0.008*sin(11.*ang + uT*6.));
+  float r = length(uv), d = r/R;
+  float v = 0.;
 
-  function frame(now){
-    const t = (now - t0)/1000;
-    pollLevels(t);
-    level = Math.max(target, level*0.9); target *= 0.82;
-    const L = level;
-    if(L - prev > 0.35 && now - lastBlink > 600){ flash = Math.max(flash, 0.55); lastBlink = now; }
-    prev = L;
-    const R = S*0.32;
-    const spin = state==='thinking' ? t*2.2 : t*0.25;
-    hot += state==='thinking' ? 0.09 : 0.012 + L*0.05;
-    const boost = 0.8 + 0.35*L + flash*0.35;
-
-    // bar heights for this frame
-    for(let i=0;i<N;i++){
-      let sv;
-      if(spec && spec.length){ const half = N/2, j = i < half ? i : N-1-i; sv = spec[Math.min(spec.length-1, Math.floor(j/half*spec.length*0.6))]/255; }
-      else sv = 0.5 + 0.5*noise(i*0.45 + t*(state==='speaking' ? 7 : 3));
-      const idle = (state==='idle' || state==='thinking') ? 0.1 + 0.08*(0.5 + 0.5*noise(i*0.3 + t*1.5)) : 0.08;
-      bars[i] += ((idle + L*sv*1.15) - bars[i]) * 0.35;
-    }
-
-    // ---- pass 1: soft glow (drawn small, then blurred) ----
-    gctx.setTransform(1,0,0,1,0,0); gctx.clearRect(0,0,gcv.width,gcv.height);
-    tilt(gctx, DPR*0.5, t);
-    gctx.globalCompositeOperation = 'lighter';
-    const glows = [['60,80,255',36,0.45,-6,-4],['255,40,200',22,0.34,4,2],['140,60,255',14,0.40,0,0],['30,200,255',8,0.42,7,-3]];
-    for(const [col,w,a,dx,dy] of glows){
-      gctx.strokeStyle = `rgba(${col},${Math.min(0.6, a*boost)})`;
-      gctx.lineWidth = w*(1 + L*0.35);
-      ring(gctx, R*(1 + L*0.03), dx, dy, t, L); gctx.stroke();
-    }
-    gctx.lineCap = 'butt';
-    for(let i=0;i<N;i++){
-      const th = i/N*TAU + spin*0.3, w = Math.exp(-Math.pow(angDiff(th, hot), 2)/0.45);
-      const len = R*(0.06 + bars[i]*0.42);
-      gctx.strokeStyle = barColor(w, 0, i, 0.28*(0.6 + 0.6*L));
-      gctx.lineWidth = R*0.05;
-      gctx.beginPath(); gctx.moveTo(Math.cos(th)*R*0.9, Math.sin(th)*R*0.9); gctx.lineTo(Math.cos(th)*(R*0.95+len), Math.sin(th)*(R*0.95+len)); gctx.stroke();
-    }
-
-    // ---- main canvas ----
-    ctx.setTransform(1,0,0,1,0,0); ctx.clearRect(0,0,cv.width,cv.height);
-    // dark glass centre with a faint rainbow sheen
-    tilt(ctx, DPR, t);
-    const g = ctx.createRadialGradient(-R*0.25, -R*0.3, R*0.05, 0, 0, R);
-    g.addColorStop(0, 'rgba(60,50,110,0.35)'); g.addColorStop(0.7, 'rgba(8,6,18,0.9)'); g.addColorStop(1, 'rgba(8,6,18,0)');
-    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0,0,R*0.97,0,TAU); ctx.fill();
-    ctx.globalCompositeOperation = 'lighter';
-    const sheen = ctx.createLinearGradient(R*0.2, -R*0.6, R*0.9, R*0.5);
-    sheen.addColorStop(0, 'rgba(255,60,120,0)'); sheen.addColorStop(0.5, 'rgba(80,255,160,0.10)'); sheen.addColorStop(1, 'rgba(60,120,255,0)');
-    ctx.fillStyle = sheen; ctx.beginPath(); ctx.arc(0,0,R*0.85,-1.2,1.3); ctx.fill();
-    for(let k=0;k<3;k++){
-      const a0 = spin*0.5 + k*1.2 + 2.3;
-      ctx.strokeStyle = `rgba(170,190,255,${0.05 + 0.03*k + flash*0.05})`;
-      ctx.lineWidth = 2 + k*1.5;
-      ctx.beginPath(); ctx.arc(-R*0.06, 0, R*(0.58 + 0.08*k), a0, a0 + 0.8 + 0.3*k); ctx.stroke();
-    }
-    // the blurred glow
-    ctx.setTransform(1,0,0,1,0,0);
-    ctx.filter = `blur(${Math.round(5*DPR)}px)`;
-    ctx.drawImage(gcv, 0, 0, cv.width, cv.height);
-    ctx.filter = 'none';
-    // crisp core ring
-    tilt(ctx, DPR, t);
-    ctx.strokeStyle = `rgba(255,225,255,${Math.min(0.85, 0.65*boost)})`; ctx.lineWidth = 1.8*(1 + L*0.4);
-    ring(ctx, R*(1 + L*0.03), 0, 0, t, L); ctx.stroke();
-    ctx.strokeStyle = `rgba(255,90,220,${Math.min(0.5, 0.32*boost)})`; ctx.lineWidth = 4*(1 + L*0.4);
-    ring(ctx, R*(1 + L*0.03), 1, 1, t, L); ctx.stroke();
-    // dotted inner ring
-    ctx.setLineDash([2,6]); ctx.lineDashOffset = -t*18;
-    ctx.strokeStyle = `rgba(255,255,255,${0.55 + 0.3*L})`; ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.arc(0,0,R*0.86,0,TAU); ctx.stroke(); ctx.setLineDash([]);
-    // crisp LED segments
-    const seg = R*0.05;
-    for(let i=0;i<N;i++){
-      const th = i/N*TAU + spin*0.3, w = Math.exp(-Math.pow(angDiff(th, hot), 2)/0.45);
-      const n = 2 + Math.round(bars[i]*8), cos = Math.cos(th), sin = Math.sin(th);
-      for(let s=0;s<n;s++){
-        const rr = R*0.92 + s*seg*1.2;
-        const alpha = (1 - s/(n+1)*0.75) * (0.4 + 0.35*Math.min(1, L+0.25));
-        ctx.fillStyle = barColor(w, s, i, alpha);
-        ctx.save(); ctx.translate(cos*rr, sin*rr); ctx.rotate(th);
-        ctx.fillRect(-seg*0.4, -seg*0.3, seg*0.8, seg*0.6);
-        ctx.restore();
+  if(d < 1.){
+    float z = sqrt(1. - d*d);
+    vec3 pf = vec3(uv/R, z), pb = vec3(uv/R, -z);
+    vec2 q = uv/R;
+    float voice = clamp(uListen*0.75 + uSpeak, 0., 1.);
+    float amp = 0.06 + 0.05*uAwake + voice*(energy*0.22 + uBass*0.16) + uThink*0.03;   // low notes: larger, slower formations
+    float inner = 0.;
+    inner += wave(q, 0.3, amp, 2.6, 0.30 + 0.16*energy*voice);
+    inner += loop(q, 1.2, energy*voice + uThink*0.4);
+    inner += loop(q, 4.0, energy*voice + uThink*0.4)*0.8;
+    inner += wave(q, 3.4, amp*0.85, 3.4, 0.24 + 0.14*uBass*voice)*0.8*(0.25 + 0.75*clamp(voice + uThink + uTask, 0., 1.));
+    if(uQ > 0.5){ inner += loop(q, 6.5, energy*voice)*0.6*(0.3 + 0.7*uAwake); }
+    if(uQ > 1.5){ inner += wave(q, 5.6, amp*1.1, 2.0, 0.36)*0.5*voice; }
+    inner *= (0.34 + 0.50*uAwake)*(0.75 + energy*voice*0.7)*(0.5 + 0.5*z);
+    // thinking: the energy winds into a slow vortex around the core
+    float vort = pow(max(0., sin(3.*ang + 7.*log(d + 0.12) - uSpin*2.2)), 4.)*(1. - d)*smoothstep(0.02, 0.3, d);
+    inner += vort*uThink*0.55;
+    // performing a task: tidy, synchronised segmented rings
+    float segs = 0.;
+    for(int k = 0; k < 3; k++){ float rk = 0.36 + 0.2*float(k);
+      segs += exp(-pow((d - rk)/0.012, 2.))*smoothstep(0.1, 0.5, sin(ang*(6. + 2.*float(k)) + uSpin*(1.2 - 0.5*float(k)))); }
+    inner += segs*uTask*0.5;
+    // fine particles: dotted rings that drift (and are drawn toward the core while she thinks)
+    if(uQ > 0.5){
+      float pr = 0.;
+      for(int k = 0; k < 3; k++){
+        float fk = float(k);
+        float rk = mix(0.78 - 0.085*fk, fract(0.78 - 0.085*fk - uSpin*0.07), uThink);
+        float count = floor(150. - 22.*fk);
+        float a = fract((ang + uSpin*(0.05 + 0.03*fk)*(mod(fk, 2.) < 1. ? 1. : -1.))/TAU*count) - 0.5;
+        float tw = 0.55 + 0.45*sin(uT*2. + floor((ang/TAU + 0.5)*count)*1.7);
+        pr += exp(-pow((d - rk)/0.006, 2.))*exp(-a*a*22.)*tw;
       }
+      inner += pr*(0.20 + 0.5*uAwake)*(0.5 + energy + uThink*0.6);
     }
-    if(flash > 0.02){
-      ctx.fillStyle = `rgba(255,170,250,${flash*0.2})`;
-      ctx.beginPath(); ctx.arc(0,0,R*0.9,0,TAU); ctx.fill();
-      flash *= 0.9;
-    }
-    ctx.globalCompositeOperation = 'source-over';
-    requestAnimationFrame(frame);
+    // the core
+    float core = exp(-d*d*(9. - 4.*uWake - 2.5*energy))*(0.05 + 0.20*uAwake + 0.30*uThink*(0.6 + 0.4*sin(uT*1.7)) + 0.38*energy*(uSpeak + 0.5*uListen) + 0.5*uWake);
+    // glass: a bright thin rim, a soft inner limb, and two curved highlights
+    float limb = pow(d, 9.)*0.22 + pow(d, 30.)*0.9;
+    float hl = pow(max(0., dot(normalize(vec3(uv/R, z)), normalize(vec3(-0.45, 0.62, 0.64)))), 22.)*0.55
+             + pow(max(0., dot(normalize(vec3(uv/R, z)), normalize(vec3(0.5, -0.66, 0.56)))), 30.)*0.28;
+    float glass = (limb + hl*(0.5 + 0.5*d))*(0.45 + 0.55*uAwake);
+    v += inner + core + glass;
   }
+  // the rim line and its glow outside the glass
+  float rim = exp(-pow((d - 1.)/0.013, 2.))*(0.55 + 0.75*pow(0.5 + 0.5*sin(ang*2. - uT*0.35 + 1.2), 2.));
+  float halo = exp(-max(0., d - 1.)*(8.5 - 3.5*energy - 2.5*uWake))*step(1., d)*(0.26 + 0.3*pow(0.5 + 0.5*sin(ang*2. - uT*0.35 + 1.2), 2.));
+  v += (rim + halo)*(0.35 + 0.65*uAwake)*(0.8 + energy*0.7 + uWake*0.6);
+  // thin rotating rings of light around the sphere
+  float rings = 0.;
+  for(int k = 0; k < 3; k++){
+    float fk = float(k);
+    float rk = R*(1.20 + 0.11*fk);
+    float dir = mod(fk, 2.) < 1. ? 1. : -1.;
+    float seg = smoothstep(0.55 - 0.35*uTask - 0.25*uWake, 0.95, sin(ang*(2. + fk) + dir*uSpin*(0.35 + 0.12*fk) + fk*2.1));
+    rings += exp(-pow((r - rk)/0.0055, 2.))*seg*(0.9 - 0.22*fk);
+  }
+  v += rings*(0.18 + 0.5*uAwake + 0.4*uWake + 0.3*uTask);
+  // task done: one soft pulse travelling outward
+  float pp = uPulse;
+  v += exp(-pow((r - R*(1. + 0.62*(1. - pp)))/0.03, 2.))*pp*pp*0.9 + pp*0.10*exp(-d*d*1.5);
+  // nothing reaches the edge of the canvas, so the orb floats on pure black
+  v *= smoothstep(1.0, 0.86, r);
+  v = 1. - exp(-v*1.55);
+  gl_FragColor = vec4(vec3(v), 1.);
+}`;
+  let gl = null, prog = null, U = {};
+  try{
+    gl = cv.getContext('webgl', {alpha:false, antialias:false, powerPreference:'high-performance', preserveDrawingBuffer:!!window.__orbKeep});
+    if(gl){
+      const sh = (type, src) => { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); if(!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)); return s; };
+      prog = gl.createProgram(); gl.attachShader(prog, sh(gl.VERTEX_SHADER, VERT)); gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FRAG)); gl.linkProgram(prog);
+      if(!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
+      gl.useProgram(prog);
+      const buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
+      const loc = gl.getAttribLocation(prog, 'p'); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+      ['uRes','uT','uSpin','uLevel','uBass','uMid','uTreb','uListen','uThink','uSpeak','uTask','uAwake','uPulse','uWake','uQ'].forEach(n => U[n] = gl.getUniformLocation(prog, n));
+    }
+  }catch(e){ window.__orbError = String(e && e.message || e); gl = null; }
+  const ctx2 = gl ? null : cv.getContext('2d');   // very old phones: a simple silver ring instead
 
-  // where the voice levels come from
+  // ----- state -----
+  let state = 'idle', idleSince = performance.now(), quality = 2, lastT = 0, phase = 0, spin = 0, pulse = 0, wake = 0, taskUntil = 0;
+  let level = 0, target = 0, bands = [0, 0, 0], bandsT = [0, 0, 0], specIn = null;
+  const w = {listen:0, think:0, speak:0, task:0, awake:0.5};
+  let W = 300, DPR = 1;
+  const Q_DPR = [1, 1.5, 2];
+  function resize(){ DPR = Math.min(window.devicePixelRatio || 1, Q_DPR[quality]); W = cv.clientWidth || 300; const px = Math.max(64, Math.round(W*DPR)); if(cv.width !== px){ cv.width = px; cv.height = px; } if(gl) gl.viewport(0, 0, px, px); }
+  resize(); window.addEventListener('resize', resize);
+  function setQuality(q){ quality = Math.max(0, Math.min(2, q|0)); resize(); }
+
+  function setState(s){
+    if(s === state) return;
+    if((state === 'idle') && s !== 'idle') wake = Math.max(wake, performance.now() - idleSince > 4000 ? 1 : 0.55);   // waking up
+    state = s; if(s === 'idle') idleSince = performance.now();
+  }
+  /* loudness 0..1, and (when known) how much of it is low / middle / high notes */
+  function feed(l, lo, mi, hi){
+    if(!(l >= 0)) return;
+    l = Math.min(1, l); if(l < 0.03) l = 0;                               // noise floor
+    target = Math.max(target, l);
+    if(lo >= 0 && mi >= 0 && hi >= 0){ bandsT[0] = Math.max(bandsT[0], Math.min(1, lo)); bandsT[1] = Math.max(bandsT[1], Math.min(1, mi)); bandsT[2] = Math.max(bandsT[2], Math.min(1, hi)); }
+    else { bandsT[0] = Math.max(bandsT[0], l*0.6); bandsT[1] = Math.max(bandsT[1], l*0.5); bandsT[2] = Math.max(bandsT[2], l*0.3); }
+    if(window.ZenixWave) window.ZenixWave.feed(l);
+  }
+  function feedSpectrum(a){ specIn = a; }
+  function task(ms){ taskUntil = performance.now() + (ms || 1400); }
+  function done(){ pulse = 1; taskUntil = Math.min(taskUntil, performance.now() + 250); }
+  function fromSpectrum(a){   // a = byte frequency data: split into low / middle / high
+    const n = a.length, b1 = Math.max(2, Math.floor(n*0.06)), b2 = Math.floor(n*0.30), b3 = Math.floor(n*0.75);
+    let lo = 0, mi = 0, hi = 0, all = 0;
+    for(let i = 1; i < b3; i++){ const x = a[i]/255; all += x; if(i < b1) lo += x; else if(i < b2) mi += x; else hi += x; }
+    feed(Math.min(1, all/(b3*0.42)), Math.min(1, lo/(b1 - 1)*1.1), Math.min(1, mi/(b2 - b1)*1.6), Math.min(1, hi/(b3 - b2)*2.6));
+  }
+  /* where the sound comes from: his microphone while she listens, HER voice (never the microphone) while she talks */
   function pollLevels(t){
-    spec = null;
     try{
-      if(typeof convo!=='undefined' && convo && typeof session!=='undefined' && session==='talk'){
-        if(state==='speaking'){ feed((convo.getOutputVolume ? convo.getOutputVolume() : 0)*1.8); if(convo.getOutputByteFrequencyData) spec = convo.getOutputByteFrequencyData(); }
-        else { feed((convo.getInputVolume ? convo.getInputVolume() : 0)*2.2); if(convo.getInputByteFrequencyData) spec = convo.getInputByteFrequencyData(); }
+      if(typeof convo !== 'undefined' && convo && typeof session !== 'undefined' && session === 'talk'){
+        if(state === 'speaking'){ const s = convo.getOutputByteFrequencyData && convo.getOutputByteFrequencyData(); if(s && s.length) fromSpectrum(s); else feed((convo.getOutputVolume ? convo.getOutputVolume() : 0)*1.8); }
+        else { const s = convo.getInputByteFrequencyData && convo.getInputByteFrequencyData(); if(s && s.length) fromSpectrum(s); else feed((convo.getInputVolume ? convo.getInputVolume() : 0)*2.2); }
         return;
       }
     }catch(e){}
-    if(typeof speech!=='undefined' && speech.playing){
-      if(vizAnalyser && speech.audio && !speech.audio.paused){
-        vizAnalyser.getByteFrequencyData(vizBuf); spec = vizBuf;
-        let sum=0; for(let i=0;i<vizBuf.length*0.6;i++) sum += vizBuf[i];
-        feed(sum/(vizBuf.length*0.6)/255*2.2);
-      } else feed(0.35 + 0.35*Math.abs(noise(t*7)));   // phone voice: no audio data, animate a talking rhythm
-    } else if(state==='thinking'){ feed(0.15 + 0.1*Math.abs(Math.sin(t*3))); }
+    if(specIn){ fromSpectrum(specIn); specIn = null; return; }
+    if(typeof speech !== 'undefined' && speech.playing && state === 'speaking'){
+      if(typeof vizAnalyser !== 'undefined' && vizAnalyser && speech.audio && !speech.audio.paused){ vizAnalyser.getByteFrequencyData(vizBuf); fromSpectrum(vizBuf); }
+      else { const k = Math.abs(Math.sin(t*5.1)*Math.sin(t*1.9 + 1.)*Math.sin(t*0.7 + 2.)); feed(0.22 + 0.5*k); }   // the phone's own voice gives no sound data: a talking rhythm only
+    }
+  }
+  const ease = (cur, to, dt, rate) => cur + (to - cur)*(1 - Math.exp(-dt*rate));
+  let slowFrames = 0, fastFrames = 0, autoQ = true, skip = 0;
+  function frame(now){
+    requestAnimationFrame(frame);
+    const view = (document.body && document.body.dataset && document.body.dataset.view) || 'talk';
+    if(document.hidden || (view !== 'talk' && !window.__orbAlways)){ lastT = 0; return; }   // not on screen: no drawing, no battery
+    if(reduce && (skip = (skip + 1) % 6)) return;                                           // reduced motion: a slow, calm version
+    const t = window.__orbTime != null ? window.__orbTime : now/1000;
+    let dt = lastT ? Math.min(0.1, t - lastT) : 0.016; if(window.__orbTime != null) dt = window.__orbDt || 0.016; lastT = t;
+    if(autoQ && window.__orbTime == null && dt > 0){   // a phone that can't keep up gets a lighter orb by itself
+      if(dt > 0.026) slowFrames++; else fastFrames++;
+      if(slowFrames + fastFrames > 70){ if(slowFrames > 30 && quality > 0) setQuality(quality - 1); slowFrames = fastFrames = 0; }
+    }
+    pollLevels(t);
+    // the envelope: quick to rise, slow to settle
+    level = target > level ? ease(level, target, dt, 22) : ease(level, target, dt, 5.5); target *= Math.exp(-dt*9);
+    for(let i = 0; i < 3; i++){ bands[i] = bandsT[i] > bands[i] ? ease(bands[i], bandsT[i], dt, 20) : ease(bands[i], bandsT[i], dt, [3.5, 6, 10][i]); bandsT[i] *= Math.exp(-dt*9); }
+    const tasking = now < taskUntil;
+    const asleep = state === 'idle' && now - idleSince > 25000;
+    w.listen = ease(w.listen, state === 'listening' ? 1 : 0, dt, 3.2);
+    w.think  = ease(w.think,  state === 'thinking' ? 1 : 0, dt, 2.6);
+    w.speak  = ease(w.speak,  state === 'speaking' ? 1 : 0, dt, 3.2);
+    w.task   = ease(w.task,   tasking ? 1 : 0, dt, 4);
+    w.awake  = ease(w.awake,  state === 'idle' ? (asleep ? 0.16 : 0.5) : 1, dt, asleep ? 0.6 : 2.2);
+    pulse = Math.max(0, pulse - dt*0.85); wake = Math.max(0, wake - dt*1.05);
+    const active = w.listen + w.speak;
+    const slow = reduce ? 0.2 : 1;
+    phase += dt*slow*(0.22 + 0.5*w.awake + active*(0.35 + level*1.5 + bands[1]*0.9) + w.think*1.1 + w.task*0.7);
+    spin  += dt*slow*(0.35 + w.think*2.4 + w.task*1.6 + active*0.5 + wake*1.5);
+    if(gl){
+      gl.uniform2f(U.uRes, cv.width, cv.height); gl.uniform1f(U.uT, phase); gl.uniform1f(U.uSpin, spin);
+      gl.uniform1f(U.uLevel, reduce ? level*0.4 : level); gl.uniform1f(U.uBass, bands[0]); gl.uniform1f(U.uMid, bands[1]); gl.uniform1f(U.uTreb, reduce ? 0 : bands[2]);
+      gl.uniform1f(U.uListen, w.listen); gl.uniform1f(U.uThink, w.think); gl.uniform1f(U.uSpeak, w.speak); gl.uniform1f(U.uTask, w.task);
+      gl.uniform1f(U.uAwake, w.awake); gl.uniform1f(U.uPulse, pulse); gl.uniform1f(U.uWake, wake); gl.uniform1f(U.uQ, quality);
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    } else if(ctx2){
+      const S = cv.width, c = S/2, R = S*0.28*(1 + level*0.04);
+      ctx2.fillStyle = '#000'; ctx2.fillRect(0, 0, S, S);
+      const g = ctx2.createRadialGradient(c, c, R*0.2, c, c, R*1.25); g.addColorStop(0, 'rgba(255,255,255,' + (0.05 + 0.3*level*w.awake) + ')'); g.addColorStop(0.78, 'rgba(255,255,255,0.03)'); g.addColorStop(0.8, 'rgba(255,255,255,' + (0.35 + 0.6*w.awake) + ')'); g.addColorStop(0.84, 'rgba(255,255,255,0.08)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx2.fillStyle = g; ctx2.beginPath(); ctx2.arc(c, c, R*1.25, 0, 6.2832); ctx2.fill();
+    }
   }
   requestAnimationFrame(frame);
-  return { setState, feed, feedSpectrum };
+  return { setState, feed, feedSpectrum, task, done, setQuality, get quality(){ return quality; }, get state(){ return state; }, set auto(v){ autoQ = !!v; }, webgl: !!gl };
 })();
 window.ZenixOrb = ZenixOrb;
 /* mic level from the phone (0..1) */
-window.zenixRms = (v) => { if(ZenixOrb) ZenixOrb.feed(v); else if(window.ZenixWave) window.ZenixWave.feed(v); };
+window.zenixRms = (v, lo, mi, hi) => { if(ZenixOrb){ if(ZenixOrb.state !== 'speaking') ZenixOrb.feed(v, lo, mi, hi); } else if(window.ZenixWave) window.ZenixWave.feed(v); };
 
 /* ---------- the sound wave under the ring: moves with his voice while she listens, with hers while she talks ---------- */
 window.ZenixWave = (() => {
@@ -3455,8 +3531,8 @@ window.ZenixWave = (() => {
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0); ctx.clearRect(0, 0, W, H);
     const gap = W / N, bw = Math.max(2, gap * 0.56), mid = H / 2;
     const g = ctx.createLinearGradient(0, 0, W, 0);
-    if(st === 'speaking'){ g.addColorStop(0, 'rgba(255,255,255,.25)'); g.addColorStop(1, 'rgba(255,255,255,.95)'); }
-    else { g.addColorStop(0, 'rgba(155,92,255,.25)'); g.addColorStop(.6, 'rgba(178,102,255,.9)'); g.addColorStop(1, 'rgba(255,79,216,1)'); }
+    if(st === 'speaking'){ g.addColorStop(0, 'rgba(255,255,255,.22)'); g.addColorStop(1, 'rgba(255,255,255,.98)'); }
+    else { g.addColorStop(0, 'rgba(120,120,120,.22)'); g.addColorStop(.6, 'rgba(184,184,184,.8)'); g.addColorStop(1, 'rgba(232,232,232,.95)'); }
     ctx.fillStyle = g;
     for(let i = 0; i < N; i++){
       const v = Math.pow(hist[i], 0.7), h = Math.max(2.5, v * (H - 4)), x = i * gap + (gap - bw) / 2, r = bw / 2;
@@ -4059,6 +4135,11 @@ $('autoBtn').onclick = () => { if(Native.openAutoSendSettings){ Native.openAutoS
 $('autoInfo').onclick = () => { if(Native.openAppInfo){ Native.openAppInfo(); toast('Tap ⋮ (top right) → Allow restricted settings'); } };
 document.addEventListener('visibilitychange', () => { if(!document.hidden) renderAuto(); });
 renderAuto();
+/* ---------- Orb quality ---------- */
+function applyOrbQ(){ const q = settings.orbQ === undefined ? 'auto' : String(settings.orbQ); document.querySelectorAll('[data-orbq]').forEach(b => b.classList.toggle('sel', b.dataset.orbq === q));
+  if(window.ZenixOrb && window.ZenixOrb.setQuality){ if(q === 'auto'){ window.ZenixOrb.auto = true; window.ZenixOrb.setQuality(2); } else { window.ZenixOrb.auto = false; window.ZenixOrb.setQuality(+q); } } }
+document.querySelectorAll('[data-orbq]').forEach(b => b.onclick = () => { settings.orbQ = b.dataset.orbq; store.set('settings', settings); applyOrbQ(); });
+applyOrbQ();
 /* ---------- Stop her by voice ---------- */
 function renderBarge(){ if(!Native.bargeStart){ $('bargeRow').style.display = 'none'; return; } $('bargeToggle').classList.toggle('on', !!settings.barge); }
 $('bargeToggle').onclick = () => { settings.barge = !settings.barge; store.set('settings', settings); renderBarge(); toast(settings.barge ? 'Say "stop", "pause", "continue" or "end" while she talks' : 'She won\'t listen while she talks'); if(settings.barge && Native.bargeReady && Native.bargeReady()!=='true') toast('Turn on "Hey Zenix" once: it downloads the listener this needs'); };
@@ -4069,7 +4150,8 @@ Object.keys(clientTools).forEach(name => {
   const run = clientTools[name]; if(typeof run !== 'function') return;
   const brief = v => { let s = typeof v === 'string' ? v : (() => { try{ return JSON.stringify(v); }catch(e){ return String(v); } })(); s = String(s || ''); return s.length > 220 ? s.slice(0, 220) + '…' : s; };
   clientTools[name] = async (args) => {
-    try{ const out = await run(args); logEv('tool', name + ' ' + brief(args) + ' → ' + brief(out)); return out; }
+    const orb = window.ZenixOrb; if(orb && orb.task) orb.task(9000);   // the orb gathers itself while she works…
+    try{ const out = await run(args); logEv('tool', name + ' ' + brief(args) + ' → ' + brief(out)); if(orb && orb.done) orb.done(); return out; }   // …and lets out one soft pulse when it's done
     catch(e){ logEv('tool', name + ' ' + brief(args) + ' → ERROR ' + e.message); throw e; }
   };
 });
