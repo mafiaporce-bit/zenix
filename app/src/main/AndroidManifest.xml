@@ -29,8 +29,6 @@
     <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
     <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
-    <!-- know when there is no internet, so the offline brain can take over -->
-    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- "Hey Zenix" with the screen off: wake the screen and open over the lock screen -->
     <uses-permission android:name="android.permission.TURN_SCREEN_ON" />
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
