@@ -1476,7 +1476,7 @@ function searchInstant(q, app){
 }
 /* "close this app" / "close YouTube": swipe it away from Recent apps, like a finger would */
 function closeInstant(name){
-  return loose(async () => {
+  return (async () => {
     if(!Native.ctl) return null;
     if(Native.isLocked && Native.isLocked()==='true') return 'Unlock the phone first, then tell me again.';
     if(!ctlOn()){ toast('Settings → Control other apps → Turn on'); return CTL_OFF; }
@@ -1488,7 +1488,7 @@ function closeInstant(name){
     let r = await screenDo('close_app', '');
     if(!r.ok && name && /Maya is the app/.test(r.message)){ await pause(1200); r = await screenDo('close_app', ''); }   // it was still opening
     return r.ok ? (name ? 'Closed ' + name + '.' : 'Closed it.') : r.message;
-  });
+  });   // not "loose": works even while a song plays, without saying "Maya" first
 }
 function playInstant(song, app){
   return loose(async () => {

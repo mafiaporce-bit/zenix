@@ -121,12 +121,23 @@ class ControlService : AccessibilityService() {
         main.postDelayed({
             try {
                 val (w, h) = screen()
-                stroke(w * 0.5f, h * 0.55f, w * 0.5f, h * 0.05f, 170L, "Closed it.") { ok, msg ->
-                    main.postDelayed({ try { performGlobalAction(GLOBAL_ACTION_HOME) } catch (_: Exception) { }; done(ok, if (ok) "Closed it." else msg) }, 500)
+                // the app's card sits in the middle of Recent apps: flick it up and off the top
+                stroke(w * 0.5f, h * 0.5f, w * 0.5f, h * 0.02f, 220L, "Closed it.") { ok, _ ->
+                    main.postDelayed({
+                        // still in Recent apps with the card there? one more, firmer flick
+                        val again = !ok || (frontPackage().contains("launcher") && all(rootInActiveWindow).any { label(it).contains(appName(front), true) })
+                        if (again) stroke(w * 0.5f, h * 0.6f, w * 0.5f, h * 0.0f, 160L, "Closed it.") { ok2, msg2 ->
+                            main.postDelayed({ try { performGlobalAction(GLOBAL_ACTION_HOME) } catch (_: Exception) { }; done(ok2, if (ok2) "Closed it." else msg2) }, 450)
+                        } else { try { performGlobalAction(GLOBAL_ACTION_HOME) } catch (_: Exception) { }; done(true, "Closed it.") }
+                    }, 600)
                 }
             } catch (_: Exception) { done(false, "That didn't work on this screen.") }
-        }, 950)
+        }, 1300)
     }
+
+    private fun appName(pkg: String): String = try {
+        packageManager.getApplicationLabel(packageManager.getApplicationInfo(pkg, 0)).toString()
+    } catch (_: Exception) { pkg }
 
     // ---------- reading the screen ----------
     private fun label(n: AccessibilityNodeInfo): String {
