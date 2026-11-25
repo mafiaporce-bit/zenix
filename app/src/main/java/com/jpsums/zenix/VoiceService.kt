@@ -20,7 +20,7 @@ import android.graphics.drawable.GradientDrawable
 import android.widget.TextView
 
 /**
- * Foreground "voice call" service. While it runs, Android lets Maya keep using
+ * Foreground "voice call" service. While it runs, Android lets Zenix keep using
  * the microphone in any app, and it shows her floating orb over other apps.
  */
 class VoiceService : Service() {
@@ -60,7 +60,7 @@ class VoiceService : Service() {
         )
         val notification = Notification.Builder(this, MainActivity.VOICE_CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notify)
-            .setContentTitle("Maya is listening")
+            .setContentTitle("Zenix is listening")
             .setContentText("Keep talking — she can hear you in any app")
             .setOngoing(true)
             .setContentIntent(openApp)

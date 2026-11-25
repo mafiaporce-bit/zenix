@@ -23,11 +23,11 @@ class ReminderReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
         val text = intent.getStringExtra("text") ?: "Reminder"
-        val title = intent.getStringExtra("title") ?: "Maya reminder"
+        val title = intent.getStringExtra("title") ?: "Zenix reminder"
         val id = intent.getIntExtra("id", 1)
         val routine = intent.getStringExtra("routine")
         if (AlarmRinger.isOn(context)) { AlarmRinger.start(context, title, text, routine); return }
-        if (routine != null) {   // snoozed routine with alarm sounds now off: let Maya do it
+        if (routine != null) {   // snoozed routine with alarm sounds now off: let Zenix do it
             try { Routines.fire(context, org.json.JSONObject(routine), false) } catch (_: Exception) { }
             return
         }

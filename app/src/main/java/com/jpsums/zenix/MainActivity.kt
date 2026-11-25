@@ -72,7 +72,7 @@ class MainActivity : Activity() {
         instance = java.lang.ref.WeakReference(this)
         webView = WebView(this)
         setContentView(webView)
-        // Keep Maya's page running at full speed while another app is open
+        // Keep Zenix's page running at full speed while another app is open
         webView.setRendererPriorityPolicy(WebView.RENDERER_PRIORITY_IMPORTANT, false)
         webView.settings.apply {
             javaScriptEnabled = true
@@ -146,7 +146,7 @@ class MainActivity : Activity() {
         }
     }
 
-    /** Lets Maya appear (and wake the screen) on top of the lock screen after "Hey Maya", without unlocking. */
+    /** Lets Zenix appear (and wake the screen) on top of the lock screen after "Hey Zenix", without unlocking. */
     fun showOverLock(on: Boolean) {
         runOnUiThread {
             overLock = on
@@ -194,7 +194,7 @@ class MainActivity : Activity() {
         }
     }
 
-    /** The chat that "Hey Maya" started is over: hand the screen back to the lock screen. */
+    /** The chat that "Hey Zenix" started is over: hand the screen back to the lock screen. */
     fun wakeChatEnded() {
         runOnUiThread {
             if (!overLock) return@runOnUiThread
@@ -204,13 +204,13 @@ class MainActivity : Activity() {
         }
     }
 
-    /** "Hey Maya" was heard: start a voice chat. */
+    /** "Hey Zenix" was heard: start a voice chat. */
     fun onWake() {
         clearWakeAlert()
         runJs("window.zenixWake && window.zenixWake()")
     }
 
-    /** A routine's time has come (morning brief, a timed reminder…): Maya carries it out and says it aloud. */
+    /** A routine's time has come (morning brief, a timed reminder…): Zenix carries it out and says it aloud. */
     fun runRoutine(json: String) {
         val now = System.currentTimeMillis()
         if (json == lastRoutine && now - lastRoutineAt < 20_000) return   // the alert and the direct opening can both arrive
@@ -264,7 +264,7 @@ class MainActivity : Activity() {
             .putExtra(android.media.RingtoneManager.EXTRA_RINGTONE_TYPE, android.media.RingtoneManager.TYPE_ALARM)
             .putExtra(android.media.RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, true)
             .putExtra(android.media.RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, false)
-            .putExtra(android.media.RingtoneManager.EXTRA_RINGTONE_TITLE, "Maya alarm sound")
+            .putExtra(android.media.RingtoneManager.EXTRA_RINGTONE_TITLE, "Zenix alarm sound")
             .putExtra(android.media.RingtoneManager.EXTRA_RINGTONE_EXISTING_URI, AlarmRinger.sound(this))
         try { startActivityForResult(i, PICK_RING) } catch (_: Exception) { runJs("window.toast && toast('No sound picker found on this phone')") }
     }
@@ -330,18 +330,18 @@ class MainActivity : Activity() {
     private fun createNotificationChannel() {
         val nm = getSystemService(NotificationManager::class.java)
         if (nm.getNotificationChannel(CHANNEL_ID) == null) {
-            val ch = NotificationChannel(CHANNEL_ID, "Maya reminders", NotificationManager.IMPORTANCE_HIGH)
-            ch.description = "Reminders set by Maya"
+            val ch = NotificationChannel(CHANNEL_ID, "Zenix reminders", NotificationManager.IMPORTANCE_HIGH)
+            ch.description = "Reminders set by Zenix"
             nm.createNotificationChannel(ch)
         }
         if (nm.getNotificationChannel(UPDATE_CHANNEL_ID) == null) {
-            val ch = NotificationChannel(UPDATE_CHANNEL_ID, "Maya updates", NotificationManager.IMPORTANCE_DEFAULT)
-            ch.description = "Tells you when a new Maya is ready"
+            val ch = NotificationChannel(UPDATE_CHANNEL_ID, "Zenix updates", NotificationManager.IMPORTANCE_DEFAULT)
+            ch.description = "Tells you when a new Zenix is ready"
             nm.createNotificationChannel(ch)
         }
         if (nm.getNotificationChannel(VOICE_CHANNEL_ID) == null) {
-            val ch = NotificationChannel(VOICE_CHANNEL_ID, "Maya voice chat", NotificationManager.IMPORTANCE_LOW)
-            ch.description = "Shows while Maya is listening"
+            val ch = NotificationChannel(VOICE_CHANNEL_ID, "Zenix voice chat", NotificationManager.IMPORTANCE_LOW)
+            ch.description = "Shows while Zenix is listening"
             nm.createNotificationChannel(ch)
         }
     }

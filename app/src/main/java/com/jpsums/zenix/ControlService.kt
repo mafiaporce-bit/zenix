@@ -14,7 +14,7 @@ import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 
 /**
- * "Maya phone control": lets Maya scroll, swipe, tap and search in whatever app is on screen,
+ * "Zenix phone control": lets Zenix scroll, swipe, tap and search in whatever app is on screen,
  * and press Back / Home, when Jim tells her to by voice. It never acts by itself.
  */
 class ControlService : AccessibilityService() {
@@ -85,7 +85,7 @@ class ControlService : AccessibilityService() {
         if (!sent) done(false, "The screen didn't take the swipe.")
     }
 
-    /** Maya's floating circle (plus a margin): her own swipes must not start on it or cross it. */
+    /** Zenix's floating circle (plus a margin): her own swipes must not start on it or cross it. */
     private fun orbBox(): Rect? = try {
         VoiceService.orbBounds()?.let { val m = (20 * resources.displayMetrics.density).toInt(); Rect(it.left - m, it.top - m, it.right + m, it.bottom + m) }
     } catch (_: Exception) { null }
@@ -115,7 +115,7 @@ class ControlService : AccessibilityService() {
     /** "Close this app": open Recent apps, flick the app's card away, go Home. Just what a finger would do. */
     private fun closeFront(done: (Boolean, String) -> Unit) {
         val front = frontPackage()
-        if (front == packageName) { done(false, "Maya is the app on the screen. Open the app you want closed, then tell me."); return }
+        if (front == packageName) { done(false, "Zenix is the app on the screen. Open the app you want closed, then tell me."); return }
         if (front.isEmpty() || front.contains("launcher")) { done(false, "No app is open on the screen."); return }
         if (!performGlobalAction(GLOBAL_ACTION_RECENTS)) { done(false, "The phone didn't open Recent apps."); return }
         main.postDelayed({

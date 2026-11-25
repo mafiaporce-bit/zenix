@@ -13,9 +13,9 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * Lets Maya see message notifications (WhatsApp, Messenger, texts, email…) so she can read them
+ * Lets Zenix see message notifications (WhatsApp, Messenger, texts, email…) so she can read them
  * out, sum up what Jim missed, and answer through the notification's own Reply button.
- * Nothing leaves the phone except what Jim asks Maya about.
+ * Nothing leaves the phone except what Jim asks Zenix about.
  */
 class NotifService : NotificationListenerService() {
 
@@ -39,9 +39,9 @@ class NotifService : NotificationListenerService() {
         private fun prefs(c: Context) = c.getSharedPreferences("zenix", Context.MODE_PRIVATE)
         private fun has(a: String, b: String) = a.isNotBlank() && b.isNotBlank() && (a.contains(b, true) || b.contains(a, true))
 
-        /** New messages as plain lines for Maya to read or sum up. */
+        /** New messages as plain lines for Zenix to read or sum up. */
         fun recent(c: Context, app: String, who: String, minutes: Int, onlyNew: Boolean): String {
-            if (!isOn(c)) return JSONObject().put("ok", false).put("message", "Notification access for Maya is off. Tell Jim to turn it on in Settings, Messages & notifications.").toString()
+            if (!isOn(c)) return JSONObject().put("ok", false).put("message", "Notification access for Zenix is off. Tell Jim to turn it on in Settings, Messages & notifications.").toString()
             instance?.seed()
             val since = if (minutes > 0) System.currentTimeMillis() - minutes * 60_000L
                         else if (onlyNew && who.isBlank() && app.isBlank()) maxOf(prefs(c).getLong("notif_read_at", 0L), System.currentTimeMillis() - 48 * 3600_000L)
@@ -60,7 +60,7 @@ class NotifService : NotificationListenerService() {
         /** Answers through the notification's Reply button (no need to open the app). */
         fun reply(c: Context, who: String, app: String, text: String): String {
             val fail = { m: String -> JSONObject().put("ok", false).put("message", m).toString() }
-            val svc = instance ?: return fail(if (isOn(c)) "Maya's message reader is still starting. Use send_message instead." else "Notification access for Maya is off, so use send_message instead.")
+            val svc = instance ?: return fail(if (isOn(c)) "Zenix's message reader is still starting. Use send_message instead." else "Notification access for Zenix is off, so use send_message instead.")
             if (who.isBlank() || text.isBlank()) return fail("Who is the reply for, and what should it say?")
             val active = try { svc.activeNotifications ?: emptyArray() } catch (_: Exception) { emptyArray<StatusBarNotification>() }
             val found = ArrayList<Triple<StatusBarNotification, Notification.Action, String>>()
@@ -95,7 +95,7 @@ class NotifService : NotificationListenerService() {
     override fun onListenerDisconnected() { if (instance === this) instance = null }
     override fun onDestroy() { if (instance === this) instance = null; super.onDestroy() }
 
-    /** Picks up what's already in the notification shade (after Maya restarts). */
+    /** Picks up what's already in the notification shade (after Zenix restarts). */
     fun seed() {
         if (seeded) return
         try { activeNotifications?.forEach { take(it, false) }; seeded = true } catch (_: Exception) { }

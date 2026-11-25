@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="acc_desc">Lets Maya tap Send for you in WhatsApp, Messenger and Messages, only after she has read the message back and you said yes. It only works inside those messaging apps.</string>
-    <string name="ctl_desc">Lets Maya scroll, swipe, tap and search in other apps when you tell her to by voice (for example "scroll down", "go back", "search for…"). She only acts on your command.</string>
+    <string name="acc_desc">Lets Zenix tap Send for you in WhatsApp, Messenger and Messages, only after she has read the message back and you said yes. It only works inside those messaging apps.</string>
+    <string name="ctl_desc">Lets Zenix scroll, swipe, tap and search in other apps when you tell her to by voice (for example "scroll down", "go back", "search for…"). She only acts on your command.</string>
 </resources>

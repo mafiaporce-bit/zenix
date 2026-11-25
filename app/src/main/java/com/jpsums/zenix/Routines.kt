@@ -17,8 +17,8 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * Things Maya does by herself at a set time: the morning brief, "every Friday remind me…",
- * a one-time "tell me when to leave tomorrow". Each routine is a short instruction that Maya's
+ * Things Zenix does by herself at a set time: the morning brief, "every Friday remind me…",
+ * a one-time "tell me when to leave tomorrow". Each routine is a short instruction that Zenix's
  * brain carries out (and speaks) when its time comes.
  * A routine: {id, title, prompt, hour, minute, days ("" = every day, else digits 1-7 with Sunday = 1), date ("" or yyyy-MM-dd for one time)}
  */
@@ -109,11 +109,11 @@ object Routines {
         if (keep.length() != arr.length()) save(c, keep)
     }
 
-    /** Its time has come: a notification always, and Maya says it out loud when she can. */
+    /** Its time has come: a notification always, and Zenix says it out loud when she can. */
     fun fire(c: Context, r: JSONObject, ring: Boolean = true) {
         val id = r.optInt("id"); val json = r.toString()
-        if (ring && AlarmRinger.isOn(c)) {   // rings like an alarm; Stop then lets Maya carry it out
-            AlarmRinger.start(c, r.optString("title", "Maya"), "Tap Stop and Maya will tell you", json); return
+        if (ring && AlarmRinger.isOn(c)) {   // rings like an alarm; Stop then lets Zenix carry it out
+            AlarmRinger.start(c, r.optString("title", "Zenix"), "Tap Stop and Zenix will tell you", json); return
         }
         val open = Intent(c, MainActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
@@ -124,12 +124,12 @@ object Routines {
         val awake = pm.isInteractive && !km.isKeyguardLocked
         val nb = Notification.Builder(c, MainActivity.CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notify)
-            .setContentTitle(r.optString("title", "Maya"))
-            .setContentText("Tap to hear it from Maya")
+            .setContentTitle(r.optString("title", "Zenix"))
+            .setContentText("Tap to hear it from Zenix")
             .setAutoCancel(true).setContentIntent(pi)
         val act = MainActivity.instance?.get()
         val nm = c.getSystemService(NotificationManager::class.java)
-        if (act != null && awake) {   // Maya is already open somewhere: she just speaks, without covering the app in front
+        if (act != null && awake) {   // Zenix is already open somewhere: she just speaks, without covering the app in front
             try { nm.notify(700000 + id, nb.build()) } catch (_: Exception) { }
             act.runRoutine(json); return
         }
@@ -148,7 +148,7 @@ object Routines {
 class RoutineReceiver : BroadcastReceiver() {
     override fun onReceive(c: Context, intent: Intent) {
         val id = intent.getIntExtra("rid", -1)
-        if (id == -1) { Routines.scheduleAll(c); return }   // phone restarted or Maya was updated
+        if (id == -1) { Routines.scheduleAll(c); return }   // phone restarted or Zenix was updated
         val r = Routines.find(c, id) ?: return
         if (r.optString("date").isNotBlank()) Routines.delete(c, id) else Routines.schedule(c, r)
         Routines.fire(c, r)

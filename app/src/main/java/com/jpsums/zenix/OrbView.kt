@@ -9,7 +9,7 @@ import android.graphics.SweepGradient
 import android.view.View
 import android.view.animation.LinearInterpolator
 
-/** Maya's floating neon ring (same look as the ring inside the app). Pulses when she speaks, breathes when listening. */
+/** Zenix's floating neon ring (same look as the ring inside the app). Pulses when she speaks, breathes when listening. */
 class OrbView(context: Context) : View(context) {
 
     private val violet = Color.parseColor("#B266FF")

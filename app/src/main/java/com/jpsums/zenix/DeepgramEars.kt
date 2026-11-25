@@ -90,7 +90,7 @@ class DeepgramEars(private val activity: MainActivity) {
                         val lvl = (rms * 9).coerceIn(0.0, 1.0)
                         js("window.zenixRms && window.zenixRms(${"%.2f".format(java.util.Locale.US, lvl)})")
                     } else if (flux && n > 0) {
-                        socket.send(silence.toByteString(0, n))   // Flux likes a continuous stream; send silence while Maya talks
+                        socket.send(silence.toByteString(0, n))   // Flux likes a continuous stream; send silence while Zenix talks
                     } else if (System.currentTimeMillis() - lastKeepAlive > 4000) {
                         socket.send("{\"type\":\"KeepAlive\"}")
                         lastKeepAlive = System.currentTimeMillis()

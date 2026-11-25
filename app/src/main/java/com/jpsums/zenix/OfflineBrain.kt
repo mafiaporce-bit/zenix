@@ -18,7 +18,7 @@ import java.util.Locale
 import java.util.concurrent.Executors
 
 /**
- * Maya's offline side: an AI brain that runs on the phone (no internet, no credits),
+ * Zenix's offline side: an AI brain that runs on the phone (no internet, no credits),
  * plus the phone's own speech recognition and text-to-speech.
  */
 class OfflineBrain(private val activity: MainActivity) {
@@ -86,8 +86,8 @@ class OfflineBrain(private val activity: MainActivity) {
         if (f.exists() && f.length() >= MODEL_BYTES) return status()
         if (f.exists()) f.delete()
         val req = DownloadManager.Request(Uri.parse(MODEL_URL))
-            .setTitle("Maya offline brain")
-            .setDescription("Downloading Maya's on-phone AI (about 1.6 GB)")
+            .setTitle("Zenix offline brain")
+            .setDescription("Downloading Zenix's on-phone AI (about 1.6 GB)")
             .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE)
             .setDestinationInExternalFilesDir(activity, "models", MODEL_FILE)
             .setAllowedOverMetered(true)

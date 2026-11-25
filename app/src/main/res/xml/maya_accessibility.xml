@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Maya auto-send: only watches messaging apps, and only acts right after Jim says yes to a message -->
+<!-- Zenix auto-send: only watches messaging apps, and only acts right after Jim says yes to a message -->
 <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
     android:accessibilityEventTypes="typeWindowStateChanged|typeWindowContentChanged"
     android:accessibilityFeedbackType="feedbackGeneric"

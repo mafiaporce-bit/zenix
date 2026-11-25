@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0B0F1A">
-<title>Maya</title>
+<title>Zenix</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
 <style>
@@ -147,7 +147,7 @@ input[type=text]{width:100%;height:46px;border-radius:12px;border:1px solid var(
 .btn-line{height:44px;padding:0 16px;border-radius:12px;border:1px solid var(--line);background:var(--surface2);font-weight:500;font-size:14px}
 .btn-line.red{color:var(--danger)}
 .settings{overflow-y:auto;padding:4px 0 16px}
-/* ---- map inside Maya ---- */
+/* ---- map inside Zenix ---- */
 .map-panel{display:none;flex-direction:column;flex:0 0 52%;min-height:0;margin:2px 0 10px;border-radius:20px;overflow:hidden;border:1px solid var(--line);background:var(--surface);position:relative;box-shadow:var(--shadow)}
 body.map-open:not([data-view=settings]) .map-panel{display:flex}
 .map-head{display:flex;align-items:center;gap:10px;padding:10px 10px 10px 14px;border-bottom:1px solid var(--line)}
@@ -310,7 +310,7 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
   <span style="display:none"><span class="dot" id="dot"></span><span id="statusText"></span></span>
 </header>
 
-<div id="updBar" style="display:none;margin:0 16px 8px;padding:10px 12px;border-radius:14px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;font-size:14px;align-items:center;gap:10px"><span style="flex:1" id="updText">New Maya update available</span><button id="updBtn" style="background:#fff;color:#6D28D9;font-weight:600;border-radius:10px;padding:8px 14px;min-height:40px">Update now</button></div>
+<div id="updBar" style="display:none;margin:0 16px 8px;padding:10px 12px;border-radius:14px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;font-size:14px;align-items:center;gap:10px"><span style="flex:1" id="updText">New Zenix update available</span><button id="updBtn" style="background:#fff;color:#6D28D9;font-weight:600;border-radius:10px;padding:8px 14px;min-height:40px">Update now</button></div>
 <main>
   <div id="mapPanel" class="map-panel">
     <div class="map-head">
@@ -327,7 +327,7 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
     <div class="hero">
       <p class="greet" id="greet" hidden></p>
       <div class="orb-wrap idle" id="orbWrap">
-        <canvas id="mayaOrb" aria-label="Maya"></canvas>
+        <canvas id="mayaOrb" aria-label="Zenix"></canvas>
       </div>
       <div class="mode-label" id="modeLabel"></div>
       <div class="live-line" id="liveLine"></div>
@@ -339,9 +339,9 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
       </button>
       <button class="btn-main" id="talkBtn">
         <svg class="i" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
-        <span id="talkLabel">Talk to Maya</span>
+        <span id="talkLabel">Talk to Zenix</span>
       </button>
-      <button class="btn-round" id="volBtn" disabled aria-label="Mute Maya voice">
+      <button class="btn-round" id="volBtn" disabled aria-label="Mute Zenix voice">
         <svg class="i" viewBox="0 0 24 24"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/></svg>
       </button>
     </div>
@@ -352,7 +352,7 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
     <div class="composer">
       <div class="chips" id="chips"></div>
       <div class="composer-box">
-        <textarea id="input" rows="1" placeholder="Message Maya"></textarea>
+        <textarea id="input" rows="1" placeholder="Message Zenix"></textarea>
         <button class="send" id="sendBtn" aria-label="Send">
           <svg class="i" viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
         </button>
@@ -363,11 +363,11 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
   <section class="view settings" id="view-settings">
     <div class="set-head">
       <div class="set-avatar" id="setAvatar">J</div>
-      <div style="flex:1;min-width:0"><h2 id="setName">Jim</h2><p id="setSub">Maya settings</p></div>
+      <div style="flex:1;min-width:0"><h2 id="setName">Jim</h2><p id="setSub">Zenix settings</p></div>
     </div>
 
     <div class="setup" id="setupCard">
-      <div class="setup-h"><b>Set up Maya</b><span id="setupCount"></span></div>
+      <div class="setup-h"><b>Set up Zenix</b><span id="setupCount"></span></div>
       <div class="setup-bar"><i id="setupBar"></i></div>
       <div id="setupRows"></div>
     </div>
@@ -401,7 +401,7 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
       <details class="set-item" data-sec="voice">
         <summary><span class="ico pink"><svg viewBox="0 0 24 24"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 010 7M19 5a10 10 0 010 14"/></svg></span><span class="set-t"><b>Voice</b><span id="sumVoice"></span></span><svg class="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></summary>
         <div class="set-body">
-          <p class="hint" id="voiceAgentNote" style="display:none">In ElevenLabs mode Maya speaks with the agent's own voice (Natasha). Pick a brain above to choose voices here.</p>
+          <p class="hint" id="voiceAgentNote" style="display:none">In ElevenLabs mode Zenix speaks with the agent's own voice (Natasha). Pick a brain above to choose voices here.</p>
           <div id="voicePicker">
             <div class="seg small"><button data-vsrc="el">ElevenLabs</button><button data-vsrc="dg">Deepgram</button><button data-vsrc="hd">Google</button><button data-vsrc="kk">Free</button></div>
             <div class="vsrc" id="vsrc-el">
@@ -434,7 +434,7 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
         <div class="set-body">
           <p class="sub-label" style="margin-top:4px">Ears</p>
           <div class="seg small"><button data-ears="phone">Phone · free</button><button data-ears="deepgram">Deepgram · faster</button></div>
-          <p class="hint" style="margin-top:8px">Deepgram hears you better and lets Maya start thinking before you finish talking.</p>
+          <p class="hint" style="margin-top:8px">Deepgram hears you better and lets Zenix start thinking before you finish talking.</p>
           <p class="sub-label">Language</p>
           <div class="seg small"><button data-lang="en-PH">English (PH)</button><button data-lang="en-US">English (US)</button><button data-lang="fil-PH">Tagalog</button></div>
         </div>
@@ -453,51 +453,51 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
     <p class="set-label">Features</p>
     <div class="set-list">
       <details class="set-item" data-sec="wake">
-        <summary><span class="ico amber"><svg viewBox="0 0 24 24"><path d="M12 3l1.8 4.7L18.5 9l-4.7 1.8L12 15.5l-1.8-4.7L5.5 9l4.7-1.3L12 3zM19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9L19 15z"/></svg></span><span class="set-t"><b>"Hey Maya"</b><span id="sumWake"></span></span><svg class="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></summary>
+        <summary><span class="ico amber"><svg viewBox="0 0 24 24"><path d="M12 3l1.8 4.7L18.5 9l-4.7 1.8L12 15.5l-1.8-4.7L5.5 9l4.7-1.3L12 3zM19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9L19 15z"/></svg></span><span class="set-t"><b>"Hey Zenix"</b><span id="sumWake"></span></span><svg class="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></summary>
         <div class="set-body">
-          <p class="hint">Say "Hey Maya" to start talking, even in another app or with the screen off. It listens on your phone only; nothing is sent until you say it. A voice chat that goes quiet ends by itself.</p>
+          <p class="hint">Say "Zenix" or "Hey Zenix" to start talking, even in another app or with the screen off. It listens on your phone only; nothing is sent until you say it. A voice chat that goes quiet ends by itself.</p>
           <div class="toggle-row"><span class="status-line" style="margin:0" id="wakeState">Off</span><button class="btn-line" id="wakeBtn">Turn on</button></div>
           <p class="status-line" id="wakeDiag" style="display:none"></p>
           <div id="wakeFix" style="display:none">
             <p class="sub-label">Still needed for screen-off and other apps</p>
-            <div class="toggle-row" id="wfOverlay"><div><b>Display over other apps</b><small>Lets Maya pop up from any app</small></div><button class="btn-line" id="wfOverlayBtn">Allow</button></div>
-            <div class="toggle-row" id="wfFull"><div><b>Full-screen alerts</b><small>Lets Maya open over the lock screen</small></div><button class="btn-line" id="wfFullBtn">Allow</button></div>
-            <div class="toggle-row" id="wfBatt"><div><b>Battery: unrestricted</b><small>Stops the phone putting Maya to sleep</small></div><button class="btn-line" id="wfBattBtn">Allow</button></div>
+            <div class="toggle-row" id="wfOverlay"><div><b>Display over other apps</b><small>Lets Zenix pop up from any app</small></div><button class="btn-line" id="wfOverlayBtn">Allow</button></div>
+            <div class="toggle-row" id="wfFull"><div><b>Full-screen alerts</b><small>Lets Zenix open over the lock screen</small></div><button class="btn-line" id="wfFullBtn">Allow</button></div>
+            <div class="toggle-row" id="wfBatt"><div><b>Battery: unrestricted</b><small>Stops the phone putting Zenix to sleep</small></div><button class="btn-line" id="wfBattBtn">Allow</button></div>
           </div>
-          <div class="toggle-row"><div><b>Private on lock screen</b><small>While the phone is locked, Maya keeps what she remembers about you to herself</small></div><button class="toggle" id="lockPrivToggle" aria-label="Private on lock screen"></button></div>
-          <p class="hint" style="margin:12px 0 0">After restarting the phone, open Maya once so she starts listening again.</p>
+          <div class="toggle-row"><div><b>Private on lock screen</b><small>While the phone is locked, Zenix keeps what she remembers about you to herself</small></div><button class="toggle" id="lockPrivToggle" aria-label="Private on lock screen"></button></div>
+          <p class="hint" style="margin:12px 0 0">After restarting the phone, open Zenix once so she starts listening again.</p>
         </div>
       </details>
       <details class="set-item" data-sec="orb">
         <summary><span class="ico"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/></svg></span><span class="set-t"><b>Floating orb</b><span id="sumOrb"></span></span><svg class="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></summary>
         <div class="set-body">
-          <p class="hint" id="orbText">Shows Maya's orb over other apps while you talk. Drag it anywhere, tap it to come back.</p>
+          <p class="hint" id="orbText">Shows Zenix's orb over other apps while you talk. Drag it anywhere, tap it to come back.</p>
           <div class="toggle-row"><span></span><button class="btn-line" id="orbBtn">Turn on orb</button></div>
         </div>
       </details>
       <details class="set-item" data-sec="autosend">
         <summary><span class="ico green"><svg viewBox="0 0 24 24"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg></span><span class="set-t"><b>Auto-send messages</b><span id="sumAuto"></span></span><svg class="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></summary>
         <div class="set-body">
-          <p class="hint">After Maya reads your message back and you say <b>yes</b>, a bubble shows <b>"Sending to Jen in 3s · Tap to cancel"</b>, then she taps Send for you in WhatsApp, Messenger and Messages. Works for group chats on WhatsApp and Messenger too. Without it, the chat opens ready and you tap Send.</p>
+          <p class="hint">After Zenix reads your message back and you say <b>yes</b>, a bubble shows <b>"Sending to Jen in 3s · Tap to cancel"</b>, then she taps Send for you in WhatsApp, Messenger and Messages. Works for group chats on WhatsApp and Messenger too. Without it, the chat opens ready and you tap Send.</p>
           <div class="toggle-row"><span class="status-line" style="margin:0" id="autoState">Off</span><button class="btn-line" id="autoBtn">Turn on</button></div>
-          <p class="hint" style="margin-top:12px">Turn on: tap <b>Turn on</b> → <b>Installed apps</b> → <b>Maya auto-send</b> → switch it on. If it's greyed out, tap <b>Allow restricted settings</b> below first (⋮ menu, top right of Maya's app info), then try again.</p>
+          <p class="hint" style="margin-top:12px">Turn on: tap <b>Turn on</b> → <b>Installed apps</b> → <b>Zenix auto-send</b> → switch it on. If it's greyed out, tap <b>Allow restricted settings</b> below first (⋮ menu, top right of Zenix's app info), then try again.</p>
           <div class="toggle-row" style="margin-top:0"><span></span><button class="btn-line" id="autoInfo">Allow restricted settings</button></div>
         </div>
       </details>
       <details class="set-item" data-sec="control">
         <summary><span class="ico"><svg viewBox="0 0 24 24"><path d="M9 11V5a1.5 1.5 0 013 0v5m0-1.5a1.5 1.5 0 013 0V11m0-.5a1.5 1.5 0 013 0V15a6 6 0 01-6 6h-1a6 6 0 01-5.2-3L5 14.5a1.5 1.5 0 012.6-1.5L9 15"/></svg></span><span class="set-t"><b>Control other apps</b><span id="sumCtl"></span></span><svg class="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></summary>
         <div class="set-body">
-          <p class="hint">Maya works the app on your screen while you talk to her. Start a voice chat, open any app, then say <b>"scroll down"</b>, <b>"swipe left"</b>, <b>"go back"</b>, <b>"go home"</b>, <b>"take a screenshot"</b>, <b>"tap Like"</b>, <b>"search for Jen"</b>, <b>"play Shape of You"</b> or <b>"close this app"</b>. She only does it when you say so.</p>
+          <p class="hint">Zenix works the app on your screen while you talk to her. Start a voice chat, open any app, then say <b>"scroll down"</b>, <b>"swipe left"</b>, <b>"go back"</b>, <b>"go home"</b>, <b>"take a screenshot"</b>, <b>"tap Like"</b>, <b>"search for Jen"</b>, <b>"play Shape of You"</b> or <b>"close this app"</b>. She only does it when you say so.</p>
           <div class="toggle-row"><span class="status-line" style="margin:0" id="ctlState">Off</span><button class="btn-line" id="ctlBtn">Turn on</button></div>
-          <p class="hint" style="margin-top:12px">Turn on: tap <b>Turn on</b> → <b>Installed apps</b> → <b>Maya phone control</b> → switch it on. If it's greyed out, tap <b>Allow restricted settings</b> below first (⋮ menu, top right of Maya's app info), then try again.</p>
+          <p class="hint" style="margin-top:12px">Turn on: tap <b>Turn on</b> → <b>Installed apps</b> → <b>Zenix phone control</b> → switch it on. If it's greyed out, tap <b>Allow restricted settings</b> below first (⋮ menu, top right of Zenix's app info), then try again.</p>
           <div class="toggle-row" style="margin-top:0"><span></span><button class="btn-line" id="ctlInfo">Allow restricted settings</button></div>
-          <p class="hint" style="margin-top:12px">While a video or music is playing in another app, Maya ignores its sound. "Scroll down", "go back" and "pause" still work straight away; for anything else, say <b>"Maya"</b> first, like <b>"Maya, play the next one"</b> or <b>"Maya, search for…"</b>.</p>
+          <p class="hint" style="margin-top:12px">While a video or music is playing in another app, Zenix ignores its sound. "Scroll down", "go back" and "pause" still work straight away; for anything else, say <b>"Zenix"</b> first, like <b>"Zenix, play the next one"</b> or <b>"Zenix, search for…"</b>.</p>
         </div>
       </details>
       <details class="set-item" data-sec="routines">
         <summary><span class="ico amber"><svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2M9 2h6"/></svg></span><span class="set-t"><b>Routines</b><span id="sumRoutines"></span></span><svg class="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></summary>
         <div class="set-body">
-          <p class="hint">Things Maya does by herself at a set time and says out loud. Just tell her: <b>"every weekday at 6, give me my morning brief"</b>, <b>"every Friday at 8 PM remind me to pay the bills"</b> or <b>"tomorrow at 5, tell me when to leave for the station"</b>.</p>
+          <p class="hint">Things Zenix does by herself at a set time and says out loud. Just tell her: <b>"every weekday at 6, give me my morning brief"</b>, <b>"every Friday at 8 PM remind me to pay the bills"</b> or <b>"tomorrow at 5, tell me when to leave for the station"</b>.</p>
           <div id="routineList"></div>
           <p class="sub-label">Morning brief</p>
           <div class="inline" style="margin-top:0"><input type="time" class="field" id="briefTime" value="06:00"><button class="btn-line" id="briefAdd">Add daily brief</button></div>
@@ -510,15 +510,15 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
       <details class="set-item" data-sec="notif">
         <summary><span class="ico pink"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 01-3.4 0"/></svg></span><span class="set-t"><b>Message reading</b><span id="sumNotif"></span></span><svg class="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></summary>
         <div class="set-body">
-          <p class="hint">Lets Maya see your message notifications (WhatsApp, Messenger, texts, email). Ask <b>"who messaged me?"</b> or <b>"what did I miss?"</b>, and reply by voice. She always reads your reply back and waits for your yes.</p>
+          <p class="hint">Lets Zenix see your message notifications (WhatsApp, Messenger, texts, email). Ask <b>"who messaged me?"</b> or <b>"what did I miss?"</b>, and reply by voice. She always reads your reply back and waits for your yes.</p>
           <div class="toggle-row"><span class="status-line" style="margin:0" id="notifState">Off</span><button class="btn-line" id="notifBtn">Turn on</button></div>
-          <p class="hint" style="margin:12px 0 0">Turn on: tap <b>Turn on</b> → <b>Maya message reader</b> → <b>Allow</b>. If it's greyed out, first tap <b>Allow restricted settings</b> in the Auto-send section above.</p>
+          <p class="hint" style="margin:12px 0 0">Turn on: tap <b>Turn on</b> → <b>Zenix message reader</b> → <b>Allow</b>. If it's greyed out, first tap <b>Allow restricted settings</b> in the Auto-send section above.</p>
         </div>
       </details>
       <details class="set-item" data-sec="drive">
         <summary><span class="ico blue"><svg viewBox="0 0 24 24"><path d="M5 17h14M6 17v2M18 17v2M4 13l2-6h12l2 6v4H4v-4z"/><circle cx="8" cy="14" r="1"/><circle cx="16" cy="14" r="1"/></svg></span><span class="set-t"><b>Driving mode</b><span id="sumDrive"></span></span><svg class="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></summary>
         <div class="set-body">
-          <p class="hint">While it's on, Maya reads new messages aloud, and you can reply or call by voice with the phone still locked. It switches on by itself when the phone connects to your car's Bluetooth. Needs Message reading, and Maya left open in the background.</p>
+          <p class="hint">While it's on, Zenix reads new messages aloud, and you can reply or call by voice with the phone still locked. It switches on by itself when the phone connects to your car's Bluetooth. Needs Message reading, and Zenix left open in the background.</p>
           <div class="toggle-row"><span class="status-line" style="margin:0" id="driveState">Off</span><button class="btn-line" id="driveBtn">Turn on now</button></div>
           <p class="sub-label">Your car</p>
           <div class="toggle-row" style="margin-top:0"><span class="status-line" style="margin:0" id="carState">Not chosen yet</span><button class="btn-line" id="carBtn">Choose car</button></div>
@@ -540,10 +540,10 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
     <p class="set-label">Memory &amp; data</p>
     <div class="set-list">
       <details class="set-item" data-sec="mem">
-        <summary><span class="ico pink"><svg viewBox="0 0 24 24"><path d="M12 21s-7-4.4-9.3-9A5 5 0 0112 6.6 5 5 0 0121.3 12C19 16.6 12 21 12 21z"/></svg></span><span class="set-t"><b>What Maya remembers</b><span id="sumMem"></span></span><svg class="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></summary>
+        <summary><span class="ico pink"><svg viewBox="0 0 24 24"><path d="M12 21s-7-4.4-9.3-9A5 5 0 0112 6.6 5 5 0 0121.3 12C19 16.6 12 21 12 21z"/></svg></span><span class="set-t"><b>What Zenix remembers</b><span id="sumMem"></span></span><svg class="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></summary>
         <div class="set-body">
           <div class="km" id="kmCard">
-            <div class="setup-h"><b>Help Maya know you</b><span id="kmCount"></span></div>
+            <div class="setup-h"><b>Help Zenix know you</b><span id="kmCount"></span></div>
             <div class="setup-bar"><i id="kmBar"></i></div>
             <p class="km-g" id="kmGroup"></p>
             <p class="km-q" id="kmQ"></p>
@@ -601,7 +601,7 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
       <details class="set-item" data-sec="sites">
         <summary><span class="ico blue"><svg viewBox="0 0 24 24"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg></span><span class="set-t"><b>My apps &amp; sites</b><span id="sumSites"></span></span><svg class="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></summary>
         <div class="set-body">
-          <p class="hint">Maya checks that your apps and websites are up. Ask <b>"are my apps okay?"</b>, or add it to your morning brief.</p>
+          <p class="hint">Zenix checks that your apps and websites are up. Ask <b>"are my apps okay?"</b>, or add it to your morning brief.</p>
           <div id="siteList"></div>
           <div class="inline"><input type="text" class="field" id="siteName" placeholder="Name" maxlength="40" style="flex:0 0 112px"><input type="url" class="field" id="siteUrl" placeholder="https://…" autocomplete="off"><button class="btn-line" id="siteAdd">Add</button></div>
           <div class="toggle-row"><span class="status-line" style="margin:0" id="siteState"></span><button class="btn-line" id="siteCheck">Check now</button></div>
@@ -648,20 +648,20 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
     <p class="set-label">App</p>
     <div class="set-list">
       <details class="set-item" data-sec="help">
-        <summary><span class="ico pink"><svg viewBox="0 0 24 24"><path d="M12 3l1.8 4.7L18.5 9l-4.7 1.8L12 15.5l-1.8-4.7L5.5 9l4.7-1.3L12 3z"/></svg></span><span class="set-t"><b>What Maya can do</b><span>Things you can say</span></span><svg class="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></summary>
+        <summary><span class="ico pink"><svg viewBox="0 0 24 24"><path d="M12 3l1.8 4.7L18.5 9l-4.7 1.8L12 15.5l-1.8-4.7L5.5 9l4.7-1.3L12 3z"/></svg></span><span class="set-t"><b>What Zenix can do</b><span>Things you can say</span></span><svg class="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></summary>
         <div class="set-body" id="helpBox"></div>
       </details>
       <details class="set-item" data-sec="perm">
         <summary><span class="ico green"><svg viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6l8-3z"/><path d="M9 12l2 2 4-4"/></svg></span><span class="set-t"><b>Phone permissions</b><span>Calls, contacts, calendar, notifications</span></span><svg class="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></summary>
         <div class="set-body">
-          <p class="hint" id="permText">Allow calls, contacts, calendar and notifications so Maya can help.</p>
+          <p class="hint" id="permText">Allow calls, contacts, calendar and notifications so Zenix can help.</p>
           <div class="toggle-row"><span></span><button class="btn-line" id="permBtn">Allow permissions</button></div>
         </div>
       </details>
       <details class="set-item" data-sec="backup">
         <summary><span class="ico amber"><svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M5 21h14"/></svg></span><span class="set-t"><b>Back up &amp; restore</b><span>Keys, settings, memory and chats</span></span><svg class="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></summary>
         <div class="set-body">
-          <p class="hint">Saves everything, including your keys, into a file in Downloads/Maya, locked with your PIN. If you clear Maya's data or change phones, restore it in one tap. Keep the PIN safe; nobody can recover it.</p>
+          <p class="hint">Saves everything, including your keys, into a file in Downloads/Zenix, locked with your PIN. If you clear Zenix's data or change phones, restore it in one tap. Keep the PIN safe; nobody can recover it.</p>
           <input type="password" inputmode="numeric" class="field" id="bkPin" placeholder="Backup PIN (4+ digits)" autocomplete="off">
           <div class="inline"><button class="btn-line" id="bkSave" style="flex:1">Back up everything</button><button class="btn-line" id="bkLoad" style="flex:1">Restore</button></div>
           <p class="status-line" id="bkState"></p>
@@ -670,7 +670,7 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
       <details class="set-item" data-sec="about">
         <summary><span class="ico blue"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg></span><span class="set-t"><b>About &amp; updates</b><span id="sumAbout"></span></span><svg class="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></summary>
         <div class="set-body">
-          <p class="hint" id="aboutText">Maya runs on the brain you pick: Claude, the Open brain (Grok) or ElevenLabs. Needs internet, or the offline brain.</p>
+          <p class="hint" id="aboutText">Zenix runs on the brain you pick: Claude, the Open brain (Grok) or ElevenLabs. Needs internet, or the offline brain.</p>
           <div class="toggle-row"><span class="status-line" style="margin:0" id="verText">Version …</span><button class="btn-line" id="updCheck">Check for updates</button></div>
           <div class="toggle-row" id="updAlt"><span class="status-line" style="margin:0">Update not installing?</span><button class="btn-line" id="updBrowser">Download in browser</button></div>
         </div>
@@ -691,7 +691,7 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
 <div class="toast" id="toast"></div>
 
 <script type="module">
-/* The ElevenLabs agent code is fetched only when that brain is used, so Maya opens even with no internet */
+/* The ElevenLabs agent code is fetched only when that brain is used, so Zenix opens even with no internet */
 let ConversationApi = null;
 async function loadConversation(){
   if(ConversationApi) return ConversationApi;
@@ -782,7 +782,7 @@ function makeWebNative(){
   // files: backups download to the PC and load from a file
   const download = (name, text) => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], {type:'application/json'})); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500); };
   W.saveBackup = (name, text) => { download(name, text); return JSON.stringify({ok:true, message:'saved'}); };
-  W.shareText = (title, text) => { download((title||'maya').replace(/\W+/g,'-').toLowerCase() + '.json', text); return OK; };
+  W.shareText = (title, text) => { download((title||'zenix').replace(/\W+/g,'-').toLowerCase() + '.json', text); return OK; };
   W.pickBackup = () => { const i = document.createElement('input'); i.type = 'file'; i.accept = '.json,application/json,text/plain';
     i.onchange = () => { const f = i.files && i.files[0]; if(!f) return; f.text().then(t => call('zenixBackupPicked', t)); }; i.click(); return OK; };
   W.openUrl = (url) => { window.open(url, '_blank', 'noopener'); return JSON.stringify({ok:true, message:'Opened it in a new tab.'}); };
@@ -810,7 +810,7 @@ function setStatus(s){
   $('dot').className='dot'+(s==='on'?' on':s==='busy'?' busy':'');
   $('statusText').textContent = s==='on'?'Online':s==='busy'?'Connecting…':'Offline';
 }
-const setOrb = s => { $('orbWrap').className = 'orb-wrap ' + s; if(window.MayaOrb) window.MayaOrb.setState(s); };
+const setOrb = s => { $('orbWrap').className = 'orb-wrap ' + s; if(window.ZenixOrb) window.ZenixOrb.setState(s); };
 
 let chatTyping = false, chatTypingTimer = 0;
 const SUGG = [
@@ -932,7 +932,7 @@ function memoryText(){
 }
 function recentChatText(){
   const recent = history.filter(m=>m.who!=='sys').slice(-14)
-    .map(m=>(m.who==='user'?'Jim: ':'Maya: ')+m.text).join('\n');
+    .map(m=>(m.who==='user'?'Jim: ':'Zenix: ')+m.text).join('\n');
   return recent ? recent.slice(-1800) : 'No previous conversation.';
 }
 
@@ -958,7 +958,7 @@ function emergencyNumber(c){
 const clientTools = {
   set_alarm: async ({hour, minute, label}) => {
     showAction(`⏰ Alarm ${String(hour).padStart(2,'0')}:${String(minute).padStart(2,'0')}`);
-    return reply(callNative('setAlarm', hour, minute, label||'Maya alarm') || {ok:false, message:'Alarms only work in the Android app.'});
+    return reply(callNative('setAlarm', hour, minute, label||'Zenix alarm') || {ok:false, message:'Alarms only work in the Android app.'});
   },
   set_reminder: async ({text, minutes_from_now}) => {
     showAction(`⏰ Reminder in ${minutes_from_now} min: ${text}`);
@@ -1032,7 +1032,7 @@ async function startSession(kind){
   if(convo || connecting) return;
   connecting=true; session=kind; setStatus('busy');   // set before any waiting, so two taps can't start two chats
   awaySince = 0;
-  if(kind==='talk'){ $('modeLabel').textContent='Connecting to Maya…'; $('talkLabel').textContent='Connecting…'; }
+  if(kind==='talk'){ $('modeLabel').textContent='Connecting to Zenix…'; $('talkLabel').textContent='Connecting…'; }
   agentTalk.fromWake = kind==='talk' && wakeGreeting; wakeGreeting = false;
   let dropped = false;
   try{
@@ -1053,22 +1053,22 @@ async function startSession(kind){
         agentTalk.lastActive = Date.now() + 8000; agentTalk.userSpoke = true; agentTalk.speaking = false;
         if(Native && Native.keepAwake) Native.keepAwake('true');
       },
-      onDisconnect: () => { dropped = true; const had = !!convo; convo=null; session=null; setStatus('off'); resetTalkUI(); if(had) addMsg('sys','Maya disconnected'); if(Native && Native.keepAwake) Native.keepAwake('false'); wakeResumeLater(); },
-      onError: (err) => { console.error(err); toast('Maya had a connection problem'); },
+      onDisconnect: () => { dropped = true; const had = !!convo; convo=null; session=null; setStatus('off'); resetTalkUI(); if(had) addMsg('sys','Zenix disconnected'); if(Native && Native.keepAwake) Native.keepAwake('false'); wakeResumeLater(); },
+      onError: (err) => { console.error(err); toast('Zenix had a connection problem'); },
       onMessage: (m) => {
         const who = (m.source || m.role) === 'user' ? 'user' : 'ai';
         const text = m.message || m.text || '';
         if(who==='user'){ agentTalk.lastActive = Date.now(); agentTalk.userSpoke = true; }
         if(who==='user' && session==='chat') return;
         addMsg(who, text);
-        if(session==='talk') $('liveLine').textContent = (who==='ai'?'Maya: ':'You: ') + (who==='ai' ? stripTags(text) : text);
+        if(session==='talk') $('liveLine').textContent = (who==='ai'?'Zenix: ':'You: ') + (who==='ai' ? stripTags(text) : text);
       },
       onModeChange: ({mode}) => {
         agentTalk.speaking = mode==='speaking';
         if(!agentTalk.speaking && agentTalk.userSpoke){ agentTalk.lastActive = Date.now(); agentTalk.userSpoke = false; }   // the quiet clock starts when she finishes answering
         if(Native && Native.setOrbMode) Native.setOrbMode(mode);
         if(session!=='talk') return;
-        if(mode==='speaking'){ setOrb('speaking'); $('modeLabel').textContent='Maya is speaking'; }
+        if(mode==='speaking'){ setOrb('speaking'); $('modeLabel').textContent='Zenix is speaking'; }
         else { setOrb('listening'); $('modeLabel').textContent = micMuted ? 'Mic muted' : 'Listening…'; }
       }
     });
@@ -1085,9 +1085,9 @@ async function startSession(kind){
     console.error(e); convo=null; session=null; setStatus('off'); resetTalkUI();
     if(Native && Native.keepAwake) Native.keepAwake('false');
     if(settings.mode==='auto' && offlineReady()){
-      toast('Cloud unreachable — switching to offline Maya');
+      toast('Cloud unreachable — switching to offline Zenix');
       if(kind==='talk') startOffline('talk'); else if(pendingText){ const t=pendingText; pendingText=null; offlineChat(t); }
-    } else { pendingText=null; stopTyping(); toast('Could not reach Maya. Check your internet.'); wakeResumeLater(); }
+    } else { pendingText=null; stopTyping(); toast('Could not reach Zenix. Check your internet.'); wakeResumeLater(); }
   }finally{ connecting=false; }
 }
 async function endSession(){
@@ -1097,8 +1097,8 @@ async function endSession(){
   if(Native && Native.keepAwake) Native.keepAwake('false');
   wakeResumeLater();
 }
-/* A voice chat nobody is talking in ends by itself: saves credits, and gives the screen back after "Hey Maya".
-   The quiet clock only runs while Jim is on Maya's Talk screen; in Settings, Chat or another app it waits (with a longer safety limit). */
+/* A voice chat nobody is talking in ends by itself: saves credits, and gives the screen back after "Hey Zenix".
+   The quiet clock only runs while Jim is on Zenix's Talk screen; in Settings, Chat or another app it waits (with a longer safety limit). */
 const onTalkScreen = () => !document.hidden && (document.body.dataset.view || 'talk')==='talk';
 const talkBusy = () => speech.playing || speech.q.length || speech.streamOpen || speech.hold || off.thinking;
 let awaySince = 0;
@@ -1128,7 +1128,7 @@ setInterval(() => {
     if(now - off.quietSince > (off.fromWake ? 30000 : 120000)){ endOffline(true); addMsg('sys', 'Voice chat ended (it went quiet)'); endedNote('The chat ended because it was quiet.'); }
   }
 }, 3000);
-/* Back on Maya's Talk screen: make sure she is really listening again */
+/* Back on Zenix's Talk screen: make sure she is really listening again */
 function backToTalk(){
   if(!(off.active && off.kind==='talk') || talkBusy()) return;
   srErrs = 0; off.quietSince = Date.now();
@@ -1138,7 +1138,7 @@ function backToTalk(){
 }
 document.addEventListener('visibilitychange', () => { if(!document.hidden) setTimeout(backToTalk, 400); });
 function resetTalkUI(){
-  $('talkBtn').classList.remove('end'); $('talkLabel').textContent='Talk to Maya';
+  $('talkBtn').classList.remove('end'); $('talkLabel').textContent='Talk to Zenix';
   $('muteBtn').disabled=true; $('volBtn').disabled=true;
   $('muteBtn').classList.remove('off'); $('volBtn').classList.remove('off');
   micMuted=false; voiceMuted=false;
@@ -1154,7 +1154,7 @@ $('talkBtn').onclick = async () => {
   if(convo && session==='chat') await endSession();
   if(Native && Native.hasOverlay && Native.hasOverlay()!=='true' && !store.get('askedOverlay', false)){
     store.set('askedOverlay', true);
-    toast('Turn on "Display over other apps" for Maya, then come back and tap Talk');
+    toast('Turn on "Display over other apps" for Zenix, then come back and tap Talk');
     setTimeout(()=>Native.requestOverlay(), 1200);
     return;
   }
@@ -1163,7 +1163,7 @@ $('talkBtn').onclick = async () => {
 $('muteBtn').onclick = () => { if(!convo) return; micMuted=!micMuted; convo.setMicMuted(micMuted); $('muteBtn').classList.toggle('off',micMuted); $('modeLabel').textContent = micMuted?'Mic muted':'Listening…'; };
 $('volBtn').onclick = () => { if(!convo) return; voiceMuted=!voiceMuted; convo.setVolume({volume:voiceMuted?0:1}); $('volBtn').classList.toggle('off',voiceMuted); };
 
-/* ---------- Maps inside Maya (OpenStreetMap: free, no key needed) ---------- */
+/* ---------- Maps inside Zenix (OpenStreetMap: free, no key needed) ---------- */
 const MapView = (() => {
   let map = null, loading = null, layer = null;
   function loadLeaflet(){
@@ -1171,7 +1171,7 @@ const MapView = (() => {
     if(loading) return loading;
     loading = new Promise((res, rej) => {
       const fail = () => { loading = null; rej(new Error('the map could not load (check internet)')); };
-      const timer = setTimeout(fail, 12000);   // never leave Maya waiting on a map that isn't coming
+      const timer = setTimeout(fail, 12000);   // never leave Zenix waiting on a map that isn't coming
       const css = document.createElement('link'); css.rel = 'stylesheet'; css.href = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css'; document.head.appendChild(css);
       const js = document.createElement('script'); js.src = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js';
       js.onload = () => { clearTimeout(timer); res(); }; js.onerror = () => { clearTimeout(timer); fail(); };
@@ -1235,7 +1235,7 @@ function myLocation(){
 }
 async function findPlace(q){
   if(HERE_RE.test(String(q||'').trim())){
-    try{ return await myLocation(); }catch(e){ throw new Error("I can't see his location (Location is off or not allowed for Maya), so ask Jim where he's starting from"); }
+    try{ return await myLocation(); }catch(e){ throw new Error("I can't see his location (Location is off or not allowed for Zenix), so ask Jim where he's starting from"); }
   }
   return geocode(q);
 }
@@ -1364,7 +1364,7 @@ clientTools.list_remove = async ({list, item}) => {
   return `Removed "${gone.t}" from the ${k} list.`;
 };
 
-/* A routine's time has come (from the phone's alarm): Maya carries it out and says it aloud */
+/* A routine's time has come (from the phone's alarm): Zenix carries it out and says it aloud */
 window.zenixRoutine = (txt) => {
   let r; try{ r = JSON.parse(txt); }catch(e){ return; }
   const title = r.title || 'Routine';
@@ -1410,7 +1410,7 @@ clientTools.phone_control = async ({action, value}) => {
 const scrWait = {}; let scrSeq = 0;
 window.zenixCtl = (id, ok, msg) => { const w = scrWait[id]; if(w){ delete scrWait[id]; w({ok: !!ok, message: String(msg||'')}); } };
 const ctlOn = () => !!(Native.ctlOn && Native.ctlOn()==='true');
-const CTL_OFF = "Phone control is off. In Maya's Settings, open Control other apps and turn it on.";
+const CTL_OFF = "Phone control is off. In Zenix's Settings, open Control other apps and turn it on.";
 function screenDo(action, arg){
   if(!Native.ctl) return Promise.resolve(NA);
   return new Promise(res => {
@@ -1429,9 +1429,9 @@ clientTools.phone_screen = async ({action, text, big}) => {
   const a = String(action||'').toLowerCase();
   if(!SCREEN_ACTIONS.includes(a)) return 'Unknown action. Use ' + SCREEN_ACTIONS.join(', ') + '.';
   if(!Native.ctl) return NA.message;
-  if(!ctlOn() && !SCREEN_FREE.includes(a)) return 'Maya phone control is off. Tell Jim to open Maya\'s Settings, then Control other apps, and turn it on.';
+  if(!ctlOn() && !SCREEN_FREE.includes(a)) return 'Zenix phone control is off. Tell Jim to open Zenix\'s Settings, then Control other apps, and turn it on.';
   if(SCREEN_TEXT.includes(a) && !String(text||'').trim()) return a==='tap' ? 'Say which button to tap, by the name written on it.' : 'Say what to search for or play.';
-  if(SCREEN_OTHER.includes(a) && !document.hidden) return 'Maya is on the screen right now. This works on other apps: tell Jim to open the app first, then ask again.';
+  if(SCREEN_OTHER.includes(a) && !document.hidden) return 'Zenix is on the screen right now. This works on other apps: tell Jim to open the app first, then ask again.';
   showAction(SCREEN_QUIET[a] || (a==='tap' ? '👆 Tap ' + text : a==='tap_first' ? '👆 Tap the first one' : /^search/.test(a) ? '🔎 Search: ' + text : /^play/.test(a) ? '▶️ Play: ' + text : '📱 ' + a.replace('_', ' ')));
   const arg = SCREEN_TEXT.includes(a) ? String(text).trim() : big ? 'big' : '';
   if(!SCREEN_TEXT.includes(a) || a==='tap') lastScreen = {action:a, arg, t: Date.now()};
@@ -1458,7 +1458,7 @@ const APP_OPEN = {fb:'facebook', ig:'instagram', insta:'instagram', 'tik tok':'t
 const frontApp = () => { try{ return (Native.ctlFront && Native.ctlFront()) || ''; }catch(e){ return ''; } };
 const frontIs = app => { const k = APP_PKG[app] || String(app).replace(/[^a-z0-9]/gi, ''); return !!k && new RegExp(k, 'i').test(frontApp()); };
 const pause = ms => new Promise(r => setTimeout(r, ms));
-function loose(fn){ fn.loose = true; return fn; }   // could be said by a video too: while one is playing, these need "Maya" first
+function loose(fn){ fn.loose = true; return fn; }   // could be said by a video too: while one is playing, these need "Zenix" first
 function searchInstant(q, app){
   return loose(async () => {
     if(!Native.ctl || (Native.isLocked && Native.isLocked()==='true')) return null;
@@ -1467,11 +1467,11 @@ function searchInstant(q, app){
     if(app && !frontIs(app)){
       const o = callNative('openApp', APP_OPEN[app] || app); if(!o || !o.ok) return null;
       showAction('📱 Opening ' + app); await pause(2800);
-    } else if(!app && !document.hidden) return null;   // Maya herself is on screen: an ordinary web search
+    } else if(!app && !document.hidden) return null;   // Zenix herself is on screen: an ordinary web search
     showAction('🔎 Search: ' + q);
     let r = await screenDo('search', q);
     if(!r.ok && app){ await pause(1600); r = await screenDo('search', q); }   // the app was still opening
-    if(!r.ok && !app) return null;   // this app has no search box: Maya looks it up herself
+    if(!r.ok && !app) return null;   // this app has no search box: Zenix looks it up herself
     return r.message;
   });
 }
@@ -1487,9 +1487,9 @@ function closeInstant(name){
     } else if(!name && !document.hidden) return 'Which app, bro? Say "close YouTube", or open the app and say "close this app".';
     showAction('✖️ Closing ' + (name || 'this app'));
     let r = await screenDo('close_app', '');
-    if(!r.ok && name && /Maya is the app/.test(r.message)){ await pause(1200); r = await screenDo('close_app', ''); }   // it was still opening
+    if(!r.ok && name && /Zenix is the app/.test(r.message)){ await pause(1200); r = await screenDo('close_app', ''); }   // it was still opening
     return r.ok ? (name ? 'Closed ' + name + '.' : 'Closed it.') : r.message;
-  });   // not "loose": works even while a song plays, without saying "Maya" first
+  });   // not "loose": works even while a song plays, without saying "Zenix" first
 }
 function playInstant(song, app){
   return loose(async () => {
@@ -1498,12 +1498,12 @@ function playInstant(song, app){
                     : frontIs('youtube music') ? 'play_ytmusic' : /spotify|\.music$/i.test(frontApp()) ? 'play_music' : 'play_youtube';
     showAction('▶️ Play: ' + song);
     const r = await screenDo(act, song);
-    if(r.ok && /Tap the one you want/.test(r.message) && !ctlOn()) toast('Turn on "Control other apps" in Settings and Maya starts it herself');
+    if(r.ok && /Tap the one you want/.test(r.message) && !ctlOn()) toast('Turn on "Control other apps" in Settings and Zenix starts it herself');
     return r.message;
   });
 }
-/* a video or song in another app is talking, not Jim: Maya stays out of it unless he says a command or her name */
-const NAME_RE = /\b(?:maya|maia|mya|maja|mayah)\b/i;
+/* a video or song in another app is talking, not Jim: Zenix stays out of it unless he says a command or her name */
+const NAME_RE = /\b(?:zenix|xenix|zenics|zennix|xanax|zen ?nix|zen ?ix|zen ?ex|maya)\b/i;
 function mayaJustAsked(){
   if(Date.now() - (speech.idleAt || 0) > 20000) return false;
   for(let i = ownMsgs.length - 1; i >= 0; i--){
@@ -1531,7 +1531,7 @@ clientTools.navigate = async ({to}) => {
 };
 clientTools.where_am_i = async () => {
   showAction('📍 Finding where you are');
-  let g; try{ g = await myLocation(); }catch(e){ return "I can't see his location (Location is off or not allowed for Maya)."; }
+  let g; try{ g = await myLocation(); }catch(e){ return "I can't see his location (Location is off or not allowed for Zenix)."; }
   let place = '';
   try{ const r = await fetchT(`https://photon.komoot.io/reverse?lat=${g.lat}&lon=${g.lon}`, 7000); const pr = (((await r.json()).features || [])[0] || {}).properties || {};
     place = [pr.name, pr.street, pr.district || pr.locality, pr.city || pr.county, pr.state, pr.country].filter(Boolean).filter((v, i, a) => a.indexOf(v)===i).join(', '); }catch(e){}
@@ -1559,7 +1559,7 @@ async function brainOnce(system, text, max, image){
     if(image && (orNoTools[model] || /:free$/.test(model))) model = 'x-ai/grok-4.3';   // the free model can't see pictures
     const content = image ? [{type:'text', text}, {type:'image_url', image_url:{url:'data:image/jpeg;base64,' + image}}] : text;
     const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {method:'POST', signal:ctl.signal,
-      headers:{'content-type':'application/json', 'authorization':'Bearer ' + orKey(), 'HTTP-Referer':'https://github.com/mafiaporce-bit/zenix', 'X-Title':'Maya'},
+      headers:{'content-type':'application/json', 'authorization':'Bearer ' + orKey(), 'HTTP-Referer':'https://github.com/mafiaporce-bit/zenix', 'X-Title':'Zenix'},
       body: JSON.stringify({model, max_tokens:max || 400, messages:[{role:'system', content:system}, {role:'user', content}]})});
     const j = await r.json(); if(!r.ok) throw new Error((j.error && j.error.message) || ('the open brain answered ' + r.status));
     if(j.usage && typeof j.usage.cost==='number'){ usage.cost += j.usage.cost; store.set('usage', usage); }
@@ -1589,19 +1589,19 @@ function snap(){
     timer = setInterval(() => { left--; cnt.textContent = left > 0 ? left : ''; if(left <= 0) finish(true); }, 1000);
   });
 }
-const VISION_SYS = 'You are the eyes of Maya, a voice assistant for Jim, an ambulance medic in the UAE. Look at the photo and answer his question. Read any text exactly, and translate Arabic or other languages into English. Be factual and short (under 90 words), with no markdown. For a medicine, label, bill, sign or form, pull out the key details. If the picture is too dark or blurry to tell, say so.';
+const VISION_SYS = 'You are the eyes of Zenix, a voice assistant for Jim, an ambulance medic in the UAE. Look at the photo and answer his question. Read any text exactly, and translate Arabic or other languages into English. Be factual and short (under 90 words), with no markdown. For a medicine, label, bill, sign or form, pull out the key details. If the picture is too dark or blurry to tell, say so.';
 clientTools.look = async ({question}) => {
   if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return 'The camera is not available here.';
   if(!getKey() && !orKey()) return 'The camera needs a Claude or OpenRouter key first.';
-  if(document.hidden) return 'Maya has to be on the screen to use the camera. Tell Jim to open Maya and ask again.';
+  if(document.hidden) return 'Zenix has to be on the screen to use the camera. Tell Jim to open Zenix and ask again.';
   showAction('📷 Looking…');
-  let shot; try{ shot = await snap(); }catch(e){ return 'Camera problem: ' + (e && e.name==='NotAllowedError' ? 'the camera is not allowed for Maya yet. He can allow it when the phone asks, then ask again' : ((e && e.message) || 'it did not open')) + '.'; }
+  let shot; try{ shot = await snap(); }catch(e){ return 'Camera problem: ' + (e && e.name==='NotAllowedError' ? 'the camera is not allowed for Zenix yet. He can allow it when the phone asks, then ask again' : ((e && e.message) || 'it did not open')) + '.'; }
   if(!shot) return 'He closed the camera before a picture was taken.';
   try{ const a = await brainOnce(VISION_SYS, 'His question: ' + (question || 'What is this?'), 500, shot); return 'What the camera shows: ' + (a || 'nothing clear') + '\n(Tell Jim this in your own words, short.)'; }
   catch(e){ return 'The picture was taken but could not be read: ' + e.message + '.'; }
 };
 
-/* Translator mode: Maya interprets between Jim (English) and another person, taking turns */
+/* Translator mode: Zenix interprets between Jim (English) and another person, taking turns */
 const TR_LANGS = [['arabic','Arabic','ar-AE','ar'], ['hindi','Hindi','hi-IN','hi-IN'], ['urdu','Urdu','ur-PK','ur-PK'], ['tagalog|filipino','Tagalog','fil-PH','fil-PH'], ['malayalam','Malayalam','ml-IN','ml-IN'],
   ['bengali|bangla','Bengali','bn-BD','bn-IN'], ['nepali','Nepali','ne-NP','ne-NP'], ['pashto','Pashto','ps-AF','ps'], ['farsi|persian','Farsi','fa-IR','fa'], ['tamil','Tamil','ta-IN','ta-IN'], ['sinhala','Sinhala','si-LK','si-LK'],
   ['russian','Russian','ru-RU','ru-RU'], ['chinese|mandarin','Chinese','zh-CN','zh-CN'], ['french','French','fr-FR','fr-FR'], ['spanish','Spanish','es-ES','es-ES']];
@@ -1610,7 +1610,7 @@ function trStop(){ tr.on = false; tr.turn = 'me'; tr.miss = 0; document.body.cla
 function trMiss(){ if(tr.on && tr.turn==='them' && ++tr.miss >= 2){ tr.turn = 'me'; tr.miss = 0; } }   // they stayed silent: back to Jim
 clientTools.translator_mode = async ({language, on}) => {
   if(on===false || on==='false'){ trStop(); return 'Translator mode is off.'; }
-  if(!(off.active && off.kind==='talk' && off.brain==='own')) return 'Translator mode works inside a voice chat with the Claude or Open brain. Tell Jim to tap Talk (or say Hey Maya) and ask again.';
+  if(!(off.active && off.kind==='talk' && off.brain==='own')) return 'Translator mode works inside a voice chat with the Claude or Open brain. Tell Jim to tap Talk (or say Hey Zenix) and ask again.';
   const want = String(language||'').toLowerCase();
   const L = TR_LANGS.find(x => new RegExp(x[0]).test(want));
   if(!L) return 'Languages you can interpret: ' + TR_LANGS.map(x => x[1]).join(', ') + '. Ask Jim which one.';
@@ -1817,7 +1817,7 @@ clientTools.check_sites = async ({action, name, url}) => {
   const bad = lines.filter(l => /PROBLEM|DOWN|no answer/.test(l));
   return (bad.length ? `${bad.length} of ${sites.length} need attention. ` : `All ${sites.length} are up. `) + lines.join('; ');
 };
-window.MayaTools = clientTools;
+window.ZenixTools = clientTools;
 
 /* ---------- Instant commands: simple orders are done right on the phone (under a second, no credits, no internet) ---------- */
 function durMinutes(t){
@@ -1844,13 +1844,13 @@ function timeOfDay(t){
 function matchInstant(raw){
   let t = String(raw||'').trim().replace(/[.!?…]+$/, '').replace(/\s+/g, ' ');
   for(let i = 0; i < 3; i++){
-    t = t.replace(/^(?:(?:hey|hi|ok|okay)\s+)?maya[,\s]+/i, '').replace(/^(?:please|pls|bro|can you|could you|would you|will you|kindly|i want you to)\s+/i, '')
-         .replace(/[,\s]+(?:please|pls|bro|for me|now|maya|right now|thanks|thank you)$/i, '').trim();
+    t = t.replace(/^(?:(?:hey|hi|ok|okay)\s+)?(?:zenix|xenix|zenics|zennix|xanax|zen ?nix|maya)[,\s]+/i, '').replace(/^(?:please|pls|bro|can you|could you|would you|will you|kindly|i want you to)\s+/i, '')
+         .replace(/[,\s]+(?:please|pls|bro|for me|now|zenix|xenix|xanax|maya|right now|thanks|thank you)$/i, '').trim();
   }
   const low = t.toLowerCase(); let m;
   const locked = () => !!(Native.isLocked && Native.isLocked()==='true');
   const nat = (fn, ...a) => { const r = callNative(fn, ...a); return r && r.ok ? r.message : null; };
-  /* the app on screen: scroll, swipe, back, home… (Maya phone control). "go down", "next video" and "tap …" only count while another app is in front */
+  /* the app on screen: scroll, swipe, back, home… (Zenix phone control). "go down", "next video" and "tap …" only count while another app is in front */
   const away = document.hidden;
   if((m = low.match(/^(scroll|page|go|move)\s+(down|up)(?:\s+((?:(?:a lot|a bit|a little|a little bit|some|more|again|further|fast|quickly)\s*)+))?$/)) && (away || /scroll|page/.test(m[1])))
     return screenInstant(m[2]==='down' ? 'scroll_down' : 'scroll_up', /a lot|fast/.test(m[3]||'') ? 'big' : '');
@@ -1874,7 +1874,7 @@ function matchInstant(raw){
     const n = m[1].trim();
     if(/^(?:notifications?|(?:notification |quick )?(?:panel|shade|settings)|keyboard|menu|pop ?up|ad|window|tab)$/.test(n)) return screenInstant('back', '');
     if(/^(?:it|this|that|this one|app|application|current|current one|one)$/.test(n)) return closeInstant('');
-    if(n.split(' ').length <= 3 && !/^(?:all|everything|maya|yourself|chat|the chat|door|eyes?|conversation|session|mic|microphone)\b/.test(n)) return closeInstant(n);
+    if(n.split(' ').length <= 3 && !/^(?:all|everything|zenix|maya|yourself|chat|the chat|door|eyes?|conversation|session|mic|microphone)\b/.test(n)) return closeInstant(n);
   }
   if(away && /^(?:play|open|start|choose|select|pick)\s+(?:the\s+)?(?:first|top)(?: one| video| result| song)?$/.test(low)) return loose(screenInstant('tap_first', ''));
   const APPS = 'youtube music|yt music|youtube|facebook|fb|instagram|insta|ig|tiktok|tik tok|spotify|play store|google play|chrome|twitter|x|whatsapp|messenger|telegram|google maps|maps|shopee|lazada|amazon|noon|netflix|temu|shein|talabat|carrefour|gallery|contacts|settings';
@@ -1898,7 +1898,7 @@ function matchInstant(raw){
   }
   if((m = low.match(/^(?:set|make|create|put)?\s*(?:an?|my)?\s*alarm\s*(?:for|at|on)?\s+(.+)$/)) || (m = low.match(/^wake me(?: up)? (?:at|by) (.+)$/))){
     const tm = timeOfDay(m[1]); if(!tm) return null;
-    return async () => { showAction(`⏰ Alarm ${String(tm.h).padStart(2,'0')}:${String(tm.mi).padStart(2,'0')}`); return nat('setAlarm', tm.h, tm.mi, 'Maya alarm'); };
+    return async () => { showAction(`⏰ Alarm ${String(tm.h).padStart(2,'0')}:${String(tm.mi).padStart(2,'0')}`); return nat('setAlarm', tm.h, tm.mi, 'Zenix alarm'); };
   }
   if((m = low.match(/^(?:set|start|put)?\s*(?:an?\s+)?timer\s+(?:for\s+)?(.+)$/)) || (m = low.match(/^(?:set|start)?\s*(?:an?\s+)?(.+?)\s+timer$/))){
     const min = durMinutes(m[1]); if(!min || min > 1440) return null;
@@ -1948,7 +1948,7 @@ async function runInstant(fn, text, speakIt, after){
   const last = ownMsgs[ownMsgs.length - 1];
   if(!last || last.role !== 'user'){ ownMsgs.push({role:'user', content:text}); ownMsgs.push({role:'assistant', content:r}); trimOwnMsgs(); }
   addMsg('ai', r);
-  if(off.kind === 'talk') $('liveLine').textContent = 'Maya: ' + r;
+  if(off.kind === 'talk') $('liveLine').textContent = 'Zenix: ' + r;
   if(speakIt){ speech.streamOpen = false; speech.onIdle = after || null; speakEnqueue(r); }
   else if(after) after(); else idleLook();
 }
@@ -1997,11 +1997,11 @@ function switchOffline(){
   stopSpeech(); try{ dgClose(); }catch(e){} try{ Native.stopListening(); }catch(e){}
   off.brain = 'offline'; off.thinking = false; off.langFallback = ''; srErrs = 0;
   $('dot').className = 'dot busy'; $('statusText').textContent = 'Offline';
-  addMsg('sys', 'No internet: offline Maya took over'); toast('No internet. Offline Maya took over.');
+  addMsg('sys', 'No internet: offline Zenix took over'); toast('No internet. Offline Zenix took over.');
   setTimeout(offListen, 250);
   return true;
 }
-let earsLocal = false;   // this phone has no offline voice pack: Maya listens with her own ears
+let earsLocal = false;   // this phone has no offline voice pack: Zenix listens with her own ears
 const localEarsOk = () => { try{ return !!(Native.localEarsReady && Native.localEarsReady()==='true'); }catch(e){ return false; } };
 
 function parseTime(t){
@@ -2017,20 +2017,20 @@ function quickAction(text){
   const t=text.trim(); const low=t.toLowerCase();
   let m;
   if(/alarm|gising/.test(low)){
-    const tm=parseTime(low); if(tm){ const r=callNative('setAlarm', tm.h, tm.mi, 'Maya alarm'); showAction(`⏰ Alarm ${String(tm.h).padStart(2,'0')}:${String(tm.mi).padStart(2,'0')}`); return r?r.message:'Alarms need the Android app.'; }
+    const tm=parseTime(low); if(tm){ const r=callNative('setAlarm', tm.h, tm.mi, 'Zenix alarm'); showAction(`⏰ Alarm ${String(tm.h).padStart(2,'0')}:${String(tm.mi).padStart(2,'0')}`); return r?r.message:'Alarms need the Android app.'; }
   }
   if((m=low.match(/remind me (?:in )?(\d+)\s*(minutes|minute|mins|min|hours|hour|hrs|hr)\s*(?:to|that|about)?\s*(.*)/))){
     const mins=parseInt(m[1],10)*(/h/.test(m[2])?60:1); const what=(m[3]||'your reminder').trim()||'your reminder';
     showAction(`🔔 Reminder in ${mins} min`); const r=callNative('setReminder', what, mins); return r?r.message:'Reminders need the Android app.';
   }
-  if((m=t.match(/^(?:(?:hey |ok |hi )?(?:zenix|maya),?\s*)?(?:please\s+)?(?:remember|tandaan mo)(?: that| na)?\s+(.{4,})$/i))){
+  if((m=t.match(/^(?:(?:hey |ok |hi )?(?:zenix|xenix|xanax|zenics|maya),?\s*)?(?:please\s+)?(?:remember|tandaan mo)(?: that| na)?\s+(.{4,})$/i))){
     saveFact(m[1].replace(/[.!?]+$/,'')); return "Got it, I'll remember that.";
   }
   if(/call history|recent calls|missed calls/.test(low)){ const r=callNative('openCallHistory'); return r?r.message:'Call history needs the Android app.'; }
-  if((m=t.match(/^(?:(?:hey |ok |hi )?(?:zenix|maya),?\s*)?(?:please\s+)?(?:can you\s+)?(?:open|launch|buksan mo(?: ang)?|buksan)\s+(?:the\s+|my\s+)?(.+?)(?:\s+app)?(?:\s+please)?[.!?]*$/i))){
+  if((m=t.match(/^(?:(?:hey |ok |hi )?(?:zenix|xenix|xanax|zenics|maya),?\s*)?(?:please\s+)?(?:can you\s+)?(?:open|launch|buksan mo(?: ang)?|buksan)\s+(?:the\s+|my\s+)?(.+?)(?:\s+app)?(?:\s+please)?[.!?]*$/i))){
     showAction(`📱 Opening ${m[1]}`); const r=callNative('openApp', m[1]); return r?r.message:'Opening apps needs the Android app.';
   }
-  if((m=t.match(/^(?:(?:hey |ok |hi )?(?:zenix|maya),?\s*)?(?:please\s+)?(?:can you\s+)?(?:call|tawagan mo(?: si)?|tawagan)\s+(.+?)(?:\s+please)?[.!?]*$/i))){
+  if((m=t.match(/^(?:(?:hey |ok |hi )?(?:zenix|xenix|xanax|zenics|maya),?\s*)?(?:please\s+)?(?:can you\s+)?(?:call|tawagan mo(?: si)?|tawagan)\s+(.+?)(?:\s+please)?[.!?]*$/i))){
     showAction(`📞 Calling ${m[1]}`); const r=callNative('makeCall', m[1]); return r?r.message:'Calling needs the Android app.';
   }
   if(/(calendar|schedule|agenda)/.test(low) || /what.*(on|plan).*(today|tomorrow)/.test(low)){
@@ -2041,7 +2041,7 @@ function quickAction(text){
 }
 function buildPrompt(userText){
   const mem = memories.slice(-10).map(x=>'- '+x).join('\n') || 'Nothing saved yet.';
-  const sys = `You are Maya, ${settings.name||'Jim'}'s funny, witty female AI assistant and best buddy. ${settings.name||'Jim'} is a Filipino EMS medic in the UAE who builds apps. You are running offline on his phone right now. Reply in 1 to 3 short spoken sentences, no lists, no emojis. If he speaks Tagalog or Taglish, reply in Taglish. Be honest; if you don't know, say so. Offline you can set alarms, reminders, open apps, make calls and check his calendar; you cannot search the web or send messages.\nThings you remember about him:\n${mem}`;
+  const sys = `You are Zenix, ${settings.name||'Jim'}'s funny, witty female AI assistant and best buddy. ${settings.name||'Jim'} is a Filipino EMS medic in the UAE who builds apps. You are running offline on his phone right now. Reply in 1 to 3 short spoken sentences, no lists, no emojis. If he speaks Tagalog or Taglish, reply in Taglish. Be honest; if you don't know, say so. Offline you can set alarms, reminders, open apps, make calls and check his calendar; you cannot search the web or send messages.\nThings you remember about him:\n${mem}`;
   const turns = history.filter(x=>x.who!=='sys').slice(-7, -1);
   let p = `<|im_start|>system\n${sys}<|im_end|>\n`;
   turns.forEach(x=>{ p += `<|im_start|>${x.who==='user'?'user':'assistant'}\n${x.text.slice(0,240)}<|im_end|>\n`; });
@@ -2066,12 +2066,12 @@ async function offlineHandle(text){
 }
 function offlineSay(text, speakIt){
   addMsg('ai', text);
-  if(off.kind==='talk') $('liveLine').textContent='Maya: '+text;
+  if(off.kind==='talk') $('liveLine').textContent='Zenix: '+text;
   if(speakIt && typeof kokoro!=='undefined' && kokoro && settings.voice!=='phone' && !isTagalog(text)){
     speech.onIdle = () => { if(off.endAfterSpeak){ off.endAfterSpeak=false; endOffline(); } else if(off.kind==='talk') offListen(); else setOrb('idle'); };
     speakEnqueue(text); return;
   }
-  if(speakIt){ setOrb('speaking'); $('modeLabel').textContent='Maya is speaking'; if(Native.setOrbMode) Native.setOrbMode('speaking'); Native.speak(text, settings.offlineLang); }
+  if(speakIt){ setOrb('speaking'); $('modeLabel').textContent='Zenix is speaking'; if(Native.setOrbMode) Native.setOrbMode('speaking'); Native.speak(text, settings.offlineLang); }
   else if(off.kind==='talk') offListen();
   else idleLook();
 }
@@ -2141,12 +2141,12 @@ window.zenixOnSpeechError = (code) => {
   if(off.brain==='own' && (code===1 || code===2 || code===12 || code===13) && switchOffline()) return;
   // this phone has no ears for that language: carry on in US English
   if((code===12 || code===13) && !off.langFallback && settings.offlineLang!=='en-US'){ off.langFallback = 'en-US'; setTimeout(offListen, 300); return; }
-  // offline, and the phone can't listen without internet (no voice pack): Maya uses her own ears
-  if(off.brain!=='own' && !earsLocal && code!==3 && code!==8 && code!==9 && localEarsOk()){ earsLocal = true; srErrs = 0; toast("Using Maya's own offline ears"); setTimeout(offListen, 200); return; }
+  // offline, and the phone can't listen without internet (no voice pack): Zenix uses her own ears
+  if(off.brain!=='own' && !earsLocal && code!==3 && code!==8 && code!==9 && localEarsOk()){ earsLocal = true; srErrs = 0; toast("Using Zenix's own offline ears"); setTimeout(offListen, 200); return; }
   // busy mic or a network blip: try again, a little slower each time, then give up instead of looping forever
   // (behind another app these errors are normal, so there she just keeps trying)
   if((code===8 || code===5 || code===3 || code===2 || code===1) && (srErrs <= 12 || document.hidden)){ setTimeout(offListen, Math.min(3000, 350*srErrs)); return; }
-  toast(code===-3 ? 'Voice chat on a computer needs Chrome or Edge' : code===9 ? 'Allow the microphone for Maya, then tap Talk again' : (off.brain!=='own' && (code===-1 || code===12 || code===13 || code===1 || code===2)) ? 'This phone can\'t listen offline yet. Turn on "Hey Maya" once: it downloads Maya\'s own offline ears.'
+  toast(code===-3 ? 'Voice chat on a computer needs Chrome or Edge' : code===9 ? 'Allow the microphone for Zenix, then tap Talk again' : (off.brain!=='own' && (code===-1 || code===12 || code===13 || code===1 || code===2)) ? 'This phone can\'t listen offline yet. Turn on "Hey Zenix" once: it downloads Zenix\'s own offline ears.'
     : (code===1 || code===2) ? 'Listening needs the internet. Check your connection.' : code===3 ? 'Another app is using the microphone.' : 'Mic problem ('+code+'). Tap Talk again.');
   endOffline(); endedNote('The microphone stopped.');
 };
@@ -2177,7 +2177,7 @@ function startOffline(kind, brain='offline'){
       const intro = off.intro; off.intro = null;
       if(intro && intro.ask) ownRespond(intro.ask, true, () => offListen());   // a routine: she does it and says the result
       else if(intro && intro.say){ speech.onIdle = () => offListen(); speakEnqueue(intro.say); }   // she has something to tell him (a message while driving…)
-      else { if(off.fromWake && !off.wakeMedia && Native.buzz) Native.buzz('45'); offListen(); }   // no greeting: she listens at once (a tiny buzz after "Hey Maya" says she's ready)
+      else { if(off.fromWake && !off.wakeMedia && Native.buzz) Native.buzz('45'); offListen(); }   // no greeting: she listens at once (a tiny buzz after "Hey Zenix" says she's ready)
       wakeGreeting = false;
     } else { wakeGreeting = false; offListen(); }
   }
@@ -2209,19 +2209,19 @@ function renderOffline(){
   const bar=$('brainBar');
   if(st.state==='ready'){ $('brainText').textContent='Offline brain is installed ✓ (about '+(st.sizeMB/1000).toFixed(1)+' GB)'; $('brainBtn').textContent='Remove'; bar.style.display='none'; }
   else if(st.state==='downloading' || st.state==='paused'){ $('brainText').textContent=(st.state==='paused'?'Paused (waiting for internet) ':'Downloading… ')+st.percent+'%'; $('brainBtn').textContent='Downloading'; bar.style.display='block'; $('brainFill').style.width=st.percent+'%'; setTimeout(renderOffline, 2000); }
-  else { $('brainText').textContent=(st.state==='failed'?'Download failed. Try again on Wi-Fi. ':'')+'Download the on-phone brain once (about 1.6 GB, use Wi-Fi). Then Maya works with no internet and no credits.'; $('brainBtn').textContent='Download'; bar.style.display='none'; }
+  else { $('brainText').textContent=(st.state==='failed'?'Download failed. Try again on Wi-Fi. ':'')+'Download the on-phone brain once (about 1.6 GB, use Wi-Fi). Then Zenix works with no internet and no credits.'; $('brainBtn').textContent='Download'; bar.style.display='none'; }
 }
 $('brainBtn').onclick = () => {
   if(!Native || !Native.offlineStatus) return;
   let st={}; try{ st=JSON.parse(Native.offlineStatus()); }catch(e){}
   if(st.state==='ready'){ if(confirm('Remove the offline brain from this phone?')){ Native.offlineDelete(); renderOffline(); } return; }
   if(st.state==='downloading') return;
-  Native.offlineDownload(); toast('Download started — you can keep using Maya'); setTimeout(renderOffline, 800);
+  Native.offlineDownload(); toast('Download started — you can keep using Zenix'); setTimeout(renderOffline, 800);
 };
-document.querySelectorAll('[data-mode]').forEach(b=>b.onclick=()=>{ settings.mode=b.dataset.mode; store.set('settings',settings); renderOffline(); toast(b.dataset.mode==='auto'?'Auto: cloud when online, offline when not':b.dataset.mode==='offline'?'Maya will stay offline':'Maya will always use the cloud'); });
+document.querySelectorAll('[data-mode]').forEach(b=>b.onclick=()=>{ settings.mode=b.dataset.mode; store.set('settings',settings); renderOffline(); toast(b.dataset.mode==='auto'?'Auto: cloud when online, offline when not':b.dataset.mode==='offline'?'Zenix will stay offline':'Zenix will always use the cloud'); });
 document.querySelectorAll('[data-lang]').forEach(b=>b.onclick=()=>{ settings.offlineLang=b.dataset.lang; store.set('settings',settings); renderOffline(); });
 window.addEventListener('online', ()=>{ if(settings.mode==='auto') toast('Back online'); });
-window.addEventListener('offline', ()=>{ if(settings.mode==='auto') toast('No internet — Maya will use offline mode'); });
+window.addEventListener('offline', ()=>{ if(settings.mode==='auto') toast('No internet — Zenix will use offline mode'); });
 renderOffline();
 
 /* ---------- Own brain: Claude API direct + free phone ears + Kokoro voice ---------- */
@@ -2247,7 +2247,7 @@ const TOOL_DEFS = [
   {name:'open_app', description:'Open an app on the phone by name (Facebook, Claude, Gemini, YouTube, Maps...).', input_schema:{type:'object', properties:{app_name:{type:'string'}}, required:['app_name']}},
   {name:'make_call', description:'Call a contact name or phone number. If it returns close matches, ask Jim which one.', input_schema:{type:'object', properties:{contact:{type:'string'}}, required:['contact']}},
   {name:'open_call_history', description:"Show the phone's recent/missed calls on screen (you can't read them).", input_schema:{type:'object', properties:{}}},
-  {name:'send_message', description:'Send a WhatsApp, Messenger or SMS message. ALWAYS read the message and the person back to Jim and wait for a clear yes BEFORE calling this. If auto-send is on, Maya taps Send herself; otherwise the chat opens ready and Jim taps Send. The result tells you which.', input_schema:{type:'object', properties:{contact:{type:'string', description:'Person or group name'}, message:{type:'string'}, app:{type:'string', enum:['whatsapp','messenger','sms']}, group:{type:'boolean', description:'true when sending to a group chat'}}, required:['contact','message','app']}},
+  {name:'send_message', description:'Send a WhatsApp, Messenger or SMS message. ALWAYS read the message and the person back to Jim and wait for a clear yes BEFORE calling this. If auto-send is on, Zenix taps Send herself; otherwise the chat opens ready and Jim taps Send. The result tells you which.', input_schema:{type:'object', properties:{contact:{type:'string', description:'Person or group name'}, message:{type:'string'}, app:{type:'string', enum:['whatsapp','messenger','sms']}, group:{type:'boolean', description:'true when sending to a group chat'}}, required:['contact','message','app']}},
   {name:'compose_email', description:'Open the email app with an email filled in for Jim to send.', input_schema:{type:'object', properties:{to:{type:'string'}, subject:{type:'string'}, body:{type:'string'}}, required:['subject','body']}},
   {name:'check_calendar', description:"Read Jim's calendar. days_from_today 0=today, 1=tomorrow.", input_schema:{type:'object', properties:{days_from_today:{type:'integer'}, num_days:{type:'integer'}}, required:['days_from_today','num_days']}},
   {name:'add_calendar_event', description:'Add an event to the calendar. start_iso like 2026-11-06T09:00:00+04:00.', input_schema:{type:'object', properties:{title:{type:'string'}, start_iso:{type:'string'}, duration_minutes:{type:'integer'}, location:{type:'string'}}, required:['title','start_iso']}},
@@ -2266,7 +2266,7 @@ const TOOL_DEFS = [
   {name:'list_read', description:'Read one list, or all his lists when no name is given.', input_schema:{type:'object', properties:{list:{type:'string'}}}},
   {name:'list_remove', description:"Remove one item from a list (done or bought), or item 'all' to clear the list.", input_schema:{type:'object', properties:{list:{type:'string'}, item:{type:'string'}}, required:['list','item']}},
   {name:'phone_control', description:'Control the phone: flashlight, media volume, Do Not Disturb, battery level, music playback.', input_schema:{type:'object', properties:{action:{type:'string', enum:['flashlight_on','flashlight_off','volume_set','volume_up','volume_down','mute','dnd_on','dnd_off','battery','music_play','music_pause','music_next','music_previous']}, value:{type:'integer', description:'For volume_set: 0-100'}}, required:['action']}},
-  {name:'phone_screen', description:'Work the app that is on the phone screen right now (not Maya herself): scroll, swipe, go back, go to the home screen, show recent apps, open the notification panel or quick settings, take a screenshot, lock the screen, or tap a button by the name written on it, type into that app\'s own search box (search), search YouTube (search_youtube), find a song or video and start playing it (play_youtube, or play_music for Spotify / YouTube Music), or close the app that is on screen (close_app). You cannot see the screen; if a tap or search fails, say so.', input_schema:{type:'object', properties:{action:{type:'string', enum:['scroll_down','scroll_up','swipe_left','swipe_right','back','home','recents','notifications','quick_settings','screenshot','lock','tap','tap_first','search','search_youtube','play_youtube','play_music','close_app']}, text:{type:'string', description:'For tap: the name on the button, e.g. Like, Follow, Skip. For search and play: the words to search for or the song to play'}, big:{type:'boolean', description:'For scrolling: true for a long scroll'}}, required:['action']}},
+  {name:'phone_screen', description:'Work the app that is on the phone screen right now (not Zenix herself): scroll, swipe, go back, go to the home screen, show recent apps, open the notification panel or quick settings, take a screenshot, lock the screen, or tap a button by the name written on it, type into that app\'s own search box (search), search YouTube (search_youtube), find a song or video and start playing it (play_youtube, or play_music for Spotify / YouTube Music), or close the app that is on screen (close_app). You cannot see the screen; if a tap or search fails, say so.', input_schema:{type:'object', properties:{action:{type:'string', enum:['scroll_down','scroll_up','swipe_left','swipe_right','back','home','recents','notifications','quick_settings','screenshot','lock','tap','tap_first','search','search_youtube','play_youtube','play_music','close_app']}, text:{type:'string', description:'For tap: the name on the button, e.g. Like, Follow, Skip. For search and play: the words to search for or the song to play'}, big:{type:'boolean', description:'For scrolling: true for a long scroll'}}, required:['action']}},
   {name:'set_timer', description:"Start a countdown timer in the phone's Clock app.", input_schema:{type:'object', properties:{minutes:{type:'number'}, seconds:{type:'number'}, label:{type:'string'}}}},
   {name:'navigate', description:'Start Google Maps turn-by-turn driving directions to a place (when he says navigate, take me to, start directions). For just seeing a route or the travel time, use show_route instead.', input_schema:{type:'object', properties:{to:{type:'string'}}, required:['to']}},
   {name:'where_am_i', description:"Find where he is right now (street, area, city) from the phone's location.", input_schema:{type:'object', properties:{}}},
@@ -2289,7 +2289,7 @@ function ownSystem(){
   const dynamic = `Right now it is ${now} (Dubai).`
     + (noTools ? `\n\nThis brain can only talk: it has no phone tools and no web search. If he asks for a phone action (alarm, call, message, map, opening an app) or something you'd need to look up, tell him in one short line that this brain can't, and that Grok or Claude in Settings can.` : '')
     + (ownMsgs.length <= 1 && !lockPrivate() ? `\n\nRecent chat from before (context only):\n${recentChatText()}` : '');
-  return [`You are Maya, ${name} Porce's personal AI assistant. You are female. ${name} is a Filipino medic in EMS under Civil Defence in the UAE, and builds and sells apps as JPSums. You live in an app on his Samsung phone and can control it.
+  return [`You are Zenix, ${name} Porce's personal AI assistant. You are female. ${name} is a Filipino medic in EMS under Civil Defence in the UAE, and builds and sells apps as JPSums. You live in an app on his Samsung phone and can control it.
 
 Personality: funny, witty and playful, his best buddy who's also super capable. Crack jokes, tease him, talk openly about sex and adult stuff, banter, puns, cheeky humour — but get the job done first. Calm and serious when it matters. He calls you "bro"; match his energy.
 
@@ -2433,7 +2433,7 @@ async function ownTurn(userText, speakIt, opts={}){
     while((m = pend.match(/^([\s\S]*?[.!?…](?:\s|(?=\[\[?\d))|[\s\S]*?\n)/)) && m[0].trim().length >= 12){ say(m[0]); said++; pend = pend.slice(m[0].length); }
     if(!said && (m = pend.match(/^([\s\S]{24,}?[,;:—])\s/))){ say(m[1]); said++; pend = pend.slice(m[0].length); } };
   for(let round=0; round<5; round++){
-    const r = await claudeStream(ownSystem(), ownMsgs, t => { if(turnStart && !turnTok) turnTok = performance.now(); spoken += t; feed(t); if(off.kind==='talk' && !speech.hold) $('liveLine').textContent = 'Maya: '+splitLinks(stripTags(spoken)).text.slice(-160); }, opts.signal);
+    const r = await claudeStream(ownSystem(), ownMsgs, t => { if(turnStart && !turnTok) turnTok = performance.now(); spoken += t; feed(t); if(off.kind==='talk' && !speech.hold) $('liveLine').textContent = 'Zenix: '+splitLinks(stripTags(spoken)).text.slice(-160); }, opts.signal);
     if(speakIt && pend.trim()){ say(pend); pend=''; }
     const p = PRICES[settings.model] || PRICES['claude-haiku-5-5'];
     usage.inTok += r.u.inTok; usage.outTok += r.u.outTok; usage.cost += (r.u.inTok*p[0] + r.u.outTok*p[1]) / 1e6 + 0.01*(r.u.searches||0); store.set('usage', usage);
@@ -2491,7 +2491,7 @@ async function orStream(system, messages, onText, signal){
     if(rm) body.reasoning = rm;
     const g = await brainFetch('https://openrouter.ai/api/v1/chat/completions', {
       method:'POST',
-      headers:{'content-type':'application/json', 'authorization':'Bearer '+orKey(), 'HTTP-Referer':'https://github.com/mafiaporce-bit/zenix', 'X-Title':'Maya'},
+      headers:{'content-type':'application/json', 'authorization':'Bearer '+orKey(), 'HTTP-Referer':'https://github.com/mafiaporce-bit/zenix', 'X-Title':'Zenix'},
       body: JSON.stringify(body)
     }, signal);
     const res = g.res;
@@ -2550,7 +2550,7 @@ async function orTurn(userText, speakIt, opts={}){
     while((m = pend.match(/^([\s\S]*?[.!?…](?:\s|(?=\[\[?\d))|[\s\S]*?\n)/)) && m[0].trim().length >= 12){ say(m[0]); said++; pend = pend.slice(m[0].length); }
     if(!said && (m = pend.match(/^([\s\S]{24,}?[,;:—])\s/))){ say(m[1]); said++; pend = pend.slice(m[0].length); } };
   for(let round=0; round<5; round++){
-    const r = await orStream(ownSystem(), ownMsgs, t => { if(turnStart && !turnTok) turnTok = performance.now(); spoken += t; feed(t); if(off.kind==='talk' && !speech.hold) $('liveLine').textContent = 'Maya: '+splitLinks(stripTags(spoken)).text.slice(-160); }, opts.signal);
+    const r = await orStream(ownSystem(), ownMsgs, t => { if(turnStart && !turnTok) turnTok = performance.now(); spoken += t; feed(t); if(off.kind==='talk' && !speech.hold) $('liveLine').textContent = 'Zenix: '+splitLinks(stripTags(spoken)).text.slice(-160); }, opts.signal);
     if(speakIt && pend.trim()){ say(pend); pend=''; }
     usage.inTok += r.u.inTok; usage.outTok += r.u.outTok; usage.cost += r.cost; store.set('usage', usage);
     const msg = {role:'assistant', content: r.text || (r.calls.length ? null : '')};
@@ -2633,7 +2633,7 @@ async function pumpSpeech(){
     if(turnSearched) parts.push('searched web');
     if(off.kind==='talk') $('actionLine').textContent = `⚡ ${(d+turnEars).toFixed(1)}s` + (parts.length ? ' · '+parts.join(' · ') : '') + speedNote();
     turnEars = 0; turnHead = false; turnSearched = false; }
-  speech.playing = true; setOrb('speaking'); $('modeLabel').textContent='Maya is speaking'; if(Native && Native.setOrbMode) Native.setOrbMode('speaking');
+  speech.playing = true; setOrb('speaking'); $('modeLabel').textContent='Zenix is speaking'; if(Native && Native.setOrbMode) Native.setOrbMode('speaking');
   try{
     // a cloud voice that takes too long is skipped for the phone's own voice, so she never goes silent
     const audio = item.wav ? await Promise.race([item.wav, new Promise(r => setTimeout(() => r(null), 15000))]) : null;
@@ -2714,14 +2714,14 @@ document.querySelectorAll('[data-model]').forEach(b => b.onclick = () => { setti
 async function pickVoice(b){
   settings.voice=b.dataset.voice; store.set('settings',settings); renderBrain(); renderHD();
   if(speech.playing || speech.q.length) stopSpeech();
-  if(settings.voice.startsWith('el:')){ if(!elKey()){ toast('Add your ElevenLabs key below first'); return; } speakEnqueue(`Hi ${settings.name||'Jim'}, I'm Maya. How do I sound?`); return; }
-  if(settings.voice.startsWith('dg:')){ if(!dgKey()){ toast('Add your Deepgram key below first'); return; } speakEnqueue(`Hi ${settings.name||'Jim'}, I'm Maya. How do I sound?`); return; }
+  if(settings.voice.startsWith('el:')){ if(!elKey()){ toast('Add your ElevenLabs key below first'); return; } speakEnqueue(`Hi ${settings.name||'Jim'}, I'm Zenix. How do I sound?`); return; }
+  if(settings.voice.startsWith('dg:')){ if(!dgKey()){ toast('Add your Deepgram key below first'); return; } speakEnqueue(`Hi ${settings.name||'Jim'}, I'm Zenix. How do I sound?`); return; }
   if(settings.voice!=='phone' && !kokoro){
-    kokoroProgress(0); toast('Getting the natural voices ready, you can keep using Maya');
-    loadKokoro().then(()=>speakEnqueue(`Hi ${settings.name||'Jim'}, I'm Maya. How do I sound?`)).catch(()=>toast('Could not load the natural voices. Check your internet.'));
+    kokoroProgress(0); toast('Getting the natural voices ready, you can keep using Zenix');
+    loadKokoro().then(()=>speakEnqueue(`Hi ${settings.name||'Jim'}, I'm Zenix. How do I sound?`)).catch(()=>toast('Could not load the natural voices. Check your internet.'));
     return;
   }
-  speakEnqueue(`Hi ${settings.name||'Jim'}, I'm Maya. How do I sound?`);
+  speakEnqueue(`Hi ${settings.name||'Jim'}, I'm Zenix. How do I sound?`);
 }
 document.querySelectorAll('[data-voice]').forEach(b => b.onclick = () => pickVoice(b));
 $('keySave').onclick = () => { const v=$('keyInput').value.trim(); if(!/^sk-ant-/.test(v)){ toast('That does not look like a Claude API key (starts with sk-ant-)'); return; } store.set('apikey', v); $('keyInput').value=''; renderBrain(); toast('API key saved on this phone only'); };
@@ -2783,7 +2783,7 @@ function renderHD(){
     const b=document.createElement('button');
     b.textContent = `${v.locale.replace('en-','')} ${i+1}${v.quality>=400?' HD':''}`;
     b.classList.toggle('sel', settings.voice==='phone' && settings.phoneVoice===v.name);
-    b.onclick=()=>{ settings.voice='phone'; settings.phoneVoice=v.name; store.set('settings',settings); applyPhoneVoice(); stopSpeech(); renderBrain(); renderHD(); speakEnqueue(`Hi ${settings.name||'Jim'}, I'm Maya. How do I sound?`); };
+    b.onclick=()=>{ settings.voice='phone'; settings.phoneVoice=v.name; store.set('settings',settings); applyPhoneVoice(); stopSpeech(); renderBrain(); renderHD(); speakEnqueue(`Hi ${settings.name||'Jim'}, I'm Zenix. How do I sound?`); };
     box.appendChild(b);
   });
 }
@@ -2856,8 +2856,8 @@ function dgOpen(){
 /* Flux head start: prepare the answer at "probably done", speak only at "definitely done" */
 let specTurn = null;
 const normT = t => t.toLowerCase().replace(/[^a-z0-9 ]/g,'').replace(/\s+/g,' ').trim();
-/* "stop", "okay bye Maya", "that's all" end the chat; "stop the alarm" or "bye-bye to my diet" do not */
-const isStopWord = t => /^(?:(?:ok(?:ay)?|alright|all right|sige)[\s,.!]+)?(?:stop(?: it| now| talking| listening)?|bye(?:[\s-]?bye)?|goodbye|end (?:the )?chat|that'?s all|that is all|tapos na)(?:[\s,.!]+(?:maya|bro|na|po|for now|please|thanks|thank you|salamat))*[\s,.!]*$/i.test(String(t||'').trim());
+/* "stop", "okay bye Zenix", "that's all" end the chat; "stop the alarm" or "bye-bye to my diet" do not */
+const isStopWord = t => /^(?:(?:ok(?:ay)?|alright|all right|sige)[\s,.!]+)?(?:stop(?: it| now| talking| listening)?|bye(?:[\s-]?bye)?|goodbye|end (?:the )?chat|that'?s all|that is all|tapos na)(?:[\s,.!]+(?:zenix|maya|bro|na|po|for now|please|thanks|thank you|salamat))*[\s,.!]*$/i.test(String(t||'').trim());
 function startSpeculative(t){
   const snap = JSON.stringify(ownMsgs);
   const ctl = new AbortController(); let go; const confirmed = new Promise(r => go = r); let cancelled = false;
@@ -2910,7 +2910,7 @@ if(dgKey() && Native && Native.dgTest) setTimeout(()=>Native.dgTest(dgKey()), 20
 
 /* ---------- ElevenLabs voices with any brain (Claude, Grok, Venice…) ---------- */
 const elKey = () => (store.get('elkey','')||'').trim();
-const EL_JESSICA = 'cgSgspJ2msm6clMCkdW9';   // same voice as the ElevenLabs Maya
+const EL_JESSICA = 'cgSgspJ2msm6clMCkdW9';   // same voice as the ElevenLabs Zenix
 const EL_NATASHA = 'j05EIz3iI3JmBTWC3CsA';   // Jim's pick: Natasha, whispery ASMR
 const EL_DEFAULT = [{id:EL_NATASHA, name:'Natasha', gender:'female'}, {id:EL_JESSICA, name:'Jessica', gender:'female'}, {id:'hpp4J3VqNfWAUOO0d1Us', name:'Bella', gender:'female'}, {id:'EXAVITQu4vr4xnSDxMaL', name:'Sarah', gender:'female'}, {id:'FGY2WhTYpPnrIDTdsKH5', name:'Laura', gender:'female'}];
 let elModel = store.get('elmodel', 'eleven_flash_v2_5');   // fastest + half the credits
@@ -2990,7 +2990,7 @@ $('elSave').onclick = () => {
   $('elState').textContent = 'Checking key with ElevenLabs…';
   if(Native && Native.elVoices) Native.elVoices(v);
   if(!settings.voice.startsWith('el:')){ settings.voice = 'el:'+EL_NATASHA; store.set('settings', settings); }
-  renderEL(); renderBrain(); renderHD(); toast('ElevenLabs key saved. Maya now speaks with Natasha.');
+  renderEL(); renderBrain(); renderHD(); toast('ElevenLabs key saved. Zenix now speaks with Natasha.');
 };
 $('elClear').onclick = () => {
   store.set('elkey', ''); store.set('elvoices', null);
@@ -3051,16 +3051,16 @@ function updSend(){ $('sendBtn').classList.toggle('off', !$('input').value.trim(
 $('input').addEventListener('input', updSend); updSend();
 
 /* ---------- Me tab ---------- */
-$('memAdd').onclick = () => { const v=$('memInput').value.trim(); if(!v) return; saveFact(v); $('memInput').value=''; toast('Maya will remember that'); };
+$('memAdd').onclick = () => { const v=$('memInput').value.trim(); if(!v) return; saveFact(v); $('memInput').value=''; toast('Zenix will remember that'); };
 $('memSearch').addEventListener('input', ()=>{ memShown=40; renderMem(); });
 $('memMore').onclick = () => { memShown+=60; renderMem(); };
 $('memExport').onclick = () => {
-  const data = JSON.stringify({app:'Maya', saved:new Date().toISOString(), memories, history});
-  if(Native && Native.shareText){ Native.shareText('Maya memory backup', data); }
+  const data = JSON.stringify({app:'Zenix', saved:new Date().toISOString(), memories, history});
+  if(Native && Native.shareText){ Native.shareText('Zenix memory backup', data); }
   else { try{ navigator.clipboard.writeText(data); toast('Backup copied'); }catch(e){ toast('Could not back up'); } }
 };
 $('memImport').onclick = () => {
-  const t = prompt('Paste your Maya memory backup here');
+  const t = prompt('Paste your Zenix memory backup here');
   if(!t) return;
   try{
     const j = JSON.parse(t); let added=0;
@@ -3074,15 +3074,15 @@ $('orbBtn').onclick = () => { if(Native && Native.requestOverlay){ Native.reques
 document.addEventListener('visibilitychange', () => { if(!document.hidden) refreshOrbBtn(); });
 refreshOrbBtn();
 $('permBtn').onclick = () => { if(Native && Native.requestPermissions){ Native.requestPermissions(); } else toast('Permissions are for the Android app'); };
-if(!IS_APP){ $('permText').textContent='You are using Maya on a computer. Alarms, calls, messages and calendar work in the Android app.'; $('permBtn').style.display='none'; }
+if(!IS_APP){ $('permText').textContent='You are using Zenix on a computer. Alarms, calls, messages and calendar work in the Android app.'; $('permBtn').style.display='none'; }
 $('nameInput').value = settings.name || '';
 $('nameInput').addEventListener('input', e => { settings.name=e.target.value.trim()||'Jim'; store.set('settings',settings); greet(); });
 const vt=$('chatVoiceToggle'); vt.classList.toggle('on', settings.chatVoice);
 vt.onclick = () => { settings.chatVoice=!settings.chatVoice; vt.classList.toggle('on',settings.chatVoice); store.set('settings',settings); if(convo && session==='chat') convo.setVolume({volume:settings.chatVoice?1:0}); };
 $('clearBtn').onclick = () => { if(confirm('Clear all chat history?')){ history=[]; store.set('history',history); renderChat(); toast('History cleared'); } };
 
-/* ---------- Maya neon ring orb (reacts to voices) ---------- */
-const MayaOrb = (() => {
+/* ---------- Zenix neon ring orb (reacts to voices) ---------- */
+const ZenixOrb = (() => {
   const cv = document.getElementById('mayaOrb'); if(!cv) return null;
   const ctx = cv.getContext('2d');
   let S = 280, DPR = 1;
@@ -3239,11 +3239,11 @@ const MayaOrb = (() => {
   requestAnimationFrame(frame);
   return { setState, feed, feedSpectrum };
 })();
-window.MayaOrb = MayaOrb;
+window.ZenixOrb = ZenixOrb;
 /* mic level from the phone (0..1) */
-window.zenixRms = (v) => { if(MayaOrb) MayaOrb.feed(v); };
+window.zenixRms = (v) => { if(ZenixOrb) ZenixOrb.feed(v); };
 
-/* analyse Maya's own voice (Kokoro / Deepgram audio) for the orb */
+/* analyse Zenix's own voice (Kokoro / Deepgram audio) for the orb */
 let vizCtx = null, vizAnalyser = null, vizBuf = null;
 function initVoiceViz(){
   try{
@@ -3258,9 +3258,9 @@ function initVoiceViz(){
 }
 document.addEventListener('click', initVoiceViz, {once:true});
 
-/* ---------- "Hey Maya" wake word ---------- */
+/* ---------- "Hey Zenix" wake word ---------- */
 if(settings.wake===undefined) settings.wake=false;
-let wakeGreeting = false;   // true for a moment after "Hey Maya": the next voice chat greets with "Yes bro?" and ends sooner when quiet
+let wakeGreeting = false;   // true for a moment after "Hey Zenix": the next voice chat greets with "Yes bro?" and ends sooner when quiet
 function wakeSt(){ try{ return JSON.parse(Native.wakeStatus()); }catch(e){ return {}; } }
 function wakePauseNow(){ if(settings.wake && Native && Native.wakePause){ Native.wakePause(); return new Promise(r=>setTimeout(r,350)); } return Promise.resolve(); }
 const inVoiceChat = () => (off.active && off.kind==='talk') || !!convo || connecting;
@@ -3286,12 +3286,12 @@ function renderWake(){
   if(st.state==='downloading'){ $('wakeState').textContent=`Downloading… ${st.percent||0}%`; }
   else if(st.state==='unpacking'){ $('wakeState').textContent='Setting up…'; }
   else if(st.state==='failed'){ $('wakeState').textContent='Download failed. Turn off and on to retry.'; }
-  else if(st.state==='ready'){ $('wakeState').textContent = st.listening ? 'On: say "Hey Maya" ✓' : (st.running ? 'On (paused while you chat)' : 'Starting…'); if(st.error && !st.listening) $('wakeState').textContent += ' · '+st.error; }
+  else if(st.state==='ready'){ $('wakeState').textContent = st.listening ? 'On: say "Hey Zenix" ✓' : (st.running ? 'On (paused while you chat)' : 'Starting…'); if(st.error && !st.listening) $('wakeState').textContent += ' · '+st.error; }
   else $('wakeState').textContent = 'Getting ready…';
-  // what she last caught, so it can be tested: say "Hey Maya" and watch this line
+  // what she last caught, so it can be tested: say "Hey Zenix" and watch this line
   if(st.state==='ready' && st.running){
     const ago = typeof st.heardAgo==='number' ? st.heardAgo : -1;
-    diag.textContent = (st.heard && ago >= 0 && ago < 900) ? `Last heard: "${st.heard}" · ${ago < 60 ? ago + ' sec' : Math.round(ago/60) + ' min'} ago` : 'To test: say "Hey Maya". What she heard shows here.';
+    diag.textContent = (st.heard && ago >= 0 && ago < 900) ? `Last heard: "${st.heard}" · ${ago < 60 ? ago + ' sec' : Math.round(ago/60) + ' min'} ago` : 'To test: say "Hey Zenix". What she heard shows here.';
     diag.style.display = 'block';
   } else diag.style.display = 'none';
   const needO = !!Native.hasOverlay && Native.hasOverlay()!=='true', needF = !!Native.canFullScreen && Native.canFullScreen()!=='true', needB = !!Native.batteryOk && Native.batteryOk()!=='true';
@@ -3307,7 +3307,7 @@ function waitWakeReady(){
     const st = wakeSt(); renderWake();
     if(st.state==='ready'){
       wakeWaiting = false;
-      // Android only lets the listener start while Maya is on screen
+      // Android only lets the listener start while Zenix is on screen
       if(!st.running && !document.hidden && !inVoiceChat()) Native.wakeEnable('true');
       setTimeout(renderWake, 1500); return;
     }
@@ -3321,9 +3321,9 @@ $('wakeBtn').onclick = () => {
   settings.wake = !settings.wake; store.set('settings', settings);
   if(settings.wake){
     const st = wakeSt();
-    if(st.state!=='ready' && st.state!=='downloading' && st.state!=='unpacking'){ wakeFetched = true; Native.wakeDownload(); toast('Downloading the "Hey Maya" listener (about 40 MB)…'); }
+    if(st.state!=='ready' && st.state!=='downloading' && st.state!=='unpacking'){ wakeFetched = true; Native.wakeDownload(); toast('Downloading the "Hey Zenix" listener (about 40 MB)…'); }
     waitWakeReady();
-    if(Native.hasOverlay && Native.hasOverlay()!=='true'){ toast('Also allow "Display over other apps" so Maya can pop up'); setTimeout(()=>Native.requestOverlay(), 1800); }
+    if(Native.hasOverlay && Native.hasOverlay()!=='true'){ toast('Also allow "Display over other apps" so Zenix can pop up'); setTimeout(()=>Native.requestOverlay(), 1800); }
   } else Native.wakeEnable('false');
   setTimeout(renderWake, 500);
 };
@@ -3337,12 +3337,12 @@ if(settings.wake && Native && Native.wakeStatus) setTimeout(waitWakeReady, 1200)
 let updState = 'idle', updAfterPerm = false;   // idle | downloading | ready
 window.zenixUpdateAvailable = (name, manual) => {
   $('updBar').style.display='flex';
-  if(updState==='idle'){ $('updText').textContent = 'New Maya '+(name?('v'+name+' '):'')+'is ready'; $('updBtn').textContent='Update now'; }   // never reset a download that's running
+  if(updState==='idle'){ $('updText').textContent = 'New Zenix '+(name?('v'+name+' '):'')+'is ready'; $('updBtn').textContent='Update now'; }   // never reset a download that's running
   if(manual){ $('verText').textContent = 'v'+name+' is ready, tap Update now at the top'; window.scrollTo({top:0, behavior:'smooth'}); }
 };
 window.zenixUpdateProgress = (pct, note) => {
   updState = 'downloading'; $('updBar').style.display='flex';
-  $('updText').textContent = note || ('Downloading the new Maya… ' + pct + '%');
+  $('updText').textContent = note || ('Downloading the new Zenix… ' + pct + '%');
   $('updBtn').textContent = note ? 'Waiting' : pct + '%';
 };
 window.zenixUpdateReady = () => { updState = 'ready'; $('updBar').style.display='flex'; $('updText').textContent = 'Update downloaded. Tap Install if the install screen is not showing.'; $('updBtn').textContent = 'Install'; };
@@ -3353,8 +3353,8 @@ window.zenixUpdateFailed = (msg) => {
 };
 $('updBtn').onclick = () => {
   const r = Native && Native.startUpdate ? Native.startUpdate() : '';
-  if(r==='permission'){ updAfterPerm = true; toast('Allow "Install unknown apps" for Maya, then come back'); }
-  else if(r==='downloading'){ if(updState!=='downloading'){ updState = 'downloading'; $('updBtn').textContent='0%'; $('updText').textContent='Downloading the new Maya…'; toast('Downloading the update. The install screen pops up when it is done.'); } else toast('Still downloading, one moment'); }
+  if(r==='permission'){ updAfterPerm = true; toast('Allow "Install unknown apps" for Zenix, then come back'); }
+  else if(r==='downloading'){ if(updState!=='downloading'){ updState = 'downloading'; $('updBtn').textContent='0%'; $('updText').textContent='Downloading the new Zenix…'; toast('Downloading the update. The install screen pops up when it is done.'); } else toast('Still downloading, one moment'); }
   else if(r==='ready'){ updState = 'ready'; $('updBtn').textContent='Install'; }
   else { toast('Could not start the update. Try "Download in browser" in Settings → About.'); }
 };
@@ -3371,7 +3371,7 @@ const myVersion = (Native && Native.appVersion) ? Native.appVersion() : '';
 $('verText').textContent = myVersion ? 'You have v'+myVersion : 'Web version · always up to date';
 if(!IS_APP){ $('updCheck').style.display='none'; $('updAlt').style.display='none'; }
 window.zenixStartUpdate = () => { $('updBar').style.display='flex'; $('updBtn').click(); };
-window.zenixUpToDate = (name) => { $('verText').textContent = 'You have v'+(myVersion||name)+' · the newest ✓'; toast('Maya is up to date (v'+(myVersion||name)+')'); };
+window.zenixUpToDate = (name) => { $('verText').textContent = 'You have v'+(myVersion||name)+' · the newest ✓'; toast('Zenix is up to date (v'+(myVersion||name)+')'); };
 window.zenixUpdateCheckFailed = () => { $('verText').textContent = 'You have v'+myVersion+' · could not check (internet?)'; };
 $('updCheck').onclick = () => {
   if(!(Native && Native.checkUpdateNow)){ toast('Updates work in the Android app'); return; }
@@ -3475,7 +3475,7 @@ function renderNotif(){
   $('notifBtn').textContent = on ? 'Settings' : 'Turn on';
   $('sumNotif').textContent = on ? 'On' : 'Off';
 }
-$('notifBtn').onclick = () => { if(Native.openNotifAccess){ Native.openNotifAccess(); toast('Maya message reader → Allow'); } };
+$('notifBtn').onclick = () => { if(Native.openNotifAccess){ Native.openNotifAccess(); toast('Zenix message reader → Allow'); } };
 function renderDrive(){
   if(!Native.drivingStatus){ $('driveState').textContent = 'Android app only'; $('driveBtn').style.display = 'none'; $('carBtn').style.display = 'none'; $('sumDrive').textContent = 'Android app only'; return; }
   let st = {}; try{ st = JSON.parse(Native.drivingStatus()); }catch(e){}
@@ -3489,7 +3489,7 @@ $('driveBtn').onclick = () => { if(!Native.setDriving) return; const on = drivin
 function showCars(){
   const box = $('carList'); box.innerHTML = '';
   let r = {}; try{ r = JSON.parse(Native.btDevices()); }catch(e){}
-  if(r.need){ toast('Allow "Nearby devices" for Maya, then tap Choose car again'); return; }
+  if(r.need){ toast('Allow "Nearby devices" for Zenix, then tap Choose car again'); return; }
   const l = r.list || [];
   if(!l.length){ box.innerHTML = '<p class="muted" style="grid-column:1/-1">No paired Bluetooth devices found. Pair the phone with your car first.</p>'; return; }
   l.forEach(d => { const b = document.createElement('button'); b.textContent = d.name;
@@ -3527,7 +3527,7 @@ function renderShifts(){
       const c = document.createElement('button'); c.className = 'btn-line'; c.style.marginTop = '6px'; c.textContent = 'Clear rota';
       c.onclick = () => { shiftPat = null; store.set('shiftpat', null); store.set('shiftex', shiftEx = []); renderShifts(); }; pb.appendChild(c);
     } else {
-      const h = document.createElement('p'); h.className = 'hint'; h.innerHTML = 'Tell Maya your rota in your own words, like <b>"I work 6:30 PM Wednesday to Friday 6:30 PM, then 4 days off"</b>, and she works out all your duties.'; pb.appendChild(h);
+      const h = document.createElement('p'); h.className = 'hint'; h.innerHTML = 'Tell Zenix your rota in your own words, like <b>"I work 6:30 PM Wednesday to Friday 6:30 PM, then 4 days off"</b>, and she works out all your duties.'; pb.appendChild(h);
     }
   }
   const q = shiftSummary(''); const box = $('shiftList'); if(!box) return; box.innerHTML = '';
@@ -3562,7 +3562,7 @@ function renderSites(results){
 $('siteAdd').onclick = async () => { const u = $('siteUrl').value.trim(); if(!u){ toast('Type the web address first'); return; } toast(await clientTools.check_sites({action:'add', name:$('siteName').value, url:u})); $('siteUrl').value = ''; $('siteName').value = ''; };
 $('siteCheck').onclick = async () => { $('siteState').textContent = 'Checking…'; const res = await checkSitesNow(); renderSites(res); const bad = sites.filter(x => { const r = res.find(y => y.url===x.url); return !(r && r.code >= 200 && r.code < 400); }).length; $('siteState').textContent = bad ? `${bad} need${bad > 1 ? '' : 's'} attention` : 'All up ✓'; };
 const lockTog = $('lockPrivToggle'); lockTog.classList.toggle('on', !!settings.lockPrivate);
-lockTog.onclick = () => { settings.lockPrivate = !settings.lockPrivate; store.set('settings', settings); lockTog.classList.toggle('on', settings.lockPrivate); toast(settings.lockPrivate ? 'While locked, Maya keeps your memories to herself' : 'Maya knows you on the lock screen too'); };
+lockTog.onclick = () => { settings.lockPrivate = !settings.lockPrivate; store.set('settings', settings); lockTog.classList.toggle('on', settings.lockPrivate); toast(settings.lockPrivate ? 'While locked, Zenix keeps your memories to herself' : 'Zenix knows you on the lock screen too'); };
 const HELP = [
   ['On her own', '"Every weekday at 6, give me my morning brief" · "Every Friday at 8 PM remind me to pay the bills" · "Tomorrow at 5, tell me when to leave for the station"'],
   ['Messages', '"Who messaged me?" · "What did I miss?" · "Tell Jen I\'ll be home by 9" · "Turn on driving mode"'],
@@ -3588,7 +3588,7 @@ document.addEventListener('visibilitychange', () => { if(!document.hidden) rende
 renderAgent();
 
 
-/* ---------- Easier Maya: setup checklist, everyday settings, chat chips, welcome guide ---------- */
+/* ---------- Easier Zenix: setup checklist, everyday settings, chat chips, welcome guide ---------- */
 const EVERYDAY = ['brain','voice','wake','mem','routines','lists'];
 (() => {
   const list = $('everyList');
@@ -3610,13 +3610,13 @@ function setupItems(){
   const brainOk = settings.engine==='eleven' || !!brainKey();
   let wakeOk = false; if(settings.wake){ const st = wakeSt(); wakeOk = st.state==='ready' && !!st.running; }
   return [
-    {k:'key', t:'Brain key', d: brainOk ? 'Maya can think' : 'Paste your Claude or OpenRouter key', ok: brainOk, fix: () => openSec(settings.provider==='openrouter' ? 'kor' : 'kclaude')},
+    {k:'key', t:'Brain key', d: brainOk ? 'Zenix can think' : 'Paste your Claude or OpenRouter key', ok: brainOk, fix: () => openSec(settings.provider==='openrouter' ? 'kor' : 'kclaude')},
     {k:'mic', t:'Microphone & phone', d:'Talk, calls, contacts, calendar', ok: yes('hasMicPermission'), fix: () => Native.requestPermissions && Native.requestPermissions()},
-    {k:'wake', t:'"Hey Maya"', d: wakeOk ? 'Listening for her name' : 'Talk hands-free, even screen off', ok: wakeOk, fix: () => { if(!settings.wake) $('wakeBtn').click(); openSec('wake'); }},
+    {k:'wake', t:'"Hey Zenix"', d: wakeOk ? 'Listening for her name' : 'Talk hands-free, even screen off', ok: wakeOk, fix: () => { if(!settings.wake) $('wakeBtn').click(); openSec('wake'); }},
     {k:'overlay', t:'Show over other apps', d:'Lets her pop up anywhere', ok: !Native.hasOverlay || yes('hasOverlay'), fix: () => Native.requestOverlay()},
     {k:'full', t:'Lock-screen alerts', d:'Wake and ring over the lock screen', ok: !Native.canFullScreen || yes('canFullScreen'), fix: () => Native.openFullScreenSetting()},
     {k:'batt', t:'Battery unrestricted', d:'Stops the phone putting her to sleep', ok: !Native.batteryOk || yes('batteryOk'), fix: () => Native.askBattery()},
-    {k:'notif', t:'Read my messages', d:'"Who messaged me?" and replies', ok: !Native.notifOn || yes('notifOn'), fix: () => { Native.openNotifAccess(); toast('Maya message reader → Allow'); }},
+    {k:'notif', t:'Read my messages', d:'"Who messaged me?" and replies', ok: !Native.notifOn || yes('notifOn'), fix: () => { Native.openNotifAccess(); toast('Zenix message reader → Allow'); }},
     {k:'ctl', t:'Control other apps', d:'"Scroll down", "search for…", "play…"', ok: !Native.ctlOn || yes('ctlOn'), fix: () => openSec('control')}
   ];
 }
@@ -3645,12 +3645,12 @@ const CHIPS = ['Who messaged me?', "What's this?", 'Set an alarm for 6 AM', 'Add
 (() => { const box = $('chips'); CHIPS.forEach(t => { const b = document.createElement('button'); b.textContent = t; b.onclick = () => sendText(t); box.appendChild(b); }); })();
 $('input').addEventListener('input', () => { $('chips').style.display = $('input').value.trim() ? 'none' : 'flex'; });
 
-/* First-time welcome guide: key → voice → "Hey Maya" */
+/* First-time welcome guide: key → voice → "Hey Zenix" */
 function wizard(step){
   const w = $('wiz'), box = $('wizIn'); w.hidden = false;
   const close = () => { w.hidden = true; store.set('welcomed', true); renderSetup(); renderMe(); };
   if(step === 1){
-    box.innerHTML = `<div class="wiz-step">Step 1 of 3</div><h2>Give Maya her brain</h2>
+    box.innerHTML = `<div class="wiz-step">Step 1 of 3</div><h2>Give Zenix her brain</h2>
       <p>Paste your Claude key (starts with sk-ant-) or OpenRouter key (starts with sk-or-). It stays on this phone only.</p>
       <input type="password" class="field" id="wizKey" placeholder="Paste your key here" autocomplete="off">
       <button class="go" id="wizNext">Next</button><button class="skip" id="wizSkip">I'll do it later</button>`;
@@ -3671,12 +3671,12 @@ function wizard(step){
         ${hasEl ? '<button data-v="el:' + EL_NATASHA + '"><b>Natasha (ElevenLabs)</b><span>Most human, uses credits</span></button>' : ''}
       </div><button class="go" id="wizNext">Next</button>`;
     const mark = () => box.querySelectorAll('[data-v]').forEach(b => b.classList.toggle('sel', b.dataset.v === settings.voice));
-    box.querySelectorAll('[data-v]').forEach(b => b.onclick = () => { settings.voice = b.dataset.v; store.set('settings', settings); renderBrain(); mark(); stopSpeech(); speakEnqueue(`Hi ${settings.name||'Jim'}, I'm Maya.`); });
+    box.querySelectorAll('[data-v]').forEach(b => b.onclick = () => { settings.voice = b.dataset.v; store.set('settings', settings); renderBrain(); mark(); stopSpeech(); speakEnqueue(`Hi ${settings.name||'Jim'}, I'm Zenix.`); });
     mark(); $('wizNext').onclick = () => wizard(3);
   } else {
-    box.innerHTML = `<div class="wiz-step">Step 3 of 3</div><h2>Turn on "Hey Maya"?</h2>
-      <p>Say "Hey Maya" to talk hands-free, even from other apps or with the screen off. It listens on the phone only.</p>
-      <button class="go" id="wizWake">Turn on "Hey Maya"</button><button class="skip" id="wizDone">Not now</button>`;
+    box.innerHTML = `<div class="wiz-step">Step 3 of 3</div><h2>Turn on "Hey Zenix"?</h2>
+      <p>Say "Hey Zenix" to talk hands-free, even from other apps or with the screen off. It listens on the phone only.</p>
+      <button class="go" id="wizWake">Turn on "Hey Zenix"</button><button class="skip" id="wizDone">Not now</button>`;
     $('wizWake').onclick = () => { if(!settings.wake && Native.wakeStatus) $('wakeBtn').click(); close(); toast('All set! Settings shows anything still left to allow.'); };
     $('wizDone').onclick = close;
   }
@@ -3699,7 +3699,7 @@ const dict = { on:false, el:null, base:'', btn:null,
   stop(){ clearTimeout(this.t); clearTimeout(this.pt); if(this.on){ try{ Native.stopListening(); }catch(e){} } this.on = false; if(this.btn) this.btn.classList.remove('on'); }
 };
 
-/* ---------- Help Maya know you: ready-made questions ---------- */
+/* ---------- Help Zenix know you: ready-made questions ---------- */
 const KNOW = [
   ['Family', 'spouse', 'Who is your wife or husband?', 'Wife/husband'],
   ['Family', 'kids', 'What are your children\'s names and birthdays?', 'Children'],
@@ -3719,13 +3719,13 @@ const KNOW = [
   ['Home', 'hometown', 'Where are you from originally?', 'Hometown'],
   ['Home', 'car', 'What car do you drive?', 'Car'],
   ['Home', 'langs', 'Which languages do you speak?', 'Languages'],
-  ['About you', 'callme', 'What should Maya call you?', 'Likes to be called'],
+  ['About you', 'callme', 'What should Zenix call you?', 'Likes to be called'],
   ['About you', 'bday', 'When is your birthday?', 'Birthday'],
   ['About you', 'food', 'What are your favourite foods?', 'Favourite food'],
   ['About you', 'hobbies', 'What are your hobbies and sports?', 'Hobbies and sports'],
   ['About you', 'shows', 'What music, shows or teams do you like?', 'Likes (music, shows, teams)'],
   ['About you', 'goals', 'What are you working towards this year?', 'Goals this year'],
-  ['About you', 'allergy', 'Any allergies or health things Maya should know?', 'Allergies/health notes']
+  ['About you', 'allergy', 'Any allergies or health things Zenix should know?', 'Allergies/health notes']
 ];
 let knowAns = store.get('knowme', {});      // key -> answer, or '' when skipped
 let kmIdx = 0;
@@ -3736,7 +3736,7 @@ function renderKnow(){
   $('kmBar').style.width = Math.round(done / KNOW.length * 100) + '%';
   const q = KNOW[kmIdx];
   if(kmIdx < 0 || !q){
-    $('kmGroup').textContent = 'All done'; $('kmQ').textContent = 'Thanks! Maya knows you much better now. You can still tell her anything new by voice.';
+    $('kmGroup').textContent = 'All done'; $('kmQ').textContent = 'Thanks! Zenix knows you much better now. You can still tell her anything new by voice.';
     ['kmA','kmMic','kmSave','kmSkip'].forEach(id => $(id).style.display = 'none'); $('kmBack').textContent = 'Start again'; return;
   }
   ['kmA','kmMic','kmSave','kmSkip'].forEach(id => $(id).style.display = ''); $('kmBack').textContent = 'Back';
@@ -3753,7 +3753,7 @@ function kmSave(){
   saveFact(`${q[3]}: ${a}`);
   if(q[1] === 'callme' && a.length < 30){ settings.name = a.split(/[ ,.]/)[0] || settings.name; store.set('settings', settings); $('nameInput').value = settings.name; greet(); renderMe(); }
   if(q[1] === 'schedule' && brainKey()){   // let her work out the rota properly
-    toast('Maya will check your schedule with you in Chat');
+    toast('Zenix will check your schedule with you in Chat');
     setTimeout(() => { document.querySelector('nav button[data-view="chat"]').click(); sendText('My work schedule: ' + a); }, 500);
   } else toast('Saved ✓');
   kmIdx = kmNext(kmIdx + 1); renderKnow();
@@ -3820,20 +3820,20 @@ $('memClean').onclick = async () => {
   showClean(items);
 };
 
-/* ---------- Auto-send (Maya taps Send after Jim says yes) ---------- */
+/* ---------- Auto-send (Zenix taps Send after Jim says yes) ---------- */
 const autoOn = () => !!(Native.autoSendOn && Native.autoSendOn()==='true');
 function renderAuto(){
   if(!Native.autoSendOn){ $('autoState').textContent='Android app only'; $('autoBtn').style.display='none'; $('autoInfo').style.display='none'; $('sumAuto').textContent='Android app only'; return; }
   const on = autoOn();
-  $('autoState').textContent = on ? 'On ✓ Maya taps Send after your yes' : 'Off: you tap Send yourself';
+  $('autoState').textContent = on ? 'On ✓ Zenix taps Send after your yes' : 'Off: you tap Send yourself';
   $('autoBtn').textContent = on ? 'Settings' : 'Turn on';
   $('sumAuto').textContent = on ? 'On · sends after your yes' : 'Off';
 }
-$('autoBtn').onclick = () => { if(Native.openAutoSendSettings){ Native.openAutoSendSettings(); toast('Installed apps → Maya auto-send → On'); } };
+$('autoBtn').onclick = () => { if(Native.openAutoSendSettings){ Native.openAutoSendSettings(); toast('Installed apps → Zenix auto-send → On'); } };
 $('autoInfo').onclick = () => { if(Native.openAppInfo){ Native.openAppInfo(); toast('Tap ⋮ (top right) → Allow restricted settings'); } };
 document.addEventListener('visibilitychange', () => { if(!document.hidden) renderAuto(); });
 renderAuto();
-/* ---------- Control other apps (Maya phone control) ---------- */
+/* ---------- Control other apps (Zenix phone control) ---------- */
 function renderCtl(){
   if(!Native.ctlOn){ $('ctlState').textContent='Android app only'; $('ctlBtn').style.display='none'; $('ctlInfo').style.display='none'; $('sumCtl').textContent='Android app only'; return; }
   const on = ctlOn();
@@ -3841,7 +3841,7 @@ function renderCtl(){
   $('ctlBtn').textContent = on ? 'Settings' : 'Turn on';
   $('sumCtl').textContent = on ? 'On · scroll, tap, search, play by voice' : 'Off';
 }
-$('ctlBtn').onclick = () => { if(Native.openCtlSettings){ Native.openCtlSettings(); toast('Installed apps → Maya phone control → On'); } };
+$('ctlBtn').onclick = () => { if(Native.openCtlSettings){ Native.openCtlSettings(); toast('Installed apps → Zenix phone control → On'); } };
 $('ctlInfo').onclick = () => { if(Native.openAppInfo){ Native.openAppInfo(); toast('Tap ⋮ (top right) → Allow restricted settings'); } };
 document.addEventListener('visibilitychange', () => { if(!document.hidden) renderCtl(); });
 renderCtl();
@@ -3861,10 +3861,10 @@ $('bkSave').onclick = async () => {
     const all = {}; for(let i=0; i<localStorage.length; i++){ const k = localStorage.key(i); if(k && k.startsWith('zenix_')) all[k] = localStorage.getItem(k); }
     const salt = crypto.getRandomValues(new Uint8Array(16)), iv = crypto.getRandomValues(new Uint8Array(12));
     const enc = await crypto.subtle.encrypt({name:'AES-GCM', iv}, await pinKey(pin, salt), new TextEncoder().encode(JSON.stringify(all)));
-    const file = JSON.stringify({app:'Maya', v:1, saved:new Date().toISOString(), salt:b64(salt), iv:b64(iv), data:b64(enc)});
+    const file = JSON.stringify({app:'Zenix', v:1, saved:new Date().toISOString(), salt:b64(salt), iv:b64(iv), data:b64(enc)});
     const name = 'maya-backup-' + new Date().toISOString().slice(0,10) + '.json';
     const r = Native && Native.saveBackup ? JSON.parse(Native.saveBackup(name, file)) : {ok:false, message:'Backups work in the Android app'};
-    $('bkState').textContent = r.ok ? '✓ Saved to Downloads/Maya/' + name + '. Remember your PIN.' : r.message;
+    $('bkState').textContent = r.ok ? '✓ Saved to Downloads/Zenix/' + name + '. Remember your PIN.' : r.message;
     if(r.ok){ $('bkPin').value=''; toast('Backup saved to your Downloads'); }
   }catch(e){ $('bkState').textContent = 'Backup failed: ' + e.message; }
 };
@@ -3874,11 +3874,11 @@ $('bkLoad').onclick = () => {
 };
 window.zenixBackupPicked = async (text) => {
   try{
-    const j = JSON.parse(text); if(j.app!=='Maya' || !j.data) throw new Error('not a Maya backup file');
+    const j = JSON.parse(text); if(j.app!=='Zenix' || !j.data) throw new Error('not a Zenix backup file');
     const dec = await crypto.subtle.decrypt({name:'AES-GCM', iv:unb64(j.iv)}, await pinKey($('bkPin').value.trim(), unb64(j.salt)), unb64(j.data));
     const all = JSON.parse(new TextDecoder().decode(dec));
     Object.keys(all).forEach(k => { if(k.startsWith('zenix_')) localStorage.setItem(k, all[k]); });
-    $('bkState').textContent = '✓ Restored. Reloading Maya…'; toast('Everything restored');
+    $('bkState').textContent = '✓ Restored. Reloading Zenix…'; toast('Everything restored');
     setTimeout(() => location.reload(), 900);
   }catch(e){ $('bkState').textContent = /decrypt|operation/i.test(e.message) || e.name==='OperationError' ? 'Wrong PIN for this backup' : ('Could not restore: ' + e.message); }
 };

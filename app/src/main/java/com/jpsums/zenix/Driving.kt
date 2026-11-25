@@ -11,7 +11,7 @@ import android.os.Build
 
 /**
  * Driving mode: on while the phone is connected to Jim's car Bluetooth (or switched on by hand).
- * While it's on, Maya reads new messages aloud and may read / reply with the phone still locked.
+ * While it's on, Zenix reads new messages aloud and may read / reply with the phone still locked.
  */
 object Driving {
     private const val NOTIF = 12
@@ -37,8 +37,8 @@ object Driving {
             if (on) {
                 val open = PendingIntent.getActivity(c, 5, Intent(c, MainActivity::class.java), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
                 nm.notify(NOTIF, Notification.Builder(c, MainActivity.VOICE_CHANNEL_ID)
-                    .setSmallIcon(R.drawable.ic_notify).setContentTitle("Maya driving mode is on")
-                    .setContentText("New messages are read aloud. Say \"Hey Maya\" to reply.")
+                    .setSmallIcon(R.drawable.ic_notify).setContentTitle("Zenix driving mode is on")
+                    .setContentText("New messages are read aloud. Say \"Hey Zenix\" to reply.")
                     .setOngoing(true).setContentIntent(open).build())
             } else nm.cancel(NOTIF)
         } catch (_: Exception) { }

@@ -10,7 +10,7 @@ import org.vosk.android.SpeechService
 import kotlin.concurrent.thread
 
 /**
- * Maya's own offline ears. Uses the small listener that "Hey Maya" already downloaded, so she can
+ * Zenix's own offline ears. Uses the small listener that "Hey Zenix" already downloaded, so she can
  * understand whole sentences with no internet even when the phone has no offline voice pack.
  * Talks to the page the same way the phone's listener does (zenixOnListening / Partial / Speech / SpeechError).
  */

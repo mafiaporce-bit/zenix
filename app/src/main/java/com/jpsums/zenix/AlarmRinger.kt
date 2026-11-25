@@ -101,13 +101,13 @@ class AlarmRinger : Service() {
             ACTION_STOP -> { finishRing(false); return START_NOT_STICKY }
             ACTION_SNOOZE -> { finishRing(true); return START_NOT_STICKY }
         }
-        title = intent?.getStringExtra("title") ?: "Maya reminder"
+        title = intent?.getStringExtra("title") ?: "Zenix reminder"
         text = intent?.getStringExtra("text") ?: ""
         routine = intent?.getStringExtra("routine")
         current = this
         val nm = getSystemService(NotificationManager::class.java)
         if (nm.getNotificationChannel(CH) == null) {
-            val ch = NotificationChannel(CH, "Maya alarms", NotificationManager.IMPORTANCE_HIGH)
+            val ch = NotificationChannel(CH, "Zenix alarms", NotificationManager.IMPORTANCE_HIGH)
             ch.setSound(null, null); ch.enableVibration(false); ch.setBypassDnd(true)
             ch.description = "Reminders and routines that ring like an alarm"
             nm.createNotificationChannel(ch)
@@ -117,7 +117,7 @@ class AlarmRinger : Service() {
         val stopPi = PendingIntent.getService(this, 42, Intent(this, AlarmRinger::class.java).setAction(ACTION_STOP), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         val snoozePi = PendingIntent.getService(this, 43, Intent(this, AlarmRinger::class.java).setAction(ACTION_SNOOZE), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         val n = Notification.Builder(this, CH)
-            .setSmallIcon(R.drawable.ic_notify).setContentTitle(title).setContentText(text.ifBlank { "Maya" })
+            .setSmallIcon(R.drawable.ic_notify).setContentTitle(title).setContentText(text.ifBlank { "Zenix" })
             .setStyle(Notification.BigTextStyle().bigText(text))
             .setCategory(Notification.CATEGORY_ALARM).setOngoing(true)
             .setFullScreenIntent(full, true).setContentIntent(full)
@@ -177,7 +177,7 @@ class AlarmRinger : Service() {
         if (savedVolume >= 0) { try { getSystemService(AudioManager::class.java).setStreamVolume(AudioManager.STREAM_ALARM, savedVolume, 0) } catch (_: Exception) { }; savedVolume = -1 }
     }
 
-    /** Stop (and maybe snooze). A routine then gets carried out by Maya. */
+    /** Stop (and maybe snooze). A routine then gets carried out by Zenix. */
     fun finishRing(snooze: Boolean, timedOut: Boolean = false) {
         main.removeCallbacksAndMessages(null)
         stopSound()
@@ -223,7 +223,7 @@ class RingActivity : Activity() {
         val time = TextView(this).apply {
             text = SimpleDateFormat("h:mm", Locale.getDefault()).format(Date()); textSize = 64f; setTextColor(Color.WHITE); gravity = Gravity.CENTER
         }
-        val bell = TextView(this).apply { text = "⏰  Maya"; textSize = 15f; setTextColor(Color.parseColor("#B266FF")); gravity = Gravity.CENTER; setPadding(0, dp(6), 0, dp(36)) }
+        val bell = TextView(this).apply { text = "⏰  Zenix"; textSize = 15f; setTextColor(Color.parseColor("#B266FF")); gravity = Gravity.CENTER; setPadding(0, dp(6), 0, dp(36)) }
         tTitle = TextView(this).apply { textSize = 26f; setTextColor(Color.WHITE); gravity = Gravity.CENTER; setTypeface(typeface, android.graphics.Typeface.BOLD) }
         tText = TextView(this).apply { textSize = 18f; setTextColor(Color.parseColor("#C9C2E6")); gravity = Gravity.CENTER; setPadding(0, dp(12), 0, 0) }
         val spacer = android.view.View(this)

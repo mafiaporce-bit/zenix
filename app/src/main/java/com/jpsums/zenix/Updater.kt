@@ -12,7 +12,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 import kotlin.concurrent.thread
 
-/** Checks GitHub for a newer Maya and installs it with one tap. */
+/** Checks GitHub for a newer Zenix and installs it with one tap. */
 class Updater(private val activity: MainActivity) {
 
     companion object {
@@ -83,7 +83,7 @@ class Updater(private val activity: MainActivity) {
                 android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE)
             val n = android.app.Notification.Builder(activity, MainActivity.UPDATE_CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_notify)
-                .setContentTitle("New Maya v$name is ready")
+                .setContentTitle("New Zenix v$name is ready")
                 .setContentText("Tap to update")
                 .setContentIntent(open).setAutoCancel(true).build()
             activity.getSystemService(android.app.NotificationManager::class.java).notify(31, n)
@@ -111,8 +111,8 @@ class Updater(private val activity: MainActivity) {
         val dm = activity.getSystemService(DownloadManager::class.java) ?: return "failed"
         val id = try {
             dm.enqueue(DownloadManager.Request(Uri.parse(BASE + "ZeniX.apk"))
-                .setTitle("Maya update")
-                .setDescription("Downloading the new Maya")
+                .setTitle("Zenix update")
+                .setDescription("Downloading the new Zenix")
                 .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE)
                 .setAllowedOverMetered(true).setAllowedOverRoaming(true)
                 .setDestinationInExternalFilesDir(activity, "updates", APK_NAME))

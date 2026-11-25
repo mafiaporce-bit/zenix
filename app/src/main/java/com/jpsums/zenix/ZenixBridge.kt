@@ -20,7 +20,7 @@ import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
 
-/** Everything Maya can do on the phone. Each method returns a JSON string {ok, message}. */
+/** Everything Zenix can do on the phone. Each method returns a JSON string {ok, message}. */
 class ZenixBridge(private val activity: MainActivity) {
     companion object {
         @Volatile private var appCache: List<Pair<String, String>>? = null
@@ -31,7 +31,7 @@ class ZenixBridge(private val activity: MainActivity) {
     private fun fail(msg: String) = JSONObject().put("ok", false).put("message", msg).toString()
     private fun has(p: String) = activity.checkSelfPermission(p) == PackageManager.PERMISSION_GRANTED
 
-    /** Opens another app's screen. Really reports false when nothing could open it (and never crashes Maya). */
+    /** Opens another app's screen. Really reports false when nothing could open it (and never crashes Zenix). */
     private fun launch(intent: Intent): Boolean {
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         if (android.os.Looper.myLooper() == android.os.Looper.getMainLooper())
@@ -51,21 +51,21 @@ class ZenixBridge(private val activity: MainActivity) {
     @JavascriptInterface fun requestPermissions(): String { activity.runOnUiThread { activity.requestAllPermissions() }; return ok("Asking for permissions.") }
     @JavascriptInterface fun keepAwake(on: String): String { activity.setKeepAwake(on == "true"); return ok("ok") }
 
-    /** Saves the PIN-locked backup into Downloads/Maya (survives clearing Maya's data). */
+    /** Saves the PIN-locked backup into Downloads/Zenix (survives clearing Zenix's data). */
     @JavascriptInterface fun saveBackup(name: String, text: String): String {
         return try {
             if (android.os.Build.VERSION.SDK_INT >= 29) {
                 val cv = android.content.ContentValues().apply {
                     put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, name)
                     put(android.provider.MediaStore.MediaColumns.MIME_TYPE, "application/json")
-                    put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, android.os.Environment.DIRECTORY_DOWNLOADS + "/Maya")
+                    put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, android.os.Environment.DIRECTORY_DOWNLOADS + "/Zenix")
                 }
                 val uri = activity.contentResolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, cv)
                     ?: return fail("Couldn't create the backup file.")
                 activity.contentResolver.openOutputStream(uri)?.use { it.write(text.toByteArray()) }
                 ok("saved")
             } else {
-                shareText("Maya backup", text)
+                shareText("Zenix backup", text)
             }
         } catch (e: Exception) { fail("Couldn't save the backup: ${e.message}") }
     }
@@ -91,13 +91,13 @@ class ZenixBridge(private val activity: MainActivity) {
     } catch (_: Exception) { "true" }
     @JavascriptInterface fun updateInBrowser(): String = if (activity.updater.openInBrowser()) ok("ok") else fail("Couldn't open the browser.")
 
-    // ---------- routines (things Maya does by herself at a set time) ----------
+    // ---------- routines (things Zenix does by herself at a set time) ----------
     @JavascriptInterface fun routineAdd(title: String, prompt: String, hour: String, minute: String, days: String, date: String): String {
         val h = hour.toIntOrNull(); val m = minute.toIntOrNull() ?: 0
         if (h == null || h !in 0..23 || m !in 0..59) return fail("I didn't get the time for that.")
         if (prompt.isBlank()) return fail("What should I do at that time?")
         if (date.isNotBlank() && !Regex("\\d{4}-\\d{2}-\\d{2}").matches(date.trim())) return fail("Give the date as 2026-11-20.")
-        val r = Routines.add(activity, title.ifBlank { "Maya routine" }.take(60), prompt.take(1200), h, m, days, date)
+        val r = Routines.add(activity, title.ifBlank { "Zenix routine" }.take(60), prompt.take(1200), h, m, days, date)
         if (Routines.nextTime(r) == 0L) { Routines.delete(activity, r.optInt("id")); return fail("That time has already passed.") }
         return ok("Saved (id ${r.optInt("id")}). It runs next on ${Routines.nextText(r)}.")
     }
@@ -138,9 +138,9 @@ class ZenixBridge(private val activity: MainActivity) {
     @JavascriptInterface fun ringStatus(): String = JSONObject().put("on", AlarmRinger.isOn(activity)).put("sound", AlarmRinger.soundName(activity)).toString()
     @JavascriptInterface fun setRing(on: String): String { AlarmRinger.setOn(activity, on == "true"); return ok("ok") }
     @JavascriptInterface fun pickRingSound(): String { activity.runOnUiThread { activity.pickRingSound() }; return ok("ok") }
-    @JavascriptInterface fun testRing(): String { AlarmRinger.start(activity, "Test reminder", "This is how Maya's reminders will ring", null); return ok("Ringing now.") }
+    @JavascriptInterface fun testRing(): String { AlarmRinger.start(activity, "Test reminder", "This is how Zenix's reminders will ring", null); return ok("Ringing now.") }
 
-    /** A tiny vibration: "I'm listening" after Hey Maya, now that she no longer says a greeting. */
+    /** A tiny vibration: "I'm listening" after Hey Zenix, now that she no longer says a greeting. */
     @JavascriptInterface fun buzz(ms: String): String {
         try {
             val v = activity.getSystemService(android.os.Vibrator::class.java)
@@ -181,7 +181,7 @@ class ZenixBridge(private val activity: MainActivity) {
                 if (pkg != null && launch(i)) back(true, "Playing $arg.") else playOnYoutube()   // no music app: use YouTube
             }
             else ->
-                if (svc == null) back(false, if (ControlService.isOn(activity)) "Phone control is still starting. Try again in a moment." else "Maya phone control is off. It can be turned on in Maya's Settings under Control other apps.")
+                if (svc == null) back(false, if (ControlService.isOn(activity)) "Phone control is still starting. Try again in a moment." else "Zenix phone control is off. It can be turned on in Zenix's Settings under Control other apps.")
                 else svc.run(action, arg, back)
         }
         return ok("running")
@@ -216,7 +216,7 @@ class ZenixBridge(private val activity: MainActivity) {
         val nm = activity.getSystemService(android.app.NotificationManager::class.java)
         if (!nm.isNotificationPolicyAccessGranted) {
             launch(Intent(android.provider.Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS))
-            fail("Maya needs Do Not Disturb access first. That setting is open now: allow Maya there, then ask again.")
+            fail("Zenix needs Do Not Disturb access first. That setting is open now: allow Zenix there, then ask again.")
         } else {
             nm.setInterruptionFilter(if (on == "true") android.app.NotificationManager.INTERRUPTION_FILTER_PRIORITY else android.app.NotificationManager.INTERRUPTION_FILTER_ALL)
             ok(if (on == "true") "Do Not Disturb is on." else "Do Not Disturb is off.")
@@ -226,7 +226,7 @@ class ZenixBridge(private val activity: MainActivity) {
     @JavascriptInterface fun setTimer(seconds: String, label: String): String {
         val s = seconds.toIntOrNull()?.coerceIn(1, 86400) ?: return fail("How long should the timer be?")
         val i = Intent(AlarmClock.ACTION_SET_TIMER).putExtra(AlarmClock.EXTRA_LENGTH, s)
-            .putExtra(AlarmClock.EXTRA_MESSAGE, label.ifBlank { "Maya timer" }).putExtra(AlarmClock.EXTRA_SKIP_UI, true)
+            .putExtra(AlarmClock.EXTRA_MESSAGE, label.ifBlank { "Zenix timer" }).putExtra(AlarmClock.EXTRA_SKIP_UI, true)
         val txt = if (s >= 3600) "${s / 3600} h ${s % 3600 / 60} min" else if (s >= 60) "${s / 60} min" + (if (s % 60 > 0) " ${s % 60} s" else "") else "$s seconds"
         return if (launch(i)) ok("Timer started: $txt.") else fail("The Clock app didn't accept the timer.")
     }
@@ -270,7 +270,7 @@ class ZenixBridge(private val activity: MainActivity) {
                         try {
                             val c = java.net.URL(u).openConnection() as java.net.HttpURLConnection
                             c.connectTimeout = 8000; c.readTimeout = 8000; c.instanceFollowRedirects = true
-                            c.setRequestProperty("User-Agent", "Mozilla/5.0 (Maya site check)")
+                            c.setRequestProperty("User-Agent", "Mozilla/5.0 (Zenix site check)")
                             o.put("code", c.responseCode); c.disconnect()
                         } catch (e: Exception) { o.put("code", 0).put("error", e.javaClass.simpleName) }
                         res[i] = o.put("ms", System.currentTimeMillis() - t0)
@@ -292,7 +292,7 @@ class ZenixBridge(private val activity: MainActivity) {
     @JavascriptInterface fun startListening(lang: String): String { localEars.cancel(); activity.brain.startListening(lang); return ok("listening") }
     @JavascriptInterface fun startListeningOnline(lang: String): String { localEars.cancel(); activity.brain.startListening(lang, false); return ok("listening") }
     @JavascriptInterface fun stopListening(): String { activity.brain.stopListening(); localEars.cancel(); return ok("stopped") }
-    // Maya's own offline ears (the "Hey Maya" listener, hearing whole sentences): for phones with no offline voice pack
+    // Zenix's own offline ears (the "Hey Zenix" listener, hearing whole sentences): for phones with no offline voice pack
     private val localEars by lazy { VoskEars(activity) }
     @JavascriptInterface fun localEarsReady(): String = localEars.ready().toString()
     @JavascriptInterface fun startListeningLocal(): String { activity.brain.stopListening(); localEars.start(); return ok("listening") }
@@ -305,10 +305,10 @@ class ZenixBridge(private val activity: MainActivity) {
     } catch (_: Exception) { "true" }
     @JavascriptInterface fun speak(text: String, lang: String): String { activity.brain.speak(text, lang); return ok("speaking") }
     @JavascriptInterface fun stopSpeaking(): String { activity.brain.stopSpeaking(); return ok("stopped") }
-    // ---------- "Hey Maya" wake word ----------
+    // ---------- "Hey Zenix" wake word ----------
     @JavascriptInterface fun wakeStatus(): String = WakeWordService.status(activity)
     @JavascriptInterface fun isLocked(): String = if (activity.isLocked()) "true" else "false"
-    /** Android 14+: is Maya allowed to open herself over the lock screen ("full screen notifications")? */
+    /** Android 14+: is Zenix allowed to open herself over the lock screen ("full screen notifications")? */
     @JavascriptInterface fun canFullScreen(): String = try {
         if (Build.VERSION.SDK_INT >= 34) activity.getSystemService(android.app.NotificationManager::class.java).canUseFullScreenIntent().toString() else "true"
     } catch (_: Exception) { "true" }
@@ -325,10 +325,10 @@ class ZenixBridge(private val activity: MainActivity) {
         if (on == "true") activity.wakeCommand(null) else activity.wakeCommand(WakeWordService.ACTION_OFF)
         return ok("ok")
     }
-    // Talk to the running listener directly (works even while Maya is behind another app or the lock screen)
+    // Talk to the running listener directly (works even while Zenix is behind another app or the lock screen)
     @JavascriptInterface fun wakePause(): String { WakeWordService.current?.let { s -> activity.runOnUiThread { s.pause() } }; return ok("ok") }
     @JavascriptInterface fun wakeResume(): String { WakeWordService.current?.let { s -> activity.runOnUiThread { s.resume() } }; return ok("ok") }
-    /** Is Maya free from Android's battery saving (so the listener isn't put to sleep)? */
+    /** Is Zenix free from Android's battery saving (so the listener isn't put to sleep)? */
     @JavascriptInterface fun batteryOk(): String = try {
         activity.getSystemService(android.os.PowerManager::class.java).isIgnoringBatteryOptimizations(activity.packageName).toString()
     } catch (_: Exception) { "true" }
@@ -494,7 +494,7 @@ class ZenixBridge(private val activity: MainActivity) {
         return null
     }
 
-    /** Close-match contact names, so Maya can ask "did you mean…". */
+    /** Close-match contact names, so Zenix can ask "did you mean…". */
     private fun suggestContacts(query: String): List<String> {
         if (!has(Manifest.permission.READ_CONTACTS)) return emptyList()
         val out = LinkedHashSet<String>()
@@ -675,7 +675,7 @@ class ZenixBridge(private val activity: MainActivity) {
     /** Auto-send (accessibility) status and setup screens. */
     @JavascriptInterface fun autoSendOn(): String = if (SendHelperService.isOn(activity)) "true" else "false"
     @JavascriptInterface fun openAutoSendSettings(): String =
-        if (launch(Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS))) ok("Find Maya auto-send and turn it on.") else fail("Couldn't open Accessibility settings.")
+        if (launch(Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS))) ok("Find Zenix auto-send and turn it on.") else fail("Couldn't open Accessibility settings.")
     @JavascriptInterface fun openAppInfo(): String =
         if (launch(Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + activity.packageName)))) ok("ok") else fail("Couldn't open app info.")
 

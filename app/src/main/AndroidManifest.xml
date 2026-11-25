@@ -31,7 +31,7 @@
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
     <!-- know when there is no internet, so the offline brain can take over -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-    <!-- "Hey Maya" with the screen off: wake the screen and open over the lock screen -->
+    <!-- "Hey Zenix" with the screen off: wake the screen and open over the lock screen -->
     <uses-permission android:name="android.permission.TURN_SCREEN_ON" />
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
@@ -55,7 +55,7 @@
     </queries>
 
     <application
-        android:label="Maya"
+        android:label="Zenix"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher"
         android:theme="@style/ZenixTheme"
@@ -108,7 +108,7 @@
         <service
             android:name=".NotifService"
             android:exported="true"
-            android:label="Maya message reader"
+            android:label="Zenix message reader"
             android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
             <intent-filter>
                 <action android:name="android.service.notification.NotificationListenerService" />
@@ -133,7 +133,7 @@
         <service
             android:name=".SendHelperService"
             android:exported="true"
-            android:label="Maya auto-send"
+            android:label="Zenix auto-send"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
             <intent-filter>
                 <action android:name="android.accessibilityservice.AccessibilityService" />
@@ -146,7 +146,7 @@
         <service
             android:name=".ControlService"
             android:exported="true"
-            android:label="Maya phone control"
+            android:label="Zenix phone control"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
             <intent-filter>
                 <action android:name="android.accessibilityservice.AccessibilityService" />

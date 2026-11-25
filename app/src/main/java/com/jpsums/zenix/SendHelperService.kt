@@ -18,12 +18,12 @@ import android.widget.TextView
 import org.json.JSONObject
 
 /**
- * "Auto-send": after Jim has said YES to a message, Maya opens the chat with the text ready
+ * "Auto-send": after Jim has said YES to a message, Zenix opens the chat with the text ready
  * and this service taps Send for him. It only works inside the messaging apps listed in
- * res/xml/maya_accessibility.xml, and only for a few seconds after Maya asks it to.
+ * res/xml/maya_accessibility.xml, and only for a few seconds after Zenix asks it to.
  *
  * Safety rules: it never types Jim's message into a chat by itself (WhatsApp / Messages must
- * already show exactly Maya's text), and it never picks between two people with similar names.
+ * already show exactly Zenix's text), and it never picks between two people with similar names.
  */
 class SendHelperService : AccessibilityService() {
 
@@ -40,7 +40,7 @@ class SendHelperService : AccessibilityService() {
             return list.contains(c.packageName + "/") && list.contains("SendHelperService")
         }
 
-        /** Called right before Maya opens the chat. Returns false if auto-send is off. */
+        /** Called right before Zenix opens the chat. Returns false if auto-send is off. */
         fun arm(c: Context, app: String, contact: String, text: String, group: Boolean = false): Boolean {
             if (!isOn(c)) return false
             job = Job(app, contact, text, group, System.currentTimeMillis() + 30_000)
@@ -85,7 +85,7 @@ class SendHelperService : AccessibilityService() {
             pkg.startsWith("com.facebook.orca") || pkg.startsWith("com.facebook.mlite") -> messenger(j, root)
             pkg.startsWith("com.whatsapp") && j.group -> whatsappGroup(j, root, pkg)
             pkg.startsWith("com.whatsapp") -> {
-                // The chat must already show exactly Maya's message (WhatsApp fills it in). Never type it ourselves.
+                // The chat must already show exactly Zenix's message (WhatsApp fills it in). Never type it ourselves.
                 val ready = findAll(root) { isBox(it) }.any { same(it.text?.toString() ?: "", j.text) }
                 val send = if (ready) root.findAccessibilityNodeInfosByViewId("$pkg:id/send").firstOrNull() ?: findSendButton(root) else null
                 if (countdownThenTap(j, send)) finish(true, "Sent to ${j.contact} on WhatsApp ✓")
@@ -258,7 +258,7 @@ class SendHelperService : AccessibilityService() {
         hideBubble()
         MainActivity.instance?.get()?.runJs("window.zenixSendResult && window.zenixSendResult($ok, ${JSONObject.quote(msg)})")
         if (ok) main.postDelayed({
-            // come back to Maya so the chat can carry on
+            // come back to Zenix so the chat can carry on
             try {
                 startActivity(Intent(this, MainActivity::class.java)
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP))
