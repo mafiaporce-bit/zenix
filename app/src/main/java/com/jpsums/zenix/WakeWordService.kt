@@ -245,7 +245,8 @@ class WakeWordService : Service() {
         // Only a clear, finished "Hey Maya" said on its own counts: no half-heard guesses (partials),
         // nothing else heard in the same breath (that's ordinary talking), and the listener sure of every word.
         if (key != "text") return
-        if (text.contains("[unk]")) return
+        // a breath or a bit of noise next to it is fine; a whole sentence around it is ordinary talking
+        if (Regex("\\[unk\\]").findAll(text).count() > 2) return
         if (!wakeRegex.matches(clean)) return
         if (now - lastTrigger < 3000) return
         if (now < quietUntil) return   // just after a chat ended: that was the tail of it, not a new "Hey Maya"
@@ -254,7 +255,7 @@ class WakeWordService : Service() {
         if (words != null && words.length() > 0) {
             var low = 1.0
             for (k in 0 until words.length()) low = minOf(low, words.optJSONObject(k)?.optDouble("conf", 1.0) ?: 1.0)
-            if (low < (if (media) 0.95 else 0.88)) return
+            if (low < (if (media) 0.85 else 0.6)) return
         }
         lastTrigger = now
         triggered()
