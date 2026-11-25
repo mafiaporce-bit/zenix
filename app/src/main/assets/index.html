@@ -1150,7 +1150,6 @@ window.zenixEnd = () => { if(off.active) endOffline(); else endSession(); }; // 
 $('talkBtn').onclick = async () => {
   if(off.active){ const wasChat = off.kind==='chat'; endOffline(wasChat); if(!wasChat) return; }
   if(convo && session==='talk') return endSession();
-  if(settings.mode==='auto' && offlineReady() && navigator.onLine && Native.online && Native.online()==='false' && Date.now() - netProbe.okAt > 60000) await probeNet();
   if(wantOffline()){ if(convo) await endSession(); startOffline('talk'); return; }
   if(settings.engine==='own'){ if(convo) await endSession(); startOffline('talk','own'); return; }
   if(convo && session==='chat') await endSession();
@@ -2011,12 +2010,12 @@ function netDown(){
   if(Date.now() - netProbe.failAt < 20000) return true;    // a real request just failed too
   probeNet(); return false;                                  // not sure yet: stay online, the check runs in the background
 }
-function wantOffline(){ return settings.mode==='offline' || (settings.mode==='auto' && netDown() && offlineReady()); }
+function wantOffline(){ return settings.mode==='offline' || (settings.mode==='auto' && !navigator.onLine && offlineReady()); }
 /* the internet dropped in the middle of an online voice chat: the offline brain takes over without ending the chat */
 function switchOffline(){
   if(!(off.active && off.kind==='talk' && off.brain==='own') || tr.on) return false;
   if(settings.mode!=='auto' || !offlineReady()) return false;
-  if(!netDown()){ probeNet().then(ok => { if(!ok) switchOffline(); }); return false; }
+  if(navigator.onLine && !off.probeFailed){ probeNet().then(ok => { if(!ok && off.active){ off.probeFailed = true; switchOffline(); off.probeFailed = false; } }); return false; }
   stopSpeech(); try{ dgClose(); }catch(e){} try{ Native.stopListening(); }catch(e){}
   off.brain = 'offline'; off.thinking = false; off.langFallback = ''; srErrs = 0;
   $('dot').className = 'dot busy'; $('statusText').textContent = 'Offline';
@@ -2133,6 +2132,10 @@ window.zenixOnSpeech = async (t) => {
   if(dict.on){ dict.done(t); return; }
   clearTimeout(partialTimer);
   if(!off.active || off.kind!=='talk') return;
+  if(t && !tr.on){   // "Hey Zenix" (however it was heard) is how he called her, not part of the question
+    t = t.replace(/^\s*(?:(?:hey|hi|ok|okay|hello)[,\s]+)?(?:zenix|xenix|zenics|zennix|zinnix|xanax|zanax|xanex|zen ?nix|zen ?ix|zen ?ex|zen x|zee ?nix|xen ?ix)\b[,.!?\s]*/i, '').trim();
+    if(!t){ offListen(); return; }
+  }
   if(!t){ trMiss(); offListen(); return; }
   if(off.brain==='own' && mediaNoise(t)){ $('liveLine').textContent = ''; offListen(); return; }   // that was the video, not Jim
   awaySince = 0;   // he is using her from another app: the "you were away" clock starts over
