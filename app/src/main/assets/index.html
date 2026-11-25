@@ -2165,7 +2165,6 @@ window.zenixOnSpeechError = (code) => {
   if(code===6 || code===7){ srErrs = 0; trMiss(); setTimeout(offListen, 350); return; }   // nothing was said: keep listening
   srErrs++;
   // no internet: the offline brain takes over
-  if(off.brain==='own' && (code===1 || code===2 || code===12 || code===13) && switchOffline()) return;
   // this phone has no ears for that language: carry on in US English
   if((code===12 || code===13) && !off.langFallback && settings.offlineLang!=='en-US'){ off.langFallback = 'en-US'; setTimeout(offListen, 300); return; }
   // offline, and the phone can't listen without internet (no voice pack): Zenix uses her own ears
@@ -2979,7 +2978,7 @@ function dgListen(){
   setOrb('listening'); $('modeLabel').textContent='Listening…'; if(Native.setOrbMode) Native.setOrbMode('listening');
   if(dg.active){ dgResume(); return; }
   dgOpen().then(() => { if(off.active && off.kind==='talk') dgResume(); })
-    .catch(e => { dgClose(); dg.failed=true; if(switchOffline()) return; toast(e.message+' — using phone listening'); if(off.active && off.kind==='talk' && Native.startListeningOnline) Native.startListeningOnline(listenLang()); });
+    .catch(e => { dgClose(); dg.failed=true; toast(e.message+' — using phone listening'); if(off.active && off.kind==='talk' && Native.startListeningOnline) Native.startListeningOnline(listenLang()); });
 }
 
 function renderDG(){
