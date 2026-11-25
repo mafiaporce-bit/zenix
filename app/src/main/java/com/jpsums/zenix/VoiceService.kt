@@ -29,6 +29,8 @@ class VoiceService : Service() {
     private var orb: OrbView? = null
     private var params: WindowManager.LayoutParams? = null
     private var speaking = false
+    // keeps the listening and the failover checks running if the screen goes off in the middle of a chat (released when the chat ends, 1 h at most)
+    private var awake: android.os.PowerManager.WakeLock? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -39,6 +41,8 @@ class VoiceService : Service() {
 
     override fun onDestroy() {
         removeOrb()
+        try { awake?.let { if (it.isHeld) it.release() } } catch (_: Exception) {}
+        awake = null
         if (current === this) current = null
         super.onDestroy()
     }
@@ -77,6 +81,11 @@ class VoiceService : Service() {
             stopSelf()
             return START_NOT_STICKY
         }
+        try {
+            if (awake == null) awake = getSystemService(android.os.PowerManager::class.java)
+                .newWakeLock(android.os.PowerManager.PARTIAL_WAKE_LOCK, "zenix:chat").apply { setReferenceCounted(false) }
+            awake?.acquire(60 * 60 * 1000L)
+        } catch (_: Exception) {}
         if (!MainActivity.inForeground) showOrb()
         return START_NOT_STICKY
     }

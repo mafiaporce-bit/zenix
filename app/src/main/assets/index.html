@@ -684,10 +684,19 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
           <p class="hint">A quick health check of everything Zenix needs on this phone.</p>
           <div class="toggle-row" style="margin-top:0"><span class="status-line" style="margin:0" id="checkState">Not run yet</span><button class="btn-line" id="checkRun">Run check</button></div>
           <div id="checkList"></div>
+          <div class="inline" style="margin-top:10px"><button class="btn-line" id="diagOpen" style="flex:1">Live status of every part</button></div>
           <p class="sub-label">Something went wrong?</p>
           <p class="hint" style="margin-top:0">Zenix keeps a short diary on this phone of what she heard and what she did (the last 400 steps). When she gets something wrong, send it to whoever looks after the app. It never includes your keys, but it does include what you said and the names involved.</p>
           <div class="inline"><button class="btn-line" id="repShare" style="flex:1">Send report</button><button class="btn-line" id="repCopy" style="flex:1">Copy</button><button class="btn-line" id="repClear">Clear</button></div>
           <pre id="repPreview" style="margin:10px 0 0;font:11px/1.45 ui-monospace,monospace;color:var(--muted);white-space:pre-wrap;word-break:break-word;max-height:190px;overflow:auto"></pre>
+        </div>
+      </details>
+      <details class="set-item" data-sec="diag">
+        <summary><span class="ico"><svg viewBox="0 0 24 24"><path d="M3 12h4l2-6 4 12 2-6h6"/></svg></span><span class="set-t"><b>Live status</b><span id="sumDiag">Which part is working right now</span></span><svg class="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></summary>
+        <div class="set-body">
+          <p class="hint">Each part of Zenix on its own line, updated every second. If something stops, this shows which part it was, so it isn't blamed on the internet by mistake. Nothing here is saved: no recordings, no keys.</p>
+          <div id="diagList"></div>
+          <div class="inline" style="margin-top:10px"><button class="btn-line" id="diagProbe" style="flex:1">Check internet now</button><button class="btn-line" id="diagCopy" style="flex:1">Copy status</button></div>
         </div>
       </details>
       <details class="set-item" data-sec="about">
@@ -2230,6 +2239,7 @@ setInterval(() => {
   }
 }, 500);
 window.zenixConf = (c, buf) => { Z.conf = {c: +c, at: Date.now(), buf: !!buf}; };   // how sure her offline ears were, and whether the words include the handed-over seconds
+function onlineVoiceUp(){ return !(Z.net.state==='down' && netFresh(20000)) && !(Z.voiceOnline.state==='failed' && Date.now() - Z.voiceOnline.at < 30000) && !(Z.ears==='offline' && !(Z.net.state!=='down' && netFresh(6000))); }
 window.zenixZ = Z;   // read by the diagnostics screen and by the automatic tests (states only: no words, no keys)
 /* a question that needs the internet, asked while there is none */
 async function answerWithoutInternet(text){
@@ -2902,7 +2912,7 @@ function speakEnqueue(text){
   if(!text || !/[a-z0-9\u00C0-\uFFFF\]]/i.test(text)) return;
   const item = { text, wav:null };
   // the online voice is skipped while the internet is known to be down or the voice service just failed: the phone's own voice answers at once
-  const voiceUp = !(Z.net.state==='down' && netFresh(20000)) && !(Z.voiceOnline.state==='failed' && Date.now() - Z.voiceOnline.at < 30000) && !(Z.ears==='offline' && !(Z.net.state!=='down' && netFresh(6000)));
+  const voiceUp = onlineVoiceUp();
   const mark = pr => pr.then(a => { Z.voiceOnline = {state:'ok', err:'', at:Date.now()}; return a; }, e => { Z.voiceOnline = {state:'failed', err:String((e && e.message) || e).slice(0, 120), at:Date.now()}; logEv('voice', 'online voice failed: ' + Z.voiceOnline.err + ' → phone voice'); return null; });
   if(voiceUp && settings.voice.startsWith('el:') && elKey()){ item.wav = mark(elTTS(text)); speech.q.push(item); pumpSpeech(); return; }
   if(voiceUp && settings.voice.startsWith('dg:') && dgKey() && !isTagalog(text)){ item.wav = mark(dgTTS(text)); speech.q.push(item); pumpSpeech(); return; }
@@ -2929,7 +2939,7 @@ async function pumpSpeech(){
   speech.playing = true; setOrb('speaking'); $('modeLabel').textContent='Zenix is speaking'; if(Native && Native.setOrbMode) Native.setOrbMode('speaking');
   try{
     // a cloud voice that takes too long is skipped for the phone's own voice, so she never goes silent
-    const audio = item.wav ? await Promise.race([item.wav, new Promise(r => setTimeout(() => r(null), Z.net.state==='ok' && netFresh(30000) ? 15000 : 6000))]) : null;
+    const audio = item.wav ? await Promise.race([item.wav, new Promise(r => setTimeout(() => r(null), Z.net.state==='ok' && netFresh(30000) ? 9000 : 5000))]) : null;
     if(audio){
       const url = URL.createObjectURL(audio.toBlob());
       if(typeof vizCtx!=='undefined' && vizCtx && vizCtx.state!=='running'){ try{ await vizCtx.resume(); }catch(e){} }
@@ -4357,6 +4367,7 @@ function reportText(){
     'Hey Zenix: ' + (settings.wake ? 'on' : 'off') + safe(() => { const w = wakeSt(); return ' (' + (w.state || '?') + (w.running ? ', listening' : ', not listening') + (w.names ? ', words: ' + w.names : '') + (w.heard ? ', last heard: ' + w.heard : '') + ')'; }) +
       ' · Stop by voice: ' + (settings.barge ? 'on' : 'off') + ' · Phone control: ' + (safe(ctlOn) ? 'on' : 'off') + ' · Auto-send: ' + (safe(autoOn) ? 'on' : 'off'),
     'Setup: ' + safe(() => setupItems().map(i => (i.ok ? '✓' : '✗') + ' ' + i.t).join(', ')),
+    'Parts now: ' + safe(() => diagRows().map(r => r[0] + '=' + r[1]).join(' · ')),
     lastCheck ? 'Last check (' + new Date(lastCheck.at).toString().slice(4, 21) + '): ' + lastCheck.items.map(i => (i.ok ? '✓' : '✗') + ' ' + i.t + (i.d ? ' [' + i.d + ']' : '')).join(' · ') : 'Check not run',
     '--- diary, oldest first ---'
   ];
@@ -4403,6 +4414,7 @@ async function runCheck(){
     if(Native.ctlOn) add(ctlOn(), 'Control other apps', ctlOn() ? 'On' : 'Off: Settings → Control other apps.');
     if(Native.autoSendOn) add(true, 'Auto-send messages', autoOn() ? 'On' : 'Off (optional: she opens the chat, you tap Send)');
     try{ setupItems().filter(i => ['overlay', 'full', 'batt', 'notif'].includes(i.k)).forEach(i => add(i.ok, i.t, i.ok ? '' : i.d)); }catch(e){}
+    add(localEarsOk(), 'Offline ears (commands with no internet)', localEarsOk() ? 'Ready' : 'Not downloaded. Turn on "Hey Zenix" once while on Wi-Fi: it downloads them.');
     add(true, 'Offline brain', offlineReady() ? 'Installed (used only with no connection)' : 'Not installed (optional)');
   }catch(e){ add(false, 'Check stopped', e.message); }
   lastCheck = {at: Date.now(), items}; store.set('lastCheck', lastCheck);
@@ -4416,6 +4428,55 @@ $('repCopy').onclick = async () => { try{ await navigator.clipboard.writeText(re
 $('repClear').onclick = () => { zlog = []; zlogDirty = true; renderReport(); toast('Diary cleared'); };
 document.querySelector('.set-item[data-sec="report"]').addEventListener('toggle', renderReport);
 renderReport();
+/* ---------- Live status: every part on its own line ---------- */
+function diagRows(){
+  const ago = t => { if(!t) return 'never'; const d = Math.round((Date.now() - t)/1000); return d < 2 ? 'just now' : d < 90 ? d + ' s ago' : d < 5400 ? Math.round(d/60) + ' min ago' : Math.round(d/3600) + ' h ago'; };
+  const yes = f => { try{ return !!(Native[f] && Native[f]()==='true'); }catch(e){ return false; } };
+  const chat = off.active && off.kind==='talk';
+  const netTxt = {ok:'Working', slow:'Working, but slow', down:'No internet', unknown:'Not checked yet'}[Z.net.state] + (Z.net.at ? ' (checked ' + ago(Z.net.at) + (Z.net.state!=='down' ? ', ' + Z.net.ms + ' ms' : '') + ')' : '');
+  let dgs = null; try{ dgs = Native.dgState ? JSON.parse(Native.dgState()) : null; }catch(e){}
+  const nice = n => ({'deepgram flux':'Deepgram (online)', 'deepgram':'Deepgram (online)', 'phone online':'The phone\'s online listening', 'own offline ears':'Zenix\'s own offline ears', 'phone offline':'The phone\'s offline listening'})[n] || n;
+  const ears = !chat ? 'Not listening (no voice chat running)' : talkBusy() ? 'Waiting while she thinks or talks' : nice(earsName()) + (Z.ears==='offline' ? ' (online listening is down)' : '');
+  const onlineVoice = /^(el|dg):/.test(settings.voice || '');
+  const voice = !onlineVoice ? (settings.voice==='phone' || !settings.voice ? 'Phone voice (on the phone, no internet needed)' : 'On-phone voice (' + settings.voice + ')')
+    : onlineVoiceUp() ? (settings.voice.startsWith('el:') ? 'ElevenLabs' : 'Deepgram') + ' online voice' : 'Phone voice (online voice unavailable right now)';
+  const mic = !yes('hasMicPermission') ? 'Not allowed' : !chat ? (safeWake() ? 'Free (only "Hey Zenix" is listening)' : 'Free') : talkBusy() ? 'Resting while she talks' : (dgs && dgs.mic ? 'In use by Deepgram (online)' : 'In use by ' + nice(earsName()).replace(/^The /, 'the '));
+  const errs = [Z.earsOnline.state==='failed' && 'ears: ' + Z.earsOnline.err, Z.cloudAI.state==='failed' && 'brain: ' + Z.cloudAI.err, Z.voiceOnline.state==='failed' && 'voice: ' + Z.voiceOnline.err].filter(Boolean);
+  return [
+    ['Internet', netTxt, Z.net.state!=='down'],
+    ['Listening with', ears, true],
+    ['Online listening', {ok:'Working', failed:'Failed ' + ago(Z.earsOnline.at), unknown:'Not used yet'}[Z.earsOnline.state], Z.earsOnline.state!=='failed'],
+    ['Offline ears', localEarsOk() ? 'Ready on this phone' : 'Not downloaded (turn on "Hey Zenix" once)', localEarsOk()],
+    ['Cloud brain', settings.engine!=='own' ? 'ElevenLabs agent' : !brainKey() ? 'No key saved' : {ok:'Working (answered ' + ago(Z.cloudAI.at) + ')', failed:'Failed ' + ago(Z.cloudAI.at), unknown:'Not used yet'}[Z.cloudAI.state], Z.cloudAI.state!=='failed'],
+    ['On-phone brain', offlineReady() ? 'Installed' : 'Not installed (optional)', true],
+    ['Voice in use', voice, true],
+    ['Microphone', mic, yes('hasMicPermission')],
+    ['Phone control', ctlOn() ? 'On' : 'Off (Settings → Control other apps)', ctlOn()],
+    ['Auto-send helper', autoOn() ? 'On' : 'Off (optional)', true],
+    ['Last switch to offline ears', Z.count ? ago(Z.since) + ': ' + Z.reason + ' (' + Z.count + ' this session)' : 'None this session', true],
+    ['Time to switch', Z.failoverMs ? Z.failoverMs + ' ms' : 'Not measured yet', true],
+    ['Last words understood', Z.lastHeard ? ago(Z.lastHeard.at) + ', by ' + nice(Z.lastHeard.ears).replace(/^The /, 'the ') : 'None yet', true],
+    ['Last command done', Z.lastCmd ? '"' + Z.lastCmd.text + '" ' + ago(Z.lastCmd.at) + ', took ' + Z.lastCmd.ms + ' ms' : 'None yet', true],
+    ['Errors from services', errs.length ? errs.join(' | ') : 'None', !errs.length]
+  ];
+}
+function safeWake(){ try{ return !!(settings.wake && wakeSt().running); }catch(e){ return false; } }
+function renderDiag(){
+  const box = $('diagList'); if(!box) return;
+  const rows = diagRows(); box.innerHTML = '';
+  rows.forEach(([k, v, good]) => { const row = document.createElement('div'); row.className = 'toggle-row'; row.style.marginTop = '6px';
+    const d = document.createElement('div'); const b = document.createElement('b'); b.textContent = k; const sm = document.createElement('small'); sm.textContent = v; if(!good) sm.style.color = 'var(--danger)';
+    d.appendChild(b); d.appendChild(sm); row.appendChild(d); box.appendChild(row); });
+  const bad = rows.filter(r => !r[2] && r[0]!=='Errors from services').map(r => r[0]);
+  $('sumDiag').textContent = bad.length ? 'Not working: ' + bad.join(', ') : 'Every part is working';
+}
+let diagTimer = 0;
+document.querySelector('.set-item[data-sec="diag"]').addEventListener('toggle', e => {
+  clearInterval(diagTimer); if(e.target.open){ renderDiag(); diagTimer = setInterval(() => { if(!document.hidden) renderDiag(); }, 1000); }
+});
+$('diagOpen').onclick = () => openSec('diag');
+$('diagProbe').onclick = () => { $('diagProbe').disabled = true; probeNet(2500).then(() => { $('diagProbe').disabled = false; renderDiag(); toast(Z.net.state==='down' ? 'No internet right now' : Z.net.state==='slow' ? 'Internet works, but slow (' + Z.net.ms + ' ms)' : 'Internet works (' + Z.net.ms + ' ms)'); }); };
+$('diagCopy').onclick = async () => { const t = 'ZENIX STATUS · v' + (myVersion || '?') + ' · ' + new Date().toString().slice(0, 24) + '\n' + diagRows().map(r => (r[2] ? '✓ ' : '✗ ') + r[0] + ': ' + r[1]).join('\n'); try{ await navigator.clipboard.writeText(t); toast('Status copied. Paste it in a message.'); }catch(e){ if(Native.shareText) Native.shareText('Zenix status', t); } };
 /* ---------- Control other apps (Zenix phone control) ---------- */
 function renderCtl(){
   if(!Native.ctlOn){ $('ctlState').textContent='Android app only'; $('ctlBtn').style.display='none'; $('ctlInfo').style.display='none'; $('sumCtl').textContent='Android app only'; return; }
