@@ -487,11 +487,11 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
       <details class="set-item" data-sec="control">
         <summary><span class="ico"><svg viewBox="0 0 24 24"><path d="M9 11V5a1.5 1.5 0 013 0v5m0-1.5a1.5 1.5 0 013 0V11m0-.5a1.5 1.5 0 013 0V15a6 6 0 01-6 6h-1a6 6 0 01-5.2-3L5 14.5a1.5 1.5 0 012.6-1.5L9 15"/></svg></span><span class="set-t"><b>Control other apps</b><span id="sumCtl"></span></span><svg class="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></summary>
         <div class="set-body">
-          <p class="hint">Maya works the app on your screen while you talk to her. Start a voice chat, open any app, then say <b>"scroll down"</b>, <b>"swipe left"</b>, <b>"go back"</b>, <b>"go home"</b>, <b>"take a screenshot"</b> or <b>"tap Like"</b>. She only does it when you say so.</p>
+          <p class="hint">Maya works the app on your screen while you talk to her. Start a voice chat, open any app, then say <b>"scroll down"</b>, <b>"swipe left"</b>, <b>"go back"</b>, <b>"go home"</b>, <b>"take a screenshot"</b>, <b>"tap Like"</b>, <b>"search for Jen"</b>, <b>"play Shape of You"</b> or <b>"close this app"</b>. She only does it when you say so.</p>
           <div class="toggle-row"><span class="status-line" style="margin:0" id="ctlState">Off</span><button class="btn-line" id="ctlBtn">Turn on</button></div>
           <p class="hint" style="margin-top:12px">Turn on: tap <b>Turn on</b> → <b>Installed apps</b> → <b>Maya phone control</b> → switch it on. If it's greyed out, tap <b>Allow restricted settings</b> below first (⋮ menu, top right of Maya's app info), then try again.</p>
           <div class="toggle-row" style="margin-top:0"><span></span><button class="btn-line" id="ctlInfo">Allow restricted settings</button></div>
-          <p class="hint" style="margin-top:12px">While a video or music is playing in another app, Maya ignores its sound. Commands like "scroll down" still work straight away; for anything else, say <b>"Maya"</b> first.</p>
+          <p class="hint" style="margin-top:12px">While a video or music is playing in another app, Maya ignores its sound. "Scroll down", "go back" and "pause" still work straight away; for anything else, say <b>"Maya"</b> first, like <b>"Maya, play the next one"</b> or <b>"Maya, search for…"</b>.</p>
         </div>
       </details>
       <details class="set-item" data-sec="routines">
@@ -1418,20 +1418,23 @@ function screenDo(action, arg){
     setTimeout(() => { if(scrWait[id]){ delete scrWait[id]; res({ok:false, message:"The screen didn't answer."}); } }, 12000);
   });
 }
-const SCREEN_ACTIONS = ['scroll_down','scroll_up','swipe_left','swipe_right','back','home','recents','notifications','quick_settings','screenshot','lock','tap','tap_first'];
+const SCREEN_ACTIONS = ['scroll_down','scroll_up','swipe_left','swipe_right','back','home','recents','notifications','quick_settings','screenshot','lock','tap','tap_first','search','search_youtube','play_youtube','play_music','close_app'];
+const SCREEN_FREE = ['search_youtube','play_youtube','play_music'];   // these open YouTube or the music app themselves, so they work without the switch
+const SCREEN_TEXT = ['tap','search','search_youtube','play_youtube','play_music'];
 const SCREEN_QUIET = {scroll_down:'⬇️ Scrolled down', scroll_up:'⬆️ Scrolled up', swipe_left:'⬅️ Swiped left', swipe_right:'➡️ Swiped right', back:'↩️ Back'};   // done without a word
-const SCREEN_OTHER = ['scroll_down','scroll_up','swipe_left','swipe_right','tap','tap_first'];   // only make sense in another app
+const SCREEN_OTHER = ['scroll_down','scroll_up','swipe_left','swipe_right','tap','tap_first','search','close_app'];   // only make sense in another app
 let lastScreen = null;
 clientTools.phone_screen = async ({action, text, big}) => {
   const a = String(action||'').toLowerCase();
   if(!SCREEN_ACTIONS.includes(a)) return 'Unknown action. Use ' + SCREEN_ACTIONS.join(', ') + '.';
   if(!Native.ctl) return NA.message;
-  if(!ctlOn()) return 'Maya phone control is off. Tell Jim to open Maya\'s Settings, then Control other apps, and turn it on.';
-  if(a==='tap' && !String(text||'').trim()) return 'Say which button to tap, by the name written on it.';
+  if(!ctlOn() && !SCREEN_FREE.includes(a)) return 'Maya phone control is off. Tell Jim to open Maya\'s Settings, then Control other apps, and turn it on.';
+  if(SCREEN_TEXT.includes(a) && !String(text||'').trim()) return a==='tap' ? 'Say which button to tap, by the name written on it.' : 'Say what to search for or play.';
   if(SCREEN_OTHER.includes(a) && !document.hidden) return 'Maya is on the screen right now. This works on other apps: tell Jim to open the app first, then ask again.';
-  showAction(SCREEN_QUIET[a] || (a==='tap' ? '👆 Tap ' + text : a==='tap_first' ? '👆 Tap the first one' : '📱 ' + a.replace('_', ' ')));
-  lastScreen = {action:a, arg: a==='tap' ? String(text) : big ? 'big' : '', t: Date.now()};
-  return reply(await screenDo(a, lastScreen.arg));
+  showAction(SCREEN_QUIET[a] || (a==='tap' ? '👆 Tap ' + text : a==='tap_first' ? '👆 Tap the first one' : /^search/.test(a) ? '🔎 Search: ' + text : /^play/.test(a) ? '▶️ Play: ' + text : '📱 ' + a.replace('_', ' ')));
+  const arg = SCREEN_TEXT.includes(a) ? String(text).trim() : big ? 'big' : '';
+  if(!SCREEN_TEXT.includes(a) || a==='tap') lastScreen = {action:a, arg, t: Date.now()};
+  return reply(await screenDo(a, arg));
 };
 /* the same thing as an instant command (no brain, no waiting) */
 function screenInstant(action, arg, times){
@@ -1447,6 +1450,57 @@ function screenInstant(action, arg, times){
     return SCREEN_QUIET[action] ? {silent:true, note:SCREEN_QUIET[action]} : r.message;
   };
 }
+/* "search …" inside the app on screen, and "play [song]" on YouTube or the music app */
+const APP_PKG = {fb:'facebook', facebook:'facebook', ig:'instagram', insta:'instagram', instagram:'instagram', tiktok:'musically|tiktok|ugc\\.trill', 'tik tok':'musically|tiktok|ugc\\.trill', twitter:'twitter', x:'twitter', maps:'maps', 'google maps':'maps',
+  'play store':'vending', 'google play':'vending', messenger:'orca', youtube:'android\\.youtube$', 'youtube music':'youtube\\.music', spotify:'spotify', chrome:'chrome', whatsapp:'whatsapp', telegram:'telegram'};
+const APP_OPEN = {fb:'facebook', ig:'instagram', insta:'instagram', 'tik tok':'tiktok', twitter:'x', 'google play':'play store', 'google maps':'maps'};
+const frontApp = () => { try{ return (Native.ctlFront && Native.ctlFront()) || ''; }catch(e){ return ''; } };
+const frontIs = app => { const k = APP_PKG[app] || String(app).replace(/[^a-z0-9]/gi, ''); return !!k && new RegExp(k, 'i').test(frontApp()); };
+const pause = ms => new Promise(r => setTimeout(r, ms));
+function loose(fn){ fn.loose = true; return fn; }   // could be said by a video too: while one is playing, these need "Maya" first
+function searchInstant(q, app){
+  return loose(async () => {
+    if(!Native.ctl || (Native.isLocked && Native.isLocked()==='true')) return null;
+    if(app === 'youtube' || (!app && document.hidden && frontIs('youtube'))){ showAction('🔎 YouTube: ' + q); return (await screenDo('search_youtube', q)).message; }   // YouTube's own search needs no switch
+    if(!ctlOn()){ if(app) toast('Settings → Control other apps → Turn on'); return app ? CTL_OFF : null; }
+    if(app && !frontIs(app)){
+      const o = callNative('openApp', APP_OPEN[app] || app); if(!o || !o.ok) return null;
+      showAction('📱 Opening ' + app); await pause(2800);
+    } else if(!app && !document.hidden) return null;   // Maya herself is on screen: an ordinary web search
+    showAction('🔎 Search: ' + q);
+    let r = await screenDo('search', q);
+    if(!r.ok && app){ await pause(1600); r = await screenDo('search', q); }   // the app was still opening
+    if(!r.ok && !app) return null;   // this app has no search box: Maya looks it up herself
+    return r.message;
+  });
+}
+/* "close this app" / "close YouTube": swipe it away from Recent apps, like a finger would */
+function closeInstant(name){
+  return loose(async () => {
+    if(!Native.ctl) return null;
+    if(Native.isLocked && Native.isLocked()==='true') return 'Unlock the phone first, then tell me again.';
+    if(!ctlOn()){ toast('Settings → Control other apps → Turn on'); return CTL_OFF; }
+    if(name && !frontIs(name)){   // it isn't the one on screen: bring it up first, then close it
+      const o = callNative('openApp', APP_OPEN[name] || name); if(!o || !o.ok) return null;
+      await pause(1700);
+    } else if(!name && !document.hidden) return 'Which app, bro? Say "close YouTube", or open the app and say "close this app".';
+    showAction('✖️ Closing ' + (name || 'this app'));
+    let r = await screenDo('close_app', '');
+    if(!r.ok && name && /Maya is the app/.test(r.message)){ await pause(1200); r = await screenDo('close_app', ''); }   // it was still opening
+    return r.ok ? (name ? 'Closed ' + name + '.' : 'Closed it.') : r.message;
+  });
+}
+function playInstant(song, app){
+  return loose(async () => {
+    if(!Native.ctl || (Native.isLocked && Native.isLocked()==='true')) return null;
+    const act = app ? (app==='youtube' ? 'play_youtube' : /youtube music|yt music/.test(app) ? 'play_ytmusic' : 'play_music')
+                    : frontIs('youtube music') ? 'play_ytmusic' : /spotify|\.music$/i.test(frontApp()) ? 'play_music' : 'play_youtube';
+    showAction('▶️ Play: ' + song);
+    const r = await screenDo(act, song);
+    if(r.ok && /Tap the one you want/.test(r.message) && !ctlOn()) toast('Turn on "Control other apps" in Settings and Maya starts it herself');
+    return r.message;
+  });
+}
 /* a video or song in another app is talking, not Jim: Maya stays out of it unless he says a command or her name */
 const NAME_RE = /\b(?:maya|maia|mya|maja|mayah)\b/i;
 function mayaJustAsked(){
@@ -1460,7 +1514,8 @@ function mayaJustAsked(){
 }
 function mediaNoise(t){
   if(!document.hidden || !Native.musicActive || tr.on || off.trusted) return false;
-  if(NAME_RE.test(t) || isStopWord(t) || matchInstant(t) || mayaJustAsked()) return false;
+  if(NAME_RE.test(t) || isStopWord(t) || mayaJustAsked()) return false;
+  const ins = matchInstant(t); if(ins && !ins.loose) return false;
   try{ return Native.musicActive()==='true'; }catch(e){ return false; }
 }
 clientTools.set_timer = async ({minutes, seconds, label}) => {
@@ -1813,11 +1868,27 @@ function matchInstant(raw){
   if(/^(?:take|grab|capture)\s+(?:a\s+|the\s+)?screen ?shot$|^screen ?shot(?: this| it| that)?$/.test(low)) return screenInstant('screenshot', '');
   if(/^lock\s+(?:the\s+|my\s+)?(?:screen|phone)$/.test(low)) return screenInstant('lock', '');
   if(/^(?:again|more|one more|once more|keep going|do it again|same again|ulit|isa pa)$/.test(low) && lastScreen && Date.now() - lastScreen.t < 45000) return screenInstant(lastScreen.action, lastScreen.arg);
+  const orig = frag => { const i = low.lastIndexOf(frag); return i < 0 ? frag : t.slice(i, i + frag.length); };
+  if((m = low.match(/^(?:close|exit|quit|kill|shut down|isara mo ang|isara mo|isara ang|isara|i-?close mo ang|i-?close mo|i-?close ang|i-?close)\s+(?:the\s+|this\s+|that\s+|my\s+)?(.+?)(?:\s+app(?:lication)?)?$/)) || (m = low.match(/^(?:close|exit|quit)\s+(?:this|that|the)?\s*(app(?:lication)?)$/))){
+    const n = m[1].trim();
+    if(/^(?:notifications?|(?:notification |quick )?(?:panel|shade|settings)|keyboard|menu|pop ?up|ad|window|tab)$/.test(n)) return screenInstant('back', '');
+    if(/^(?:it|this|that|this one|app|application|current|current one|one)$/.test(n)) return closeInstant('');
+    if(n.split(' ').length <= 3 && !/^(?:all|everything|maya|yourself|chat|the chat|door|eyes?|conversation|session|mic|microphone)\b/.test(n)) return closeInstant(n);
+  }
+  if(away && /^(?:play|open|start|choose|select|pick)\s+(?:the\s+)?(?:first|top)(?: one| video| result| song)?$/.test(low)) return loose(screenInstant('tap_first', ''));
+  const APPS = 'youtube music|yt music|youtube|facebook|fb|instagram|insta|ig|tiktok|tik tok|spotify|play store|google play|chrome|twitter|x|whatsapp|messenger|telegram|google maps|maps|shopee|lazada|amazon|noon|netflix|temu|shein|talabat|carrefour|gallery|contacts|settings';
+  if((m = low.match(new RegExp('^(?:search for|search|look for|look up|find|hanapin mo ang|hanapin mo|hanapin ang|hanapin)\\s+(.+?)\\s+(?:on|in|inside|sa)\\s+(?:the\\s+|my\\s+)?(' + APPS + ')(?:\\s+app)?$'))) && m[1].split(' ').length <= 10)
+    return searchInstant(orig(m[1]), m[2]==='yt music' ? 'youtube music' : m[2]);
+  if((m = low.match(/^(?:search for|search|look for|look up|hanapin mo ang|hanapin mo|hanapin ang|hanapin)\s+(.+)$/)) && m[1].split(' ').length <= 10 && !/^(?:the web|the internet|online|google|it|this|that)\b|\b(?:on|in) (?:google|the web|the internet)$/.test(m[1]))
+    return searchInstant(orig(m[1]).replace(/\s+(?:here|in here|in this app|dito)$/i, ''), '');
+  if((m = low.match(new RegExp('^(?:play|patugtugin mo ang|patugtugin mo|patugtugin ang|patugtugin|i-?play mo ang|i-?play mo|i-?play ang|i-?play)\\s+(.+?)(?:\\s+(?:on|in|sa|from|using)\\s+(?:the\\s+|my\\s+)?(youtube music|yt music|youtube|spotify|music app|music))?$'))) && m[1].split(' ').length <= 12
+     && !/^(?:it|this|that|next|again|something|anything|(?:the |this |that |some |any |my |a |an )?(?:music|songs?|video|videos|playlist|game|games|radio|podcast|voicemail|recording|message)(?: .*)?|with .*|along.*|a (?:game|trick|joke|role).*|the (?:first|next|last|previous) .*|dead|dumb|nice|fair|safe)$/.test(m[1]))
+    return playInstant(orig(m[1]), m[2] || '');
   if(away && (m = low.match(/^(?:tap|click|press|select|pindutin(?: mo)?(?: ang)?)\s+(?:on\s+)?(?:the\s+)?(.+?)(?:\s+button)?$/)) && m[1].split(' ').length <= 5){
-    if(/^(?:first|top)(?: one| video| result| post| song| item| link)?$/.test(m[1])) return screenInstant('tap_first', '');
+    if(/^(?:first|top)(?: one| video| result| post| song| item| link)?$/.test(m[1])) return loose(screenInstant('tap_first', ''));
     const name = m[1].replace(/^(?:that|this|the|on)\s+/, '').replace(/\s+(?:button|icon|thing|option|tab|link)$/, '');
     const go = screenInstant('tap', name);
-    return async () => { const r = await go(); return (typeof r === 'string' && /can't see/.test(r) && name.split(' ').length > 2) ? null : r; };   // a long, loose description: let the brain work out the button's name
+    return loose(async () => { const r = await go(); return (typeof r === 'string' && /can't see/.test(r) && name.split(' ').length > 2) ? null : r; });   // a long, loose description: let the brain work out the button's name
   }
   if((m = low.match(/^(?:open|launch|start|buksan mo(?: ang)?|buksan)\s+(?:me\s+|up\s+)?(?:the\s+|my\s+)?(.+?)(?:\s+app(?:lication)?)?$/))){
     const name = m[1];
@@ -2165,7 +2236,7 @@ const TOOL_DEFS = [
   {name:'list_read', description:'Read one list, or all his lists when no name is given.', input_schema:{type:'object', properties:{list:{type:'string'}}}},
   {name:'list_remove', description:"Remove one item from a list (done or bought), or item 'all' to clear the list.", input_schema:{type:'object', properties:{list:{type:'string'}, item:{type:'string'}}, required:['list','item']}},
   {name:'phone_control', description:'Control the phone: flashlight, media volume, Do Not Disturb, battery level, music playback.', input_schema:{type:'object', properties:{action:{type:'string', enum:['flashlight_on','flashlight_off','volume_set','volume_up','volume_down','mute','dnd_on','dnd_off','battery','music_play','music_pause','music_next','music_previous']}, value:{type:'integer', description:'For volume_set: 0-100'}}, required:['action']}},
-  {name:'phone_screen', description:'Work the app that is on the phone screen right now (not Maya herself): scroll, swipe, go back, go to the home screen, show recent apps, open the notification panel or quick settings, take a screenshot, lock the screen, or tap a button by the name written on it. You cannot see the screen; if a tap fails, say so.', input_schema:{type:'object', properties:{action:{type:'string', enum:['scroll_down','scroll_up','swipe_left','swipe_right','back','home','recents','notifications','quick_settings','screenshot','lock','tap','tap_first']}, text:{type:'string', description:'For tap: the name on the button, e.g. Like, Follow, Skip'}, big:{type:'boolean', description:'For scrolling: true for a long scroll'}}, required:['action']}},
+  {name:'phone_screen', description:'Work the app that is on the phone screen right now (not Maya herself): scroll, swipe, go back, go to the home screen, show recent apps, open the notification panel or quick settings, take a screenshot, lock the screen, or tap a button by the name written on it, type into that app\'s own search box (search), search YouTube (search_youtube), find a song or video and start playing it (play_youtube, or play_music for Spotify / YouTube Music), or close the app that is on screen (close_app). You cannot see the screen; if a tap or search fails, say so.', input_schema:{type:'object', properties:{action:{type:'string', enum:['scroll_down','scroll_up','swipe_left','swipe_right','back','home','recents','notifications','quick_settings','screenshot','lock','tap','tap_first','search','search_youtube','play_youtube','play_music','close_app']}, text:{type:'string', description:'For tap: the name on the button, e.g. Like, Follow, Skip. For search and play: the words to search for or the song to play'}, big:{type:'boolean', description:'For scrolling: true for a long scroll'}}, required:['action']}},
   {name:'set_timer', description:"Start a countdown timer in the phone's Clock app.", input_schema:{type:'object', properties:{minutes:{type:'number'}, seconds:{type:'number'}, label:{type:'string'}}}},
   {name:'navigate', description:'Start Google Maps turn-by-turn driving directions to a place (when he says navigate, take me to, start directions). For just seeing a route or the travel time, use show_route instead.', input_schema:{type:'object', properties:{to:{type:'string'}}, required:['to']}},
   {name:'where_am_i', description:"Find where he is right now (street, area, city) from the phone's location.", input_schema:{type:'object', properties:{}}},
@@ -2200,7 +2271,7 @@ Your words are spoken aloud: everyday replies are short and snappy, usually one 
 
 His work rota: when he describes his schedule, use set_shift_pattern (never calculate dates or weekdays in your head; the phone does it) and read back what it returns; for any question about his duties use shift_schedule, and for leave or swaps use shift_change.
 
-You are his agent, not just a chatbot. add_routine makes you do things by yourself at a set time (morning brief, "every Friday remind me…", "tomorrow at 5 tell me when to leave": for that last kind, the routine's prompt should say to use show_route from here and tell him when to leave). read_notifications shows his new messages: for "who messaged me" or "what did I miss", sum them up by person, most important first, in a few sentences. To answer one, read your reply back, wait for his yes, then use reply_notification. list_add, list_read and list_remove keep his shopping list, to-do list, notes, shift log and client follow-ups; when a follow-up has a date, also add a one-time routine for it. phone_control does the flashlight, volume, Do Not Disturb, battery and music; phone_screen works the app that is on his screen (scroll, swipe, back, home, screenshot, tap a button by its name) when he asks in his own words, like "go down a bit more" or "press follow": do it and answer in three words or fewer; set_timer starts a timer; navigate starts Google Maps directions; where_am_i tells him where he is. look takes a photo so you can see or read what's in front of him. translator_mode makes you a live interpreter for a patient or anyone. shift_log keeps his shifts and overtime, and check_sites checks that his apps and websites are up. Emergency numbers in the UAE: ambulance 998, police 999, civil defence 997. A message in [square brackets] that starts with Routine or Driving mode comes from the app, not from him: do what it says and speak the result.
+You are his agent, not just a chatbot. add_routine makes you do things by yourself at a set time (morning brief, "every Friday remind me…", "tomorrow at 5 tell me when to leave": for that last kind, the routine's prompt should say to use show_route from here and tell him when to leave). read_notifications shows his new messages: for "who messaged me" or "what did I miss", sum them up by person, most important first, in a few sentences. To answer one, read your reply back, wait for his yes, then use reply_notification. list_add, list_read and list_remove keep his shopping list, to-do list, notes, shift log and client follow-ups; when a follow-up has a date, also add a one-time routine for it. phone_control does the flashlight, volume, Do Not Disturb, battery and music; phone_screen works the app that is on his screen (scroll, swipe, back, home, screenshot, tap a button by its name, search inside that app) when he asks in his own words, like "go down a bit more", "press follow" or "look for Jen here": do it and answer in three words or fewer. When he asks to play a song or video, use phone_screen play_youtube (or play_music when he says Spotify or YouTube Music) so it really starts playing, instead of just opening a link, and when he asks to search YouTube use search_youtube with his words straight away (never ask him to repeat them); set_timer starts a timer; navigate starts Google Maps directions; where_am_i tells him where he is. look takes a photo so you can see or read what's in front of him. translator_mode makes you a live interpreter for a patient or anyone. shift_log keeps his shifts and overtime, and check_sites checks that his apps and websites are up. Emergency numbers in the UAE: ambulance 998, police 999, civil defence 997. A message in [square brackets] that starts with Routine or Driving mode comes from the app, not from him: do what it says and speak the result.
 
 Use your phone tools instead of just talking about them. Maps: show_map and show_route open a map right inside this app (never send him to another app for that); after show_route, say the time and distance in one short sentence. Before sending any message, always read back who it's going to and the exact words, and only call send_message after he clearly says yes. If a tool reports an error, tell him simply what to allow.
 
@@ -3514,7 +3585,7 @@ function setupItems(){
     {k:'full', t:'Lock-screen alerts', d:'Wake and ring over the lock screen', ok: !Native.canFullScreen || yes('canFullScreen'), fix: () => Native.openFullScreenSetting()},
     {k:'batt', t:'Battery unrestricted', d:'Stops the phone putting her to sleep', ok: !Native.batteryOk || yes('batteryOk'), fix: () => Native.askBattery()},
     {k:'notif', t:'Read my messages', d:'"Who messaged me?" and replies', ok: !Native.notifOn || yes('notifOn'), fix: () => { Native.openNotifAccess(); toast('Maya message reader → Allow'); }},
-    {k:'ctl', t:'Control other apps', d:'"Scroll down", "go back", "tap Like"', ok: !Native.ctlOn || yes('ctlOn'), fix: () => openSec('control')}
+    {k:'ctl', t:'Control other apps', d:'"Scroll down", "search for…", "play…"', ok: !Native.ctlOn || yes('ctlOn'), fix: () => openSec('control')}
   ];
 }
 function renderSetup(){
@@ -3734,9 +3805,9 @@ renderAuto();
 function renderCtl(){
   if(!Native.ctlOn){ $('ctlState').textContent='Android app only'; $('ctlBtn').style.display='none'; $('ctlInfo').style.display='none'; $('sumCtl').textContent='Android app only'; return; }
   const on = ctlOn();
-  $('ctlState').textContent = on ? 'On ✓ Say "scroll down", "go back", "tap Like"' : 'Off';
+  $('ctlState').textContent = on ? 'On ✓ Say "scroll down", "search for…", "play…"' : 'Off';
   $('ctlBtn').textContent = on ? 'Settings' : 'Turn on';
-  $('sumCtl').textContent = on ? 'On · scroll, swipe, tap by voice' : 'Off';
+  $('sumCtl').textContent = on ? 'On · scroll, tap, search, play by voice' : 'Off';
 }
 $('ctlBtn').onclick = () => { if(Native.openCtlSettings){ Native.openCtlSettings(); toast('Installed apps → Maya phone control → On'); } };
 $('ctlInfo').onclick = () => { if(Native.openAppInfo){ Native.openAppInfo(); toast('Tap ⋮ (top right) → Allow restricted settings'); } };

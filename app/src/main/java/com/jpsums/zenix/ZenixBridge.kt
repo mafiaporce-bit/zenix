@@ -148,31 +148,32 @@ class ZenixBridge(private val activity: MainActivity) {
     @JavascriptInterface fun ctl(id: String, action: String, arg: String): String {
         val back = { okk: Boolean, msg: String -> activity.runJs("window.zenixCtl && window.zenixCtl(${JSONObject.quote(id)}, $okk, ${JSONObject.quote(msg)})") }
         val svc = ControlService.instance
-        if (svc == null) { back(false, if (ControlService.isOn(activity)) "Phone control is still starting. Try again in a moment." else "Maya phone control is off. It can be turned on in Maya's Settings under Control other apps."); return ok("off") }
+        val ui = android.os.Handler(android.os.Looper.getMainLooper())
+        // YouTube's own search page for these words (works without the phone control switch)
+        fun youtube(): Boolean =
+            launch(Intent(Intent.ACTION_SEARCH).setPackage("com.google.android.youtube").putExtra("query", arg)) ||
+                launch(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.youtube.com/results?search_query=" + Uri.encode(arg))))
+        // …and, with phone control on, start the first video
+        fun playOnYoutube() {
+            if (!youtube()) { back(false, "I couldn't open YouTube."); return }
+            if (svc == null) back(true, "YouTube is showing $arg. Tap the one you want.")
+            else ui.postDelayed({ svc.run("youtube_first", "", back) }, 2200)
+        }
         when (action) {
-            "play_youtube" -> {   // YouTube's own search, then start the first video
-                val i = Intent(Intent.ACTION_SEARCH).setPackage("com.google.android.youtube").putExtra("query", arg)
-                if (!launch(i) && !launch(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.youtube.com/results?search_query=" + Uri.encode(arg))))) { back(false, "YouTube isn't installed."); return ok("no") }
-                android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({ svc.run("youtube_first", "", back) }, 2200)
-            }
-            "search_youtube" -> {
-                val i = Intent(Intent.ACTION_SEARCH).setPackage("com.google.android.youtube").putExtra("query", arg)
-                back(launch(i), "YouTube is showing results for $arg.")
-            }
-            "play_music" -> {     // the music app plays it straight away
+            "search_youtube" -> if (youtube()) back(true, "Here's $arg on YouTube.") else back(false, "I couldn't open YouTube.")
+            "play_youtube" -> playOnYoutube()
+            "play_music", "play_ytmusic" -> {     // the music app plays it straight away
                 val pm = activity.packageManager
-                val pkg = listOf("com.spotify.music", "com.google.android.apps.youtube.music").firstOrNull { try { pm.getPackageInfo(it, 0); true } catch (_: Exception) { false } }
+                val order = if (action == "play_ytmusic") listOf("com.google.android.apps.youtube.music", "com.spotify.music") else listOf("com.spotify.music", "com.google.android.apps.youtube.music")
+                val pkg = order.firstOrNull { try { pm.getPackageInfo(it, 0); true } catch (_: Exception) { false } }
                 val i = Intent(android.provider.MediaStore.INTENT_ACTION_MEDIA_PLAY_FROM_SEARCH)
                     .putExtra(android.provider.MediaStore.EXTRA_MEDIA_FOCUS, "vnd.android.cursor.item/*").putExtra(android.app.SearchManager.QUERY, arg)
                 if (pkg != null) i.setPackage(pkg)
-                if (pkg != null && launch(i)) back(true, "Playing $arg.")
-                else {   // no music app: use YouTube
-                    val y = Intent(Intent.ACTION_SEARCH).setPackage("com.google.android.youtube").putExtra("query", arg)
-                    if (launch(y)) android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({ svc.run("youtube_first", "", back) }, 2200)
-                    else back(false, "I couldn't find a music app or YouTube.")
-                }
+                if (pkg != null && launch(i)) back(true, "Playing $arg.") else playOnYoutube()   // no music app: use YouTube
             }
-            else -> svc.run(action, arg, back)
+            else ->
+                if (svc == null) back(false, if (ControlService.isOn(activity)) "Phone control is still starting. Try again in a moment." else "Maya phone control is off. It can be turned on in Maya's Settings under Control other apps.")
+                else svc.run(action, arg, back)
         }
         return ok("running")
     }

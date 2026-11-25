@@ -60,6 +60,7 @@ class ControlService : AccessibilityService() {
                     "tap_first" -> tapFirst(done)
                     "search" -> search(arg, done)
                     "youtube_first" -> youtubeFirst(0, done)
+                    "close_app" -> closeFront(done)
                     else -> done(false, "I don't know that screen action.")
                 }
             } catch (e: Exception) { done(false, "That didn't work on this screen.") }
@@ -109,6 +110,22 @@ class ControlService : AccessibilityService() {
 
     private fun global(action: Int, okMsg: String, done: (Boolean, String) -> Unit) {
         if (performGlobalAction(action)) done(true, okMsg) else done(false, "The phone didn't do that.")
+    }
+
+    /** "Close this app": open Recent apps, flick the app's card away, go Home. Just what a finger would do. */
+    private fun closeFront(done: (Boolean, String) -> Unit) {
+        val front = frontPackage()
+        if (front == packageName) { done(false, "Maya is the app on the screen. Open the app you want closed, then tell me."); return }
+        if (front.isEmpty() || front.contains("launcher")) { done(false, "No app is open on the screen."); return }
+        if (!performGlobalAction(GLOBAL_ACTION_RECENTS)) { done(false, "The phone didn't open Recent apps."); return }
+        main.postDelayed({
+            try {
+                val (w, h) = screen()
+                stroke(w * 0.5f, h * 0.55f, w * 0.5f, h * 0.05f, 170L, "Closed it.") { ok, msg ->
+                    main.postDelayed({ try { performGlobalAction(GLOBAL_ACTION_HOME) } catch (_: Exception) { }; done(ok, if (ok) "Closed it." else msg) }, 500)
+                }
+            } catch (_: Exception) { done(false, "That didn't work on this screen.") }
+        }, 950)
     }
 
     // ---------- reading the screen ----------
