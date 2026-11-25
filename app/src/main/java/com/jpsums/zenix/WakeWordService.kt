@@ -204,7 +204,9 @@ class WakeWordService : Service() {
         return arr.toString()
     }
 
-    private val wakeRegex = Regex("\\b(hey|hi|okay|hello)\\s+(maya|maia|mya|my a|my ah|my uh)\\b")
+    private val wakeRegex: Regex get() =
+        if (activeNames.contains("my ")) Regex("^(hey|hi|okay|hello) (maya|maia|mya|my a|my ah|my uh)$")
+        else Regex("^(hey|hi|okay|hello) (maya|maia|mya)$")
 
     private fun startListening() {
         if (speech != null || paused) return
@@ -240,20 +242,19 @@ class WakeWordService : Service() {
         val now = System.currentTimeMillis()
         val clean = text.replace("[unk]", " ").trim().replace(Regex("\\s+"), " ")
         if (clean.isNotEmpty()) { lastHeard = clean; lastHeardAt = now }   // shown in Settings, to check she can hear you
-        if (!wakeRegex.containsMatchIn(text)) return
+        // Only a clear, finished "Hey Maya" said on its own counts: no half-heard guesses (partials),
+        // nothing else heard in the same breath (that's ordinary talking), and the listener sure of every word.
+        if (key != "text") return
+        if (text.contains("[unk]")) return
+        if (!wakeRegex.matches(clean)) return
         if (now - lastTrigger < 3000) return
         if (now < quietUntil) return   // just after a chat ended: that was the tail of it, not a new "Hey Maya"
-        // a video or song is playing: its sound is easily mistaken for "Hey Maya", so only a clear, finished
-        // phrase counts (no half-heard guesses) and the listener must be sure of every word
         val media = try { getSystemService(android.media.AudioManager::class.java).isMusicActive } catch (_: Exception) { false }
-        if (media) {
-            if (key != "text") return
-            val words = try { JSONObject(hyp ?: "{}").optJSONArray("result") } catch (_: Exception) { null }
-            if (words != null && words.length() > 0) {
-                var low = 1.0
-                for (i in 0 until words.length()) low = minOf(low, words.optJSONObject(i)?.optDouble("conf", 1.0) ?: 1.0)
-                if (low < 0.93) return
-            }
+        val words = try { JSONObject(hyp ?: "{}").optJSONArray("result") } catch (_: Exception) { null }
+        if (words != null && words.length() > 0) {
+            var low = 1.0
+            for (k in 0 until words.length()) low = minOf(low, words.optJSONObject(k)?.optDouble("conf", 1.0) ?: 1.0)
+            if (low < (if (media) 0.95 else 0.88)) return
         }
         lastTrigger = now
         triggered()
