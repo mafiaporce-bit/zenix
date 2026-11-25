@@ -215,25 +215,25 @@ class RingActivity : Activity() {
         instance = this
         if (Build.VERSION.SDK_INT >= 27) { setShowWhenLocked(true); setTurnScreenOn(true) }
         window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        window.statusBarColor = Color.parseColor("#06050C"); window.navigationBarColor = Color.parseColor("#06050C")
+        window.statusBarColor = Color.BLACK; window.navigationBarColor = Color.BLACK
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER_HORIZONTAL
-            setBackgroundColor(Color.parseColor("#06050C")); setPadding(dp(28), dp(90), dp(28), dp(48))
+            setBackgroundColor(Color.BLACK); setPadding(dp(28), dp(90), dp(28), dp(48))
         }
         val time = TextView(this).apply {
             text = SimpleDateFormat("h:mm", Locale.getDefault()).format(Date()); textSize = 64f; setTextColor(Color.WHITE); gravity = Gravity.CENTER
         }
-        val bell = TextView(this).apply { text = "⏰  Zenix"; textSize = 15f; setTextColor(Color.parseColor("#B266FF")); gravity = Gravity.CENTER; setPadding(0, dp(6), 0, dp(36)) }
+        val bell = TextView(this).apply { text = "⏰  Zenix"; textSize = 15f; setTextColor(Color.parseColor("#B8B8B8")); gravity = Gravity.CENTER; setPadding(0, dp(6), 0, dp(36)) }
         tTitle = TextView(this).apply { textSize = 26f; setTextColor(Color.WHITE); gravity = Gravity.CENTER; setTypeface(typeface, android.graphics.Typeface.BOLD) }
-        tText = TextView(this).apply { textSize = 18f; setTextColor(Color.parseColor("#C9C2E6")); gravity = Gravity.CENTER; setPadding(0, dp(12), 0, 0) }
+        tText = TextView(this).apply { textSize = 18f; setTextColor(Color.parseColor("#C8C8C8")); gravity = Gravity.CENTER; setPadding(0, dp(12), 0, 0) }
         val spacer = android.view.View(this)
         fun button(label: String, fill: IntArray, onTap: () -> Unit) = TextView(this).apply {
-            text = label; textSize = 18f; setTextColor(Color.WHITE); gravity = Gravity.CENTER
+            text = label; textSize = 18f; setTextColor(if (fill[0] == Color.WHITE) Color.BLACK else Color.WHITE); gravity = Gravity.CENTER
             background = GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, fill).apply { cornerRadius = dp(32).toFloat() }
             setOnClickListener { onTap() }
         }
-        val stop = button("Stop", intArrayOf(Color.parseColor("#B266FF"), Color.parseColor("#FF3FD2"))) { AlarmRinger.current?.finishRing(false) ?: run { AlarmRinger.stop(this); finish() } }
-        val snooze = button("Snooze 10 min", intArrayOf(Color.parseColor("#1B1733"), Color.parseColor("#1B1733"))) { AlarmRinger.current?.finishRing(true) ?: finish() }
+        val stop = button("Stop", intArrayOf(Color.WHITE, Color.parseColor("#B8B8B8"))) { AlarmRinger.current?.finishRing(false) ?: run { AlarmRinger.stop(this); finish() } }
+        val snooze = button("Snooze 10 min", intArrayOf(Color.parseColor("#1C1C1C"), Color.parseColor("#1C1C1C"))) { AlarmRinger.current?.finishRing(true) ?: finish() }
         root.addView(time); root.addView(bell); root.addView(tTitle); root.addView(tText)
         root.addView(spacer, LinearLayout.LayoutParams(-1, 0, 1f))
         root.addView(stop, LinearLayout.LayoutParams(-1, dp(64)))

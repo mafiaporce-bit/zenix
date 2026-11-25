@@ -161,7 +161,7 @@ class VoiceService : Service() {
         val sz = dp(64)
         val tv = TextView(this).apply {
             text = "✕"; textSize = 24f; setTextColor(Color.WHITE); gravity = Gravity.CENTER
-            background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(0xCC1B1733.toInt()); setStroke(dp(2), 0x99FFFFFF.toInt()) }
+            background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(0xCC181818.toInt()); setStroke(dp(2), 0x99FFFFFF.toInt()) }
             alpha = 0f
         }
         val (cx, cy) = closeCenter()
@@ -175,7 +175,7 @@ class VoiceService : Service() {
     private fun highlightClose(on: Boolean) {
         closeView?.let { v ->
             v.animate().scaleX(if (on) 1.3f else 1f).scaleY(if (on) 1.3f else 1f).setDuration(120).start()
-            (v.background as? GradientDrawable)?.setColor(if (on) 0xEEE5484D.toInt() else 0xCC1B1733.toInt())
+            (v.background as? GradientDrawable)?.setColor(if (on) 0xEEE8E8E8.toInt() else 0xCC181818.toInt())
         }
     }
     private fun hideCloseTarget() {

@@ -201,9 +201,9 @@ class SendHelperService : AccessibilityService() {
     private fun showBubble() {
         if (bubble != null) return
         val tv = TextView(this).apply {
-            setTextColor(Color.WHITE); textSize = 15f
+            setTextColor(Color.BLACK); textSize = 15f
             setPadding(dp(20), dp(13), dp(20), dp(13))
-            background = GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, intArrayOf(0xF27C3AED.toInt(), 0xF2D946EF.toInt())).apply { cornerRadius = dp(26).toFloat() }
+            background = GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, intArrayOf(0xF2FFFFFF.toInt(), 0xF2B8B8B8.toInt())).apply { cornerRadius = dp(26).toFloat() }
             elevation = dp(10).toFloat()
             setOnClickListener { cancel() }
         }

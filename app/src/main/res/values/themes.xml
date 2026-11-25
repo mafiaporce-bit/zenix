@@ -5,6 +5,6 @@
         <item name="android:statusBarColor">@color/zenix_bg</item>
         <item name="android:navigationBarColor">@color/zenix_bg</item>
     </style>
-    <color name="zenix_bg">#0D0B17</color>
-    <color name="zenix_icon_bg">#0D0B17</color>
+    <color name="zenix_bg">#000000</color>
+    <color name="zenix_icon_bg">#000000</color>
 </resources>

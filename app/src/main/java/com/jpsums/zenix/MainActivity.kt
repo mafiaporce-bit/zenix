@@ -62,7 +62,7 @@ class MainActivity : Activity() {
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.statusBarColor = Color.parseColor("#0D0B17")
+        window.statusBarColor = Color.parseColor("#000000")
         createNotificationChannel()
 
         val assetLoader = WebViewAssetLoader.Builder()
