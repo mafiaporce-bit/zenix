@@ -112,27 +112,86 @@ class ControlService : AccessibilityService() {
         if (performGlobalAction(action)) done(true, okMsg) else done(false, "The phone didn't do that.")
     }
 
-    /** "Close this app": open Recent apps, flick the app's card away, go Home. Just what a finger would do. */
+    private fun dbg(what: String, text: String) = try {
+        MainActivity.instance?.get()?.runJs("window.zenixDbg && window.zenixDbg(${org.json.JSONObject.quote(what)}, ${org.json.JSONObject.quote(text.take(400))})")
+    } catch (_: Exception) { }
+
+    /** Everything readable on screen right now, across the windows a finger could touch. */
+    private fun screenNodes(): List<AccessibilityNodeInfo> {
+        val out = ArrayList<AccessibilityNodeInfo>()
+        try { for (win in windows) { val r = win.root ?: continue; if (r.packageName?.toString() != packageName) out.addAll(all(r, 1500)) } } catch (_: Exception) { }
+        if (out.isEmpty()) out.addAll(all(rootInActiveWindow))
+        return out
+    }
+
+    /** The card of one app in Recent apps: the biggest thing on screen that carries the app's name. */
+    private fun recentCard(name: String): AccessibilityNodeInfo? {
+        val want = name.trim().lowercase()
+        if (want.isEmpty()) return null
+        val word = Regex("(^|[^a-z0-9])" + Regex.escape(want) + "([^a-z0-9]|$)")
+        return screenNodes().filter { n ->
+            if (!n.isVisibleToUser || isEdit(n)) return@filter false
+            val pkg = n.packageName?.toString() ?: ""
+            if (!(pkg.contains("launcher") || pkg.contains("systemui") || pkg.contains("recents") || pkg.contains("quickstep"))) return@filter false
+            val l = ((n.contentDescription?.toString() ?: "") + " " + (n.text?.toString() ?: "")).lowercase()
+            word.containsMatchIn(l)
+        }.maxByOrNull { val r = bounds(it); r.width().toLong() * r.height() }
+    }
+
+    /**
+     * "Close this app": open Recent apps, find THIS app's card by its name, and flick only that card away.
+     * If the card can't be found or doesn't go, nothing else is touched.
+     */
     private fun closeFront(done: (Boolean, String) -> Unit) {
         val front = frontPackage()
         if (front == packageName) { done(false, "Zenix is the app on the screen. Open the app you want closed, then tell me."); return }
         if (front.isEmpty() || front.contains("launcher")) { done(false, "No app is open on the screen."); return }
+        val name = appName(front)
+        if (name.contains("zenix", true)) { done(false, "I won't close myself."); return }
         if (!performGlobalAction(GLOBAL_ACTION_RECENTS)) { done(false, "The phone didn't open Recent apps."); return }
+        findCardThenSwipe(name, 0, done)
+    }
+
+    private fun leaveRecents() { try { performGlobalAction(GLOBAL_ACTION_HOME) } catch (_: Exception) { } }
+
+    private fun findCardThenSwipe(name: String, tries: Int, done: (Boolean, String) -> Unit) {
         main.postDelayed({
             try {
-                val (w, h) = screen()
-                // the app's card sits in the middle of Recent apps: flick it up and off the top
-                stroke(w * 0.5f, h * 0.5f, w * 0.5f, h * 0.02f, 220L, "Closed it.") { ok, _ ->
-                    main.postDelayed({
-                        // still in Recent apps with the card there? one more, firmer flick
-                        val again = !ok || (frontPackage().contains("launcher") && all(rootInActiveWindow).any { label(it).contains(appName(front), true) })
-                        if (again) stroke(w * 0.5f, h * 0.6f, w * 0.5f, h * 0.0f, 160L, "Closed it.") { ok2, msg2 ->
-                            main.postDelayed({ try { performGlobalAction(GLOBAL_ACTION_HOME) } catch (_: Exception) { }; done(ok2, if (ok2) "Closed it." else msg2) }, 450)
-                        } else { try { performGlobalAction(GLOBAL_ACTION_HOME) } catch (_: Exception) { }; done(true, "Closed it.") }
-                    }, 600)
+                val card = recentCard(name)
+                if (card == null) {
+                    if (tries < 7) { findCardThenSwipe(name, tries + 1, done); return@postDelayed }   // Recent apps is still opening
+                    dbg("close", "no card for '$name'. on screen: " + screenNodes().mapNotNull { n -> label(n).takeIf { it.isNotEmpty() && it.length < 40 } }.distinct().take(25).joinToString(" | "))
+                    leaveRecents()
+                    done(false, "I opened Recent apps but couldn't find $name there, so I didn't close anything.")
+                    return@postDelayed
                 }
-            } catch (_: Exception) { done(false, "That didn't work on this screen.") }
-        }, 1300)
+                val (w, h) = screen()
+                val r = bounds(card)
+                val cx = r.exactCenterX()
+                if (cx < w * 0.12f || cx > w * 0.88f) {   // the card is off to the side: too risky to swipe
+                    dbg("close", "card for '$name' is off-centre: $r")
+                    leaveRecents()
+                    done(false, "I found $name in Recent apps but it wasn't in the middle, so I didn't close anything.")
+                    return@postDelayed
+                }
+                // a small match is just the name above the card: the card itself is in the middle of the screen
+                var cy = if (r.height() >= h * 0.25f) r.exactCenterY() else h * 0.5f
+                var x = cx
+                orbBox()?.let { o -> if (x >= o.left && x <= o.right && o.bottom >= cy - h * 0.6f && o.top <= cy) x = if (o.exactCenterX() > w / 2f) cx - w * 0.12f else cx + w * 0.12f }
+                cy = cy.coerceIn(h * 0.3f, h * 0.75f)
+                dbg("close", "swiping '$name' card $r from ${x.toInt()},${cy.toInt()}")
+                stroke(x, cy, x, maxOf(h * 0.02f, cy - h * 0.6f), 190L, "Closed $name.") { _, _ ->
+                    main.postDelayed({
+                        try {
+                            val still = recentCard(name)?.let { Math.abs(bounds(it).exactCenterX() - cx) < w * 0.15f } ?: false
+                            leaveRecents()
+                            if (still) { dbg("close", "card for '$name' is still there after the swipe"); done(false, "I tried to swipe $name away but it stayed. I didn't touch any other app.") }
+                            else done(true, "Closed $name.")
+                        } catch (_: Exception) { leaveRecents(); done(true, "Closed $name.") }
+                    }, 750)
+                }
+            } catch (_: Exception) { leaveRecents(); done(false, "That didn't work on this screen.") }
+        }, if (tries == 0) 900L else 350L)
     }
 
     private fun appName(pkg: String): String = try {

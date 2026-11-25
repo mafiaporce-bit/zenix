@@ -33,14 +33,17 @@ class DeepgramEars(private val activity: MainActivity) {
 
     @Volatile private var flux = false
 
-    fun open(key: String, lang: String, useFlux: Boolean = false) {
+    fun open(key: String, lang: String, useFlux: Boolean = false, terms: List<String> = emptyList()) {
         if (ws != null) { js("window.zenixDGOpen && window.zenixDGOpen(true, '')"); return }
         flux = useFlux
         val url = if (useFlux)
             "wss://api.deepgram.com/v2/listen?model=flux-general-en&encoding=linear16&sample_rate=16000&eot_threshold=0.75&eager_eot_threshold=0.5&eot_timeout_ms=4000"
         else "wss://api.deepgram.com/v1/listen?model=nova-3&language=$lang&encoding=linear16&sample_rate=16000&channels=1" +
             "&smart_format=true&interim_results=true&endpointing=350&utterance_end_ms=1000&vad_events=true"
-        val req = Request.Builder().url(url).header("Authorization", "Token $key").build()
+        // names and words she should get right ("Zenix", his family, his places): Deepgram listens for them specially
+        val boost = terms.map { it.trim() }.filter { it.length in 2..40 }.distinct().take(45)
+            .joinToString("") { "&keyterm=" + java.net.URLEncoder.encode(it, "UTF-8") }
+        val req = Request.Builder().url(url + boost).header("Authorization", "Token $key").build()
         ws = client.newWebSocket(req, object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
                 if (startMic()) js("window.zenixDGOpen && window.zenixDGOpen(true, '')")

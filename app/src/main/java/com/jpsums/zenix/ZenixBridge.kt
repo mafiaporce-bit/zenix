@@ -354,6 +354,24 @@ class ZenixBridge(private val activity: MainActivity) {
     // ---------- Deepgram ears (native) ----------
     @JavascriptInterface fun dgOpen(key: String, lang: String): String { activity.ears.open(key, lang); return ok("opening") }
     @JavascriptInterface fun dgOpenFlux(key: String): String { activity.ears.open(key, "en", true); return ok("opening") }
+    /** Same, plus the words she should know (a JSON list). */
+    @JavascriptInterface fun dgOpenWords(key: String, lang: String, flux: String, wordsJson: String): String {
+        val words = try { val a = org.json.JSONArray(wordsJson); (0 until a.length()).map { a.optString(it) } } catch (_: Exception) { emptyList() }
+        activity.ears.open(key, lang, flux == "true", words)
+        return ok("opening")
+    }
+    /** Names of his starred (favourite) contacts, so the listener spells them right. */
+    @JavascriptInterface fun starredContacts(): String {
+        val arr = org.json.JSONArray()
+        if (!has(Manifest.permission.READ_CONTACTS)) return arr.toString()
+        try {
+            activity.contentResolver.query(ContactsContract.Contacts.CONTENT_URI, arrayOf(ContactsContract.Contacts.DISPLAY_NAME_PRIMARY),
+                "${ContactsContract.Contacts.STARRED} = 1", null, null)?.use { c ->
+                while (c.moveToNext() && arr.length() < 25) c.getString(0)?.let { arr.put(it) }
+            }
+        } catch (_: Exception) { }
+        return arr.toString()
+    }
     @JavascriptInterface fun dgSending(on: String): String { activity.ears.setSending(on == "true"); return ok("ok") }
     @JavascriptInterface fun dgClose(): String { activity.ears.close(); return ok("closed") }
     @JavascriptInterface fun dgTest(key: String): String { activity.ears.test(key); return ok("testing") }

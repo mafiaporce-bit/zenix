@@ -58,6 +58,8 @@ body{background:radial-gradient(120% 80% at 50% 35%,#12102A 0%,#06050C 60%)}
 @keyframes talk{from{transform:scale(.95)}to{transform:scale(1.07)}}
 @keyframes ring{0%{transform:scale(.95);opacity:.8}100%{transform:scale(1.35);opacity:0}}
 @keyframes zg{0%,100%{opacity:.7}50%{opacity:1}}
+#wave{width:min(300px,78vw);height:46px;display:block;margin:2px auto 4px;opacity:0;transition:opacity .35s}
+#wave.on{opacity:1}
 .mode-label{font-size:13px;font-weight:600;color:var(--accent);min-height:18px;letter-spacing:.3px}
 .live-line{min-height:44px;max-width:340px;font-size:15px;opacity:.9}
 body.tr-on .live-line{font-size:22px;line-height:1.35;opacity:1;max-width:370px;font-weight:500}
@@ -329,6 +331,7 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
       <div class="orb-wrap idle" id="orbWrap">
         <canvas id="mayaOrb" aria-label="Zenix"></canvas>
       </div>
+      <canvas id="wave" aria-hidden="true"></canvas>
       <div class="mode-label" id="modeLabel"></div>
       <div class="live-line" id="liveLine"></div>
       <div class="action" id="actionLine"></div>
@@ -435,6 +438,10 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
           <p class="sub-label" style="margin-top:4px">Ears</p>
           <div class="seg small"><button data-ears="phone">Phone · free</button><button data-ears="deepgram">Deepgram · faster</button></div>
           <p class="hint" style="margin-top:8px">Deepgram hears you better and lets Zenix start thinking before you finish talking.</p>
+          <p class="sub-label">Words she should know</p>
+          <textarea class="field" id="hearWords" rows="3" style="height:auto;padding:10px 12px;line-height:1.4" placeholder="Names and words she gets wrong, one per line: Jennylene, Banias, Mafraq…"></textarea>
+          <div class="toggle-row" style="margin-top:8px"><span class="status-line" style="margin:0" id="hearWordsState"></span><button class="btn-line" id="hearWordsSave">Save</button></div>
+          <p class="hint" style="margin:6px 0 0">With Deepgram, Zenix listens specially for these, plus your name, your starred contacts and the names in her memory.</p>
           <p class="sub-label">Language</p>
           <div class="seg small"><button data-lang="en-PH">English (PH)</button><button data-lang="en-US">English (US)</button><button data-lang="fil-PH">Tagalog</button></div>
         </div>
@@ -1507,13 +1514,17 @@ function closeInstant(name){
     if(Native.isLocked && Native.isLocked()==='true') return 'Unlock the phone first, then tell me again.';
     if(!ctlOn()){ toast('Settings → Control other apps → Turn on'); return CTL_OFF; }
     if(name && !frontIs(name)){   // it isn't the one on screen: bring it up first, then close it
+      const before = frontApp();
       const o = callNative('openApp', APP_OPEN[name] || name); if(!o || !o.ok) return null;
-      await pause(1700);
+      // wait until that app is really the one on screen (a slow start must never end with the wrong app closed)
+      let up = false;
+      for(let i = 0; i < 24 && !up; i++){ await pause(300); const f = frontApp(); up = !!f && !/jpsums\.zenix|launcher/i.test(f) && (frontIs(name) || (i >= 8 && f !== before)); }
+      if(!up) return 'I couldn\'t bring ' + name + ' up, so I didn\'t close anything.';
+      await pause(700);
     } else if(!name && !document.hidden) return 'Which app, bro? Say "close YouTube", or open the app and say "close this app".';
     showAction('✖️ Closing ' + (name || 'this app'));
-    let r = await screenDo('close_app', '');
-    if(!r.ok && name && /Zenix is the app/.test(r.message)){ await pause(1200); r = await screenDo('close_app', ''); }   // it was still opening
-    return r.ok ? (name ? 'Closed ' + name + '.' : 'Closed it.') : r.message;
+    const r = await screenDo('close_app', '');
+    return r.message || (r.ok ? 'Closed it.' : 'I couldn\'t close it.');
   });   // not "loose": works even while a song plays, without saying "Zenix" first
 }
 function playInstant(song, app){
@@ -2922,7 +2933,23 @@ if(settings.engine==='own' && settings.voice!=='phone' && !/^(dg|el):/.test(sett
 /* ---------- Deepgram: fast cloud ears + Aura voices (middle option) ---------- */
 if(!settings.ears) settings.ears='phone';
 const dgKey = () => (store.get('dgkey','')||'').trim();
-const useDGEars = () => IS_APP && settings.ears==='deepgram' && !!dgKey() && settings.offlineLang!=='fil-PH' && !(typeof dg!=='undefined' && dg.failed);
+// he has a Deepgram key and never chose: the better ears become the default (once)
+if(!settings.earsPicked){ if(IS_APP && settings.ears==='phone' && (store.get('dgkey','')||'').trim()) settings.ears = 'deepgram'; settings.earsPicked = true; store.set('settings', settings); }
+const useDGEars = () => {
+  if(typeof dg!=='undefined' && dg.failed && Date.now() - (dg.failedAt || 0) > 40000) dg.failed = false;   // a dropped line is tried again after a little while, not given up on for the whole chat
+  return IS_APP && settings.ears==='deepgram' && !!dgKey() && settings.offlineLang!=='fil-PH' && !(typeof dg!=='undefined' && dg.failed);
+};
+/* the names and words the listener should get right */
+function hearWords(){
+  const out = new Map(); const add = w => { w = String(w||'').replace(/[^\p{L}\p{N}' .-]/gu, ' ').replace(/\s+/g, ' ').trim(); if(w.length >= 2 && w.length <= 40 && !out.has(w.toLowerCase())) out.set(w.toLowerCase(), w); };
+  add('Zenix'); add(settings.name);
+  String(settings.words || '').split(/[\n,;]+/).forEach(add);
+  try{ JSON.parse(Native.starredContacts ? Native.starredContacts() : '[]').forEach(add); }catch(e){}
+  // names in her memory: words that start with a capital and aren't the first word of the line
+  const skip = /^(?:Jim|I|He|She|His|Her|The|A|An|My|In|On|At|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday|January|February|March|April|May|June|July|August|September|October|November|December|AM|PM|UAE)$/;
+  (typeof memories!=='undefined' ? memories : []).slice(-60).forEach(m => { (String(m).replace(/^\S+\s*/, '').match(/\b\p{Lu}\p{Ll}{2,}(?:\s\p{Lu}\p{Ll}{2,})?\b/gu) || []).forEach(w => { if(!skip.test(w)) add(w); }); });
+  return [...out.values()].slice(0, 45);
+}
 const DG_VOICES = [['dg:aura-2-thalia-en','Thalia'],['dg:aura-2-andromeda-en','Andromeda'],['dg:aura-2-helena-en','Helena'],['dg:aura-2-luna-en','Luna'],['dg:aura-2-asteria-en','Asteria']];
 const dgWait = {}; let dgSeq = 0;
 function dgTTS(text){
@@ -2963,7 +2990,7 @@ window.zenixDGMsg = (txt) => {
   } else if(m.type==='UtteranceEnd' && !dg.paused && dg.buf.trim()) dgFinish();
 };
 window.zenixDGOpen = (ok, err) => { const w=dg.opening; dg.opening=null; if(!w) return; ok ? w.resolve() : w.reject(new Error(/401|403/.test(err||'') ? 'Deepgram key not accepted' : ('Could not connect to Deepgram '+(err||'')).trim())); };
-window.zenixDGClosed = () => { const was=dg.active; dg.active=false; dg.paused=true; if(was && off.active && off.brain==='own' && off.kind==='talk'){ dg.failed=true; toast('Deepgram disconnected, using phone listening');
+window.zenixDGClosed = () => { const was=dg.active; dg.active=false; dg.paused=true; if(was && off.active && off.brain==='own' && off.kind==='talk'){ dg.failed=true; dg.failedAt=Date.now(); toast('Deepgram dropped for a moment, using phone listening');
     // if she's mid-answer, the normal "finished speaking" step starts the phone's listening (no listening to her own voice)
     if(!(speech.playing || speech.q.length || speech.streamOpen || speech.hold)) offListen(); } };
 window.zenixDGTest = (ok, msg) => { $('dgState').textContent = ok ? 'Deepgram key works ✓' : ('✗ '+msg); if(!ok) toast(msg); };
@@ -2971,7 +2998,8 @@ function dgOpen(){
   const attempt = (flux) => new Promise((res, rej) => {
     if(!Native || !Native.dgOpen) return rej(new Error('Deepgram needs the Android app'));
     const mine = dg.opening = {resolve:res, reject:rej};
-    flux ? Native.dgOpenFlux(dgKey()) : Native.dgOpen(dgKey(), 'en');
+    if(Native.dgOpenWords) Native.dgOpenWords(dgKey(), 'en', flux ? 'true' : 'false', JSON.stringify(hearWords()));
+    else flux ? Native.dgOpenFlux(dgKey()) : Native.dgOpen(dgKey(), 'en');
     setTimeout(() => { if(dg.opening === mine){ dg.opening=null; rej(new Error('Deepgram timed out')); } }, 10000);
   });
   const tryFlux = !!(Native && Native.dgOpenFlux) && !dg.noFlux;
@@ -3018,13 +3046,16 @@ function dgListen(){
   setOrb('listening'); $('modeLabel').textContent='Listening…'; if(Native.setOrbMode) Native.setOrbMode('listening');
   if(dg.active){ dgResume(); return; }
   dgOpen().then(() => { if(off.active && off.kind==='talk') dgResume(); })
-    .catch(e => { dgClose(); dg.failed=true; toast(e.message+' — using phone listening'); if(off.active && off.kind==='talk' && Native.startListeningOnline) Native.startListeningOnline(listenLang()); });
+    .catch(e => { dgClose(); dg.failed=true; dg.failedAt=Date.now(); toast(e.message+' — using phone listening'); if(off.active && off.kind==='talk' && Native.startListeningOnline) Native.startListeningOnline(listenLang()); });
 }
 
 function renderDG(){
   document.querySelectorAll('[data-ears]').forEach(b => b.classList.toggle('sel', b.dataset.ears===settings.ears));
+  if(document.activeElement !== $('hearWords')) $('hearWords').value = settings.words || '';
+  $('hearWordsState').textContent = settings.ears==='deepgram' && dgKey() ? hearWords().length + ' words and names in use' : 'Used when Deepgram ears are on';
   $('dgState').textContent = dgKey() ? 'Deepgram key saved on this phone' : 'No Deepgram key yet';
 }
+$('hearWordsSave').onclick = () => { settings.words = $('hearWords').value.trim(); store.set('settings', settings); if(typeof dgClose==='function' && !(off.active && off.kind==='talk')) dgClose(); renderDG(); toast('Saved. She\'ll listen for these from the next voice chat.'); };
 document.querySelectorAll('[data-ears]').forEach(b => b.onclick = () => {
   if(b.dataset.ears==='deepgram' && !dgKey()){ toast('Add your Deepgram key first'); return; }
   settings.ears=b.dataset.ears; store.set('settings',settings); renderDG();
@@ -3221,7 +3252,7 @@ const ZenixOrb = (() => {
   const noise = x => (Math.sin(x*1.7) + Math.sin(x*2.9+1.3) + Math.sin(x*4.3+2.1)) / 3;
   const angDiff = (a,b) => { let d = (a-b) % TAU; if(d > Math.PI) d -= TAU; if(d < -Math.PI) d += TAU; return d; };
   function setState(s){ if(s !== state){ state = s; flash = Math.max(flash, 0.7); } }
-  function feed(l){ if(!(l >= 0)) return; target = Math.max(target, Math.min(1, l)); }
+  function feed(l){ if(!(l >= 0)) return; target = Math.max(target, Math.min(1, l)); if(window.ZenixWave) window.ZenixWave.feed(l); }
   function feedSpectrum(a){ spec = a; }
 
   const gcv = document.createElement('canvas'); const gctx = gcv.getContext('2d');
@@ -3367,7 +3398,43 @@ const ZenixOrb = (() => {
 })();
 window.ZenixOrb = ZenixOrb;
 /* mic level from the phone (0..1) */
-window.zenixRms = (v) => { if(ZenixOrb) ZenixOrb.feed(v); };
+window.zenixRms = (v) => { if(ZenixOrb) ZenixOrb.feed(v); else if(window.ZenixWave) window.ZenixWave.feed(v); };
+
+/* ---------- the sound wave under the ring: moves with his voice while she listens, with hers while she talks ---------- */
+window.ZenixWave = (() => {
+  const cv = document.getElementById('wave'); if(!cv) return null;
+  const ctx = cv.getContext('2d');
+  const N = 48, hist = new Float32Array(N); let W = 300, H = 46, DPR = 1, peak = 0, lastPush = 0, quietFor = 0;
+  function resize(){ DPR = Math.min(window.devicePixelRatio || 1, 2); W = cv.clientWidth || 300; H = cv.clientHeight || 46; cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR); }
+  resize(); window.addEventListener('resize', resize);
+  function feed(l){ if(l > peak) peak = Math.min(1, l); }
+  function frame(now){
+    requestAnimationFrame(frame);
+    const st = (document.getElementById('orbWrap').className.match(/listening|speaking|thinking/) || [''])[0];
+    const live = !!st && !document.hidden;
+    cv.classList.toggle('on', live);
+    if(!live){ peak = 0; return; }
+    if(now - lastPush > 55){   // a new bar about 18 times a second; older ones slide left
+      lastPush = now;
+      hist.copyWithin(0, 1); hist[N - 1] = st === 'thinking' ? 0.10 + 0.08 * Math.abs(Math.sin(now / 260)) : peak;
+      quietFor = peak < 0.04 ? quietFor + 1 : 0; peak *= 0.35;
+    }
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0); ctx.clearRect(0, 0, W, H);
+    const gap = W / N, bw = Math.max(2, gap * 0.56), mid = H / 2;
+    const g = ctx.createLinearGradient(0, 0, W, 0);
+    if(st === 'speaking'){ g.addColorStop(0, 'rgba(255,255,255,.25)'); g.addColorStop(1, 'rgba(255,255,255,.95)'); }
+    else { g.addColorStop(0, 'rgba(155,92,255,.25)'); g.addColorStop(.6, 'rgba(178,102,255,.9)'); g.addColorStop(1, 'rgba(255,79,216,1)'); }
+    ctx.fillStyle = g;
+    for(let i = 0; i < N; i++){
+      const v = Math.pow(hist[i], 0.7), h = Math.max(2.5, v * (H - 4)), x = i * gap + (gap - bw) / 2, r = bw / 2;
+      ctx.beginPath();
+      if(ctx.roundRect) ctx.roundRect(x, mid - h / 2, bw, h, r); else ctx.rect(x, mid - h / 2, bw, h);
+      ctx.fill();
+    }
+  }
+  requestAnimationFrame(frame);
+  return { feed };
+})();
 
 /* analyse Zenix's own voice (Kokoro / Deepgram audio) for the orb */
 let vizCtx = null, vizAnalyser = null, vizBuf = null;
