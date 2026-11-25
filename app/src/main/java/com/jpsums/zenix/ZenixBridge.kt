@@ -296,6 +296,11 @@ class ZenixBridge(private val activity: MainActivity) {
     private val localEars by lazy { VoskEars(activity) }
     @JavascriptInterface fun localEarsReady(): String = localEars.ready().toString()
     @JavascriptInterface fun startListeningLocal(): String { activity.brain.stopListening(); localEars.start(); return ok("listening") }
+    // listening for "stop / pause / continue / end" while she is talking
+    private val barge by lazy { BargeEars(activity) }
+    @JavascriptInterface fun bargeReady(): String = barge.ready().toString()
+    @JavascriptInterface fun bargeStart(): String { barge.start(); return ok("ok") }
+    @JavascriptInterface fun bargeStop(): String { barge.stop(); return ok("ok") }
     /** Real internet right now (connected AND working), not just "Wi-Fi is on". */
     @JavascriptInterface fun online(): String = try {
         val cm = activity.getSystemService(android.net.ConnectivityManager::class.java)

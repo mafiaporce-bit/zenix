@@ -458,6 +458,7 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
           <p class="hint">Say "Zenix" or "Hey Zenix" to start talking, even in another app or with the screen off. It listens on your phone only; nothing is sent until you say it. A voice chat that goes quiet ends by itself.</p>
           <div class="toggle-row"><span class="status-line" style="margin:0" id="wakeState">Off</span><button class="btn-line" id="wakeBtn">Turn on</button></div>
           <p class="status-line" id="wakeDiag" style="display:none"></p>
+          <div class="toggle-row" id="bargeRow"><div><b>Stop her by voice</b><small>While she talks, say "stop", "pause", "continue" or "end"</small></div><button class="toggle" id="bargeToggle" aria-label="Stop her by voice"></button></div>
           <div id="wakeFix" style="display:none">
             <p class="sub-label">Still needed for screen-off and other apps</p>
             <div class="toggle-row" id="wfOverlay"><div><b>Display over other apps</b><small>Lets Zenix pop up from any app</small></div><button class="btn-line" id="wfOverlayBtn">Allow</button></div>
@@ -1118,7 +1119,7 @@ setInterval(() => {
     // ears that died silently (it happens behind other apps): start them again
     const dgOn = typeof dg!=='undefined' && dg.active;
     if(!dgOn && off.brain==='own' && !nativeSpeakResolve && off.earsAt && now - off.earsAt > 15000){ off.earsAt = now; try{ Native.stopListening(); }catch(e){} offListen(); }
-    if(off.fromWake && !off.heard && off.wakeAt && now - off.wakeAt > 12000 && !off.thinking){ endOffline(true); addMsg('sys', 'Voice chat ended (nobody spoke)'); idleLook(); return; }
+    if(off.fromWake && !off.heard && off.wakeAt && now - off.wakeAt > 20000 && !off.thinking){ endOffline(true); addMsg('sys', 'Voice chat ended (nobody spoke)'); idleLook(); return; }
     if(!off.quietSince) return;
     if(away){
       off.quietSince = now;   // the quiet clock waits while he's elsewhere
@@ -1936,6 +1937,7 @@ function matchInstant(raw){
 }
 /* run an instant command; anything it can't do cleanly goes to the brain as usual */
 async function runInstant(fn, text, speakIt, after){
+  speech.muted = false;
   let r = null; try{ r = await fn(); }catch(e){ r = null; }
   if(!r){ return ownRespond(text, speakIt, after); }
   if(r.silent){   // a swipe on the screen: do it, say nothing, keep listening
@@ -2071,12 +2073,13 @@ function offlineSay(text, speakIt){
     speech.onIdle = () => { if(off.endAfterSpeak){ off.endAfterSpeak=false; endOffline(); } else if(off.kind==='talk') offListen(); else setOrb('idle'); };
     speakEnqueue(text); return;
   }
-  if(speakIt){ setOrb('speaking'); $('modeLabel').textContent='Zenix is speaking'; if(Native.setOrbMode) Native.setOrbMode('speaking'); Native.speak(text, settings.offlineLang); }
+  if(speakIt){ setOrb('speaking'); $('modeLabel').textContent='Zenix is speaking'; if(Native.setOrbMode) Native.setOrbMode('speaking'); off.sayingNative = true; off.sayingText = text; Native.speak(text, settings.offlineLang); }
   else if(off.kind==='talk') offListen();
   else idleLook();
 }
 function offListen(){
   if(!off.active || off.kind!=='talk') return;
+  bargeOff();
   setOrb('listening'); $('modeLabel').textContent = off.brain==='own' ? 'Listening…' : 'Listening… (offline)';
   if(Native.setOrbMode) Native.setOrbMode('listening');
   if(!off.quietSince) off.quietSince = Date.now();
@@ -2112,7 +2115,7 @@ window.zenixOnSpeech = async (t) => {
   if(!t){ trMiss(); offListen(); return; }
   if(off.brain==='own' && mediaNoise(t)){ $('liveLine').textContent = ''; offListen(); return; }   // that was the video, not Jim
   awaySince = 0;   // he is using her from another app: the "you were away" clock starts over
-  off.heard = true;
+  off.heard = true; speech.muted = false;
   srErrs = 0; off.quietSince = 0; off.trusted = false;   // Jim is talking now: the normal lock-screen rules apply again
   addMsg('user', t); $('liveLine').textContent='You: '+t;
   if(tr.on && tr.turn==='them'){ trHandle(t); return; }
@@ -2152,6 +2155,9 @@ window.zenixOnSpeechError = (code) => {
 };
 window.zenixOnSpeakDone = () => {
   if(nativeSpeakResolve){ const r=nativeSpeakResolve; nativeSpeakResolve=null; r(); return; }
+  if(speech.paused || off.pausedText) return;   // paused on purpose: she waits for "continue"
+  if(!off.sayingNative && speech.muted) return;   // the voice he just stopped: he is already being listened to
+  off.sayingNative = false;
   if(!off.active) return;
   if(Native.setOrbMode) Native.setOrbMode('listening');
   if(off.endAfterSpeak){ off.endAfterSpeak=false; endOffline(); return; }
@@ -2187,6 +2193,7 @@ function endOffline(quiet){
   if(!off.active) return;
   const wasTalk = off.kind==='talk';
   off.active=false; off.kind=null; off.quietSince=0; off.thinking=false; off.trusted=false; off.intro=null;
+  off.sayingNative=false; off.pausedText=''; speech.paused=false; speech.muted=false; bargeOff();
   clearTimeout(partialTimer);
   try{ Native.stopListening(); Native.stopSpeaking(); }catch(e){}
   stopSpeech(); dgClose(); trStop();
@@ -2195,6 +2202,7 @@ function endOffline(quiet){
   wakeResumeLater();
 }
 async function offlineChat(text){
+  speech.muted = false;
   if(!off.active && !startOffline('chat')){ stopTyping(); return; }
   const reply = await offlineHandle(text);
   offlineSay(reply, settings.chatVoice);
@@ -2608,6 +2616,7 @@ const speech = { q:[], playing:false, streamOpen:false, onIdle:null, audio:new A
 let nativeSpeakResolve = null;
 function nativeSay(text, lang){ return new Promise(res => { nativeSpeakResolve = res; Native.speak(text, lang); setTimeout(()=>{ if(nativeSpeakResolve===res){ nativeSpeakResolve=null; res(); } }, 4000 + text.length*120); }); }
 function speakEnqueue(text){
+  if(speech.muted) return;   // he said "stop": the rest of this answer stays unsaid
   text = splitLinks(text).text.replace(/[*_#`>]/g,'').replace(/\s+/g,' ').trim();
   if(!expressiveOn()) text = stripTags(text);
   if(!text || !/[a-z0-9\u00C0-\uFFFF\]]/i.test(text)) return;
@@ -2621,7 +2630,7 @@ function speakEnqueue(text){
   speech.q.push(item); pumpSpeech();
 }
 async function pumpSpeech(){
-  if(speech.playing || speech.hold) return;
+  if(speech.playing || speech.hold || speech.paused) return;
   const item = speech.q.shift();
   if(!item){ if(!speech.streamOpen){ speech.idleAt = Date.now(); const f=speech.onIdle; speech.onIdle=null; if(f) f(); else if(off.active && off.kind==='talk' && !off.thinking && !off.endAfterSpeak) offListen(); else idleLook(); } return; }
   if(typeof dg!=='undefined' && dg.active && !dg.paused) dgPause();
@@ -2633,6 +2642,7 @@ async function pumpSpeech(){
     if(turnSearched) parts.push('searched web');
     if(off.kind==='talk') $('actionLine').textContent = `⚡ ${(d+turnEars).toFixed(1)}s` + (parts.length ? ' · '+parts.join(' · ') : '') + speedNote();
     turnEars = 0; turnHead = false; turnSearched = false; }
+  speech.prevText = speech.nowText || ''; speech.nowText = item.text; speech.nowItem = item;
   speech.playing = true; setOrb('speaking'); $('modeLabel').textContent='Zenix is speaking'; if(Native && Native.setOrbMode) Native.setOrbMode('speaking');
   try{
     // a cloud voice that takes too long is skipped for the phone's own voice, so she never goes silent
@@ -2650,7 +2660,60 @@ async function pumpSpeech(){
   if(Native && Native.setOrbMode) Native.setOrbMode('listening');
   pumpSpeech();
 }
-function stopSpeech(){ speech.hold=false; speech.q=[]; speech.streamOpen=false; speech.onIdle=null; try{ speech.audio.pause(); }catch(e){} try{ Native.stopSpeaking(); }catch(e){} if(nativeSpeakResolve){ const r=nativeSpeakResolve; nativeSpeakResolve=null; r(); } speech.playing=false; }
+/* ---------- "stop", "pause", "continue", "end" while she is talking ---------- */
+if(settings.barge===undefined) settings.barge = true;
+const speakingNow = () => speech.playing || speech.q.length > 0 || !!speech.paused || !!nativeSpeakResolve || !!off.sayingNative || !!off.pausedText;
+let bargeOn = false, bargeIdleAt = 0;
+function bargeOff(){ if(bargeOn){ bargeOn = false; try{ Native.bargeStop(); }catch(e){} } }
+setInterval(() => {
+  const want = settings.barge && !!Native.bargeStart && off.active && off.kind==='talk' && !tr.on && speakingNow();
+  if(want){ bargeIdleAt = 0; if(!bargeOn){ bargeOn = true; Native.bargeStart(); } }
+  else if(bargeOn){ if(!bargeIdleAt) bargeIdleAt = Date.now(); else if(Date.now() - bargeIdleAt > 1500) bargeOff(); }   // short gaps between her sentences don't switch it off
+  // paused and forgotten: after 3 minutes she drops what was left and just listens
+  if((speech.paused || off.pausedText) && Date.now() - (speech.pausedAt || 0) > 180000 && off.active){ stopTalking(); }
+}, 250);
+function pauseSpeech(){
+  if(speech.paused || off.pausedText) return;
+  speech.pausedAt = Date.now();
+  if(off.sayingNative){   // the offline voice: she repeats that reply when he says "continue"
+    off.pausedText = off.sayingText || ''; off.sayingNative = false; speech.paused = true; try{ Native.stopSpeaking(); }catch(e){}
+  } else {
+    speech.paused = true;
+    if(nativeSpeakResolve){   // the phone's voice can't freeze mid-sentence: this sentence is said again on "continue"
+      if(speech.nowItem) speech.q.unshift(speech.nowItem);
+      try{ Native.stopSpeaking(); }catch(e){} const r = nativeSpeakResolve; nativeSpeakResolve = null; r();
+    } else { try{ speech.audio.pause(); }catch(e){} }
+  }
+  setOrb('idle'); $('modeLabel').textContent = 'Paused. Say "continue".'; if(Native.setOrbMode) Native.setOrbMode('listening');
+}
+function resumeSpeech(){
+  if(!speech.paused && !off.pausedText) return;
+  speech.paused = false;
+  setOrb('speaking'); $('modeLabel').textContent = 'Zenix is speaking'; if(Native.setOrbMode) Native.setOrbMode('speaking');
+  if(off.pausedText){ const t = off.pausedText; off.pausedText = ''; off.sayingNative = true; off.sayingText = t; Native.speak(t, settings.offlineLang); return; }
+  if(speech.playing && speech.audio.src && speech.audio.paused && !speech.audio.ended){ speech.audio.play().catch(() => { speech.playing = false; pumpSpeech(); }); return; }
+  pumpSpeech();
+}
+function stopTalking(){   // "stop" / "cancel": quiet at once, then she listens
+  speech.muted = true; speech.paused = false; off.pausedText = ''; off.sayingNative = false;
+  stopSpeech();
+  if(off.active && off.kind==='talk'){
+    $('liveLine').textContent = ''; const t0 = Date.now();
+    setTimeout(() => { if(off.active && off.kind==='talk' && !speakingNow() && !(off.earsAt >= t0)) offListen(); }, 60);   // (the speech queue may already have started the ears)
+  } else idleLook();
+}
+window.zenixBarge = (cmd) => {
+  if(!(off.active && off.kind==='talk') || !settings.barge || !speakingNow()) return;
+  // she is saying that very word herself right now: that was her, not him
+  const saying = ((speech.prevText||'') + ' ' + (speech.nowText||'') + ' ' + (off.sayingText||'')).toLowerCase();
+  const own = {stop:/\b(?:stop|stops|stopped|cancel|cancell?ed)\b/, pause:/\b(?:pause|paused|pauses)\b/, 'continue':/\b(?:continue|continues|continued|resume)\b/, end:/\b(?:end|ends|ended)\b/}[cmd];
+  if(own && own.test(saying) && !speech.paused && !off.pausedText) return;
+  if(cmd==='continue'){ resumeSpeech(); return; }
+  if(cmd==='pause'){ pauseSpeech(); return; }
+  if(cmd==='stop'){ stopTalking(); return; }
+  if(cmd==='end'){ speech.paused = false; off.pausedText = ''; stopSpeech(); endOffline(true); addMsg('sys', 'Voice chat ended'); idleLook(); }
+};
+function stopSpeech(){ speech.paused=false; speech.hold=false; speech.q=[]; speech.streamOpen=false; speech.onIdle=null; try{ speech.audio.pause(); }catch(e){} try{ Native.stopSpeaking(); }catch(e){} if(nativeSpeakResolve){ const r=nativeSpeakResolve; nativeSpeakResolve=null; r(); } speech.playing=false; }
 
 let turnStart = 0, turnTok = 0, turnEars = 0, turnHead = false, turnSearched = false;
 function speedNote(){
@@ -2659,7 +2722,7 @@ function speedNote(){
   return '';
 }
 async function ownRespond(text, speakIt, after, opts={}){
-  off.quietSince = 0;
+  off.quietSince = 0; speech.muted = false;
   if(!opts.quiet){ turnStart = performance.now(); turnTok = 0; turnSearched = false; $('modeLabel').textContent = 'Thinking…'; setOrb('thinking'); }
   speech.streamOpen = true; speech.onIdle = after || null;
   let full = '';
@@ -2685,7 +2748,7 @@ async function ownRespond(text, speakIt, after, opts={}){
 
 $('orbWrap').addEventListener('click', () => {
   if(off.active && (speech.playing || speech.q.length)){
-    const after = speech.onIdle; stopSpeech(); toast('Okay, I\'m listening');
+    const after = speech.onIdle; speech.muted = true; off.pausedText = ''; stopSpeech(); toast('Okay, I\'m listening');
     if(off.kind==='talk') offListen(); else if(after) after();
   } else if(off.active && off.kind==='talk' && tr.on && !off.thinking){ tr.turn = tr.turn==='me' ? 'them' : 'me'; tr.miss = 0; try{ Native.stopListening(); }catch(e){} setTimeout(offListen, 250); }   // translator: tap to pass the turn
   else if(off.active && off.kind==='talk' && off.brain){ offListen(); }
@@ -3833,6 +3896,10 @@ $('autoBtn').onclick = () => { if(Native.openAutoSendSettings){ Native.openAutoS
 $('autoInfo').onclick = () => { if(Native.openAppInfo){ Native.openAppInfo(); toast('Tap ⋮ (top right) → Allow restricted settings'); } };
 document.addEventListener('visibilitychange', () => { if(!document.hidden) renderAuto(); });
 renderAuto();
+/* ---------- Stop her by voice ---------- */
+function renderBarge(){ if(!Native.bargeStart){ $('bargeRow').style.display = 'none'; return; } $('bargeToggle').classList.toggle('on', !!settings.barge); }
+$('bargeToggle').onclick = () => { settings.barge = !settings.barge; store.set('settings', settings); renderBarge(); toast(settings.barge ? 'Say "stop", "pause", "continue" or "end" while she talks' : 'She won\'t listen while she talks'); if(settings.barge && Native.bargeReady && Native.bargeReady()!=='true') toast('Turn on "Hey Zenix" once: it downloads the listener this needs'); };
+renderBarge();
 /* ---------- Control other apps (Zenix phone control) ---------- */
 function renderCtl(){
   if(!Native.ctlOn){ $('ctlState').textContent='Android app only'; $('ctlBtn').style.display='none'; $('ctlInfo').style.display='none'; $('sumCtl').textContent='Android app only'; return; }

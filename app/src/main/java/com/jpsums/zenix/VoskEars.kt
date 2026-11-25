@@ -3,7 +3,6 @@ package com.jpsums.zenix
 import android.os.Handler
 import android.os.Looper
 import org.json.JSONObject
-import org.vosk.Model
 import org.vosk.Recognizer
 import org.vosk.android.RecognitionListener
 import org.vosk.android.SpeechService
@@ -16,7 +15,6 @@ import kotlin.concurrent.thread
  */
 class VoskEars(private val activity: MainActivity) {
     private val main = Handler(Looper.getMainLooper())
-    private var model: Model? = null
     private var speech: SpeechService? = null
     private var rec: Recognizer? = null
     private var session = 0          // main thread only
@@ -37,7 +35,7 @@ class VoskEars(private val activity: MainActivity) {
         if (!ready()) { err(-1); return@post }
         thread {
             try {
-                val m = model ?: Model(WakeWordService.modelDir(activity).absolutePath).also { model = it }
+                val m = VoskShared.get(activity)
                 val r = Recognizer(m, 16000.0f)
                 main.post {
                     if (my != session) { try { r.close() } catch (_: Exception) { }; return@post }
