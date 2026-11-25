@@ -103,6 +103,43 @@ class DeepgramEars(private val activity: MainActivity) {
 
     fun setSending(on: Boolean) { sending = on }
 
+    /**
+     * While Zenix talks, another listener needs the microphone (the one that hears "stop" / "pause").
+     * Two listeners on one microphone starve each other, so this one lets go of it; the line to Deepgram stays open.
+     */
+    @Volatile private var lent = false
+    fun lendMic() {
+        if (ws == null || lent) return
+        val r = rec ?: return
+        lent = true
+        rec = null
+        try { r.stop() } catch (_: Exception) {}
+        try { r.release() } catch (_: Exception) {}
+        thread(name = "zenix-dg-idle") {   // keep the line alive until the microphone comes back
+            val silence = ByteArray(2560)
+            var lastKeepAlive = 0L
+            while (lent && rec == null) {
+                val socket = ws ?: break
+                try {
+                    if (flux) { socket.send(silence.toByteString(0, silence.size)); Thread.sleep(80) }
+                    else {
+                        if (System.currentTimeMillis() - lastKeepAlive > 4000) { socket.send("{\"type\":\"KeepAlive\"}"); lastKeepAlive = System.currentTimeMillis() }
+                        Thread.sleep(150)
+                    }
+                } catch (_: Exception) { break }
+            }
+        }
+    }
+    /** She finished talking: take the microphone back. */
+    fun takeMicBack() {
+        if (!lent) return
+        lent = false
+        if (ws != null && rec == null && !startMic()) {
+            close()
+            js("window.zenixDGClosed && window.zenixDGClosed()")
+        }
+    }
+
     fun close() {
         val socket = ws
         try { socket?.send("{\"type\":\"CloseStream\"}") } catch (_: Exception) {}
@@ -112,6 +149,7 @@ class DeepgramEars(private val activity: MainActivity) {
 
     private fun cleanup() {
         sending = false
+        lent = false
         val r = rec
         rec = null
         ws = null

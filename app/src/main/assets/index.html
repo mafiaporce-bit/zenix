@@ -459,6 +459,7 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
           <div class="toggle-row"><span class="status-line" style="margin:0" id="wakeState">Off</span><button class="btn-line" id="wakeBtn">Turn on</button></div>
           <p class="status-line" id="wakeDiag" style="display:none"></p>
           <div class="toggle-row" id="bargeRow"><div><b>Stop her by voice</b><small>While she talks, say "stop", "pause", "continue" or "end"</small></div><button class="toggle" id="bargeToggle" aria-label="Stop her by voice"></button></div>
+          <p class="status-line" id="bargeHeard" style="display:none"></p>
           <div id="wakeFix" style="display:none">
             <p class="sub-label">Still needed for screen-off and other apps</p>
             <div class="toggle-row" id="wfOverlay"><div><b>Display over other apps</b><small>Lets Zenix pop up from any app</small></div><button class="btn-line" id="wfOverlayBtn">Allow</button></div>
@@ -2725,6 +2726,8 @@ function stopTalking(){   // "stop" / "cancel": quiet at once, then she listens
     setTimeout(() => { if(off.active && off.kind==='talk' && !speakingNow() && !(off.earsAt >= t0)) offListen(); }, 60);   // (the speech queue may already have started the ears)
   } else idleLook();
 }
+/* what the stop-word listener heard last, shown in Settings (useful when "stop" isn't caught) */
+window.zenixBargeHeard = (t) => { const el = $('bargeHeard'); if(!el) return; el.style.display = ''; el.textContent = 'Heard while she talked: "' + String(t||'').replace(/\[unk\]/g, '…') + '"'; };
 window.zenixBarge = (cmd) => {
   if(!(off.active && off.kind==='talk') || !settings.barge || !speakingNow()) return;
   // she is saying that very word herself right now: that was her, not him

@@ -299,8 +299,15 @@ class ZenixBridge(private val activity: MainActivity) {
     // listening for "stop / pause / continue / end" while she is talking
     private val barge by lazy { BargeEars(activity) }
     @JavascriptInterface fun bargeReady(): String = barge.ready().toString()
-    @JavascriptInterface fun bargeStart(): String { barge.start(); return ok("ok") }
-    @JavascriptInterface fun bargeStop(): String { barge.stop(); return ok("ok") }
+    private val micTurns = java.util.concurrent.Executors.newSingleThreadExecutor()   // one microphone, one listener at a time, strictly in order
+    @JavascriptInterface fun bargeStart(): String {
+        micTurns.execute { try { activity.ears.lendMic(); barge.start() } catch (_: Throwable) { } }
+        return ok("ok")
+    }
+    @JavascriptInterface fun bargeStop(): String {
+        micTurns.execute { try { barge.stopAndWait() } catch (_: Throwable) { }; try { activity.ears.takeMicBack() } catch (_: Throwable) { } }
+        return ok("ok")
+    }
     /** Real internet right now (connected AND working), not just "Wi-Fi is on". */
     @JavascriptInterface fun online(): String = try {
         val cm = activity.getSystemService(android.net.ConnectivityManager::class.java)

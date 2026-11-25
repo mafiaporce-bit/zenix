@@ -42,8 +42,19 @@ class BargeEars(private val activity: MainActivity) {
     fun ready(): Boolean = WakeWordService.modelReady(activity) &&
         activity.checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
 
-    fun start() { val my = ++gen; if (!ready()) return; thread(name = "zenix-barge") { run(my) } }
+    @Volatile private var worker: Thread? = null
+    fun start() {
+        val my = ++gen
+        if (!ready()) return
+        worker = thread(name = "zenix-barge") { run(my) }
+    }
     fun stop() { gen++ }
+    /** Stops and waits until the microphone is really free again (a moment at most). */
+    fun stopAndWait() {
+        gen++
+        val w = worker; worker = null
+        try { w?.join(500) } catch (_: Exception) { }
+    }
 
     @SuppressLint("MissingPermission")
     private fun open(source: Int, size: Int): AudioRecord? = try {
@@ -51,19 +62,24 @@ class BargeEars(private val activity: MainActivity) {
         if (r.state == AudioRecord.STATE_INITIALIZED) r else { r.release(); null }
     } catch (_: Exception) { null }
 
-    /** The command at the end of what was heard, or null. A few stray sounds around it are fine; a stream of them is her own voice leaking in. */
+    /**
+     * The newest command in what has been heard so far, with where it sits ("7:stop"), or null.
+     * Her own voice may leak in as a stream of unknown sounds; that is fine, only the command words matter.
+     */
     private fun command(raw: String, finished: Boolean): String? {
         val tokens = raw.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
         if (tokens.isEmpty()) return null
-        val unk = tokens.count { it == "[unk]" }
-        if (unk > 2) return null
-        if (tokens.last() == "[unk]") return null
-        val words = tokens.filter { it != "[unk]" }
-        for (n in minOf(3, words.size) downTo 1) {
-            val cmd = phrases[words.takeLast(n).joinToString(" ")] ?: continue
-            // "end" sounds like "and": it only counts when said cleanly on its own
-            if (cmd == "end" && (unk > 0 || !finished || words.size != n)) return null
-            return cmd
+        for (end in tokens.size downTo maxOf(1, tokens.size - 3)) {          // only something said just now
+            for (n in 3 downTo 1) {
+                if (end - n < 0) continue
+                val cmd = phrases[tokens.subList(end - n, end).joinToString(" ")] ?: continue
+                // a bare "end" sounds like "and": it only counts when said cleanly on its own; "end chat" always counts
+                if (cmd == "end" && n == 1) {
+                    val others = tokens.size - 1
+                    if (!finished || others > 1) continue
+                }
+                return "$end:$cmd"
+            }
         }
         return null
     }
@@ -81,8 +97,8 @@ class BargeEars(private val activity: MainActivity) {
             try { if (AcousticEchoCanceler.isAvailable()) aec = AcousticEchoCanceler.create(ar.audioSessionId)?.also { it.enabled = true } } catch (_: Throwable) { }
             try { if (NoiseSuppressor.isAvailable()) ns = NoiseSuppressor.create(ar.audioSessionId)?.also { it.enabled = true } } catch (_: Throwable) { }
             ar.startRecording()
-            val buf = ShortArray(1600)   // a tenth of a second
-            var last = ""; var hits = 0; var lastFire = 0L
+            val buf = ShortArray(800)   // a twentieth of a second
+            var last = ""; var hits = 0; var lastFire = 0L; var lastShown = ""; var lastShownAt = 0L
             while (my == gen) {
                 val n = ar.read(buf, 0, buf.size)
                 if (n < 0) break
@@ -91,18 +107,24 @@ class BargeEars(private val activity: MainActivity) {
                 val raw = try {
                     if (finished) JSONObject(rec.result).optString("text") else JSONObject(rec.partialResult).optString("partial")
                 } catch (_: Exception) { "" }
-                val cmd = command(raw, finished)
+                // shown in Settings, so it's easy to see what this listener really hears
+                val nowMs = SystemClock.elapsedRealtime()
+                if (raw.isNotBlank() && raw != lastShown && nowMs - lastShownAt > 600) {
+                    lastShown = raw; lastShownAt = nowMs
+                    activity.runJs("window.zenixBargeHeard && window.zenixBargeHeard(${JSONObject.quote(raw.takeLast(70))})")
+                }
+                val hit = command(raw, finished)
                 var fire: String? = null
-                if (finished) { fire = cmd; last = ""; hits = 0 }
-                else if (cmd != null) {
-                    if (cmd == last) hits++ else { last = cmd; hits = 1 }
-                    if (hits >= 4) fire = cmd          // the word stayed the last thing heard for ~0.4 s
-                } else { last = ""; hits = 0 }
+                if (hit == null) { last = ""; hits = 0 }
+                else if (finished) { fire = hit; last = ""; hits = 0 }
+                else {
+                    if (hit == last) hits++ else { last = hit; hits = 1 }
+                    if (hits >= 4) fire = hit          // the same word in the same place for ~0.2 s: it's real, not a passing guess
+                }
                 if (fire != null) {
-                    val now = SystemClock.elapsedRealtime()
-                    if (now - lastFire > 1200) {
-                        lastFire = now
-                        activity.runJs("window.zenixBarge && window.zenixBarge(${JSONObject.quote(fire)})")
+                    if (nowMs - lastFire > 1200) {
+                        lastFire = nowMs
+                        activity.runJs("window.zenixBarge && window.zenixBarge(${JSONObject.quote(fire.substringAfter(':'))})")
                     }
                     if (!finished) try { rec.reset() } catch (_: Throwable) { }
                     last = ""; hits = 0
