@@ -2149,10 +2149,10 @@ function startOffline(kind, brain='offline'){
       if(settings.voice!=='phone' && !/^(dg|el):/.test(settings.voice)) loadKokoro().catch(()=>{});
       const intro = off.intro; off.intro = null;
       if(intro && intro.ask) ownRespond(intro.ask, true, () => offListen());   // a routine: she does it and says the result
-      else if(wakeGreeting && off.wakeMedia && !(intro && intro.say)){ offListen(); }   // a video is playing: no greeting, she just listens (it may have been the video)
-      else { speech.onIdle = () => offListen(); speakEnqueue(intro && intro.say ? intro.say : (wakeGreeting ? 'Yes bro?' : `Hey ${settings.name||'Jim'}! What's up?`)); }
+      else if(intro && intro.say){ speech.onIdle = () => offListen(); speakEnqueue(intro.say); }   // she has something to tell him (a message while driving…)
+      else { if(off.fromWake && !off.wakeMedia && Native.buzz) Native.buzz('45'); offListen(); }   // no greeting: she listens at once (a tiny buzz after "Hey Maya" says she's ready)
       wakeGreeting = false;
-    } else { wakeGreeting = false; offlineSay(`Hey ${settings.name||'Jim'}, offline Maya here. What's up?`, true); }
+    } else { wakeGreeting = false; offListen(); }
   }
   return true;
 }

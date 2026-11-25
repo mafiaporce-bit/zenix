@@ -140,6 +140,15 @@ class ZenixBridge(private val activity: MainActivity) {
     @JavascriptInterface fun pickRingSound(): String { activity.runOnUiThread { activity.pickRingSound() }; return ok("ok") }
     @JavascriptInterface fun testRing(): String { AlarmRinger.start(activity, "Test reminder", "This is how Maya's reminders will ring", null); return ok("Ringing now.") }
 
+    /** A tiny vibration: "I'm listening" after Hey Maya, now that she no longer says a greeting. */
+    @JavascriptInterface fun buzz(ms: String): String {
+        try {
+            val v = activity.getSystemService(android.os.Vibrator::class.java)
+            v?.vibrate(android.os.VibrationEffect.createOneShot((ms.toLongOrNull() ?: 45L).coerceIn(10L, 300L), android.os.VibrationEffect.DEFAULT_AMPLITUDE))
+        } catch (_: Exception) { }
+        return ok("ok")
+    }
+
     // ---------- control other apps (scroll, swipe, tap, search) ----------
     @JavascriptInterface fun ctlOn(): String = ControlService.isOn(activity).toString()
     @JavascriptInterface fun ctlFront(): String = ControlService.instance?.frontPackage() ?: ""
