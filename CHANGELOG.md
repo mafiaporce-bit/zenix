@@ -46,3 +46,8 @@ Online/offline failover: ears, brain, voice and phone control each look after th
 - With Smart Brain on and Opus picked, quick questions still go to Haiku so she answers fast; hard ones go to Opus.
 - Cost counter uses Opus prices ($4 in / $20 out per million words-pieces).
 - The top Settings card now updates straight away when you change the Claude model.
+
+## Weather and internet search on the Claude brain
+- New weather tool (Open-Meteo, free, no key): "what's the weather" works on every brain, for Abu Dhabi or any city, up to 7 days.
+- If Anthropic refuses Claude's own internet search, searches go through Grok (when a Grok key is saved), otherwise she opens a Google results page. She no longer uses the phone's in-app search box to look things up.
+- Check Zenix has a new "Internet search (Claude)" line that shows Anthropic's exact reason when search is refused. The check does not spend a search.

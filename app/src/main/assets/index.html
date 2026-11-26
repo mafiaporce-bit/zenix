@@ -1090,6 +1090,40 @@ function callNative(method, ...args){
   try{ return JSON.parse(Native[method](...args.map(a => a==null ? '' : String(a)))); }
   catch(e){ return { ok:false, message:'Phone action failed: '+e.message }; }
 }
+/* Weather from Open-Meteo: free, no key, works on every brain */
+const WX = {0:'clear sky',1:'mostly clear',2:'partly cloudy',3:'cloudy',45:'foggy',48:'foggy',51:'light drizzle',53:'drizzle',55:'heavy drizzle',61:'light rain',63:'rain',65:'heavy rain',66:'freezing rain',67:'freezing rain',71:'light snow',73:'snow',75:'heavy snow',80:'light showers',81:'showers',82:'heavy showers',95:'thunderstorms',96:'thunderstorms with hail',99:'thunderstorms with hail'};
+async function getWeather(place, days){
+  try{
+    let lat = 24.4539, lon = 54.3773, name = 'Abu Dhabi';
+    if(place && !/^(here|abu ?dhabi)$/i.test(place.trim())){
+      const g = await (await fetchT('https://geocoding-api.open-meteo.com/v1/search?count=1&language=en&name=' + encodeURIComponent(place), 8000)).json();
+      const r = (g.results || [])[0]; if(!r) return 'Could not find a place called ' + place + '.';
+      lat = r.latitude; lon = r.longitude; name = [r.name, r.country].filter(Boolean).join(', ');
+    }
+    const n = Math.min(Math.max(+days || 2, 1), 7);
+    const w = await (await fetchT(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=auto&forecast_days=${n}`, 9000)).json();
+    const c = w.current || {}, d = w.daily || {};
+    let out = `${name} now: ${WX[c.weather_code] || 'weather code ' + c.weather_code}, ${Math.round(c.temperature_2m)}°C (feels like ${Math.round(c.apparent_temperature)}°C), humidity ${c.relative_humidity_2m}%, wind ${Math.round(c.wind_speed_10m)} km/h.`;
+    (d.time || []).forEach((t, i) => { out += ` ${i===0 ? 'Today' : i===1 ? 'Tomorrow' : new Date(t + 'T12:00').toLocaleDateString('en-GB', {weekday:'long'})}: ${WX[d.weather_code[i]] || ''}, ${Math.round(d.temperature_2m_min[i])} to ${Math.round(d.temperature_2m_max[i])}°C, ${d.precipitation_probability_max[i] ?? 0}% chance of rain.`; });
+    return out + ' Tell him in a sentence or two, like a friend.';
+  }catch(e){ return 'The weather service did not answer (' + (e.name==='AbortError' ? 'too slow' : (e.message || e)) + '). Tell him simply.'; }
+}
+/* When Claude's own search is refused: ask Grok (which has its own search) for just the facts */
+async function grokLookup(q){
+  const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 25000);
+  try{
+    const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {method:'POST', signal:ctl.signal,
+      headers:{'content-type':'application/json', 'authorization':'Bearer ' + orKey(), 'HTTP-Referer':'https://github.com/mafiaporce-bit/zenix', 'X-Title':'Zenix'},
+      body: JSON.stringify({model:'x-ai/grok-4.3', max_tokens:400, tools:[{type:'openrouter:web_search', parameters:{max_results:3, max_uses:1}}],
+        messages:[{role:'system', content:'Search the web and give the current facts in two or three plain sentences. Location: Abu Dhabi, UAE. Time zone Asia/Dubai. No links.'}, {role:'user', content:q}]})});
+    const j = await r.json(); if(!r.ok) throw new Error((j.error && j.error.message) || ('open brain ' + r.status));
+    if(j.usage && typeof j.usage.cost==='number'){ usage.cost += j.usage.cost; store.set('usage', usage); }
+    const m = j.choices && j.choices[0] && j.choices[0].message;
+    const a = String((m && m.content) || '').trim();
+    return a ? 'Found online: ' + a + ' Tell him the answer in a sentence or two.' : '';
+  }finally{ clearTimeout(t); }
+}
+const openSite = query => clientTools._openSite({query});
 function webFallback(url){ try{ window.open(url, '_blank'); return {ok:true, message:'Opened on the phone.'}; }catch(e){ return {ok:false,message:'Could not open it.'}; } }
 function showAction(t){ $('actionLine').textContent = t; addMsg('sys', t); if(window.ZenixOrb && window.ZenixOrb.task) window.ZenixOrb.task(1600); }
 const reply = r => (r && r.message) ? r.message : JSON.stringify(r);
@@ -1171,8 +1205,15 @@ const clientTools = {
     showAction(`📅 Adding: ${title}`);
     return reply(callNative('addCalendarEvent', title, start_iso, duration_minutes||60, location||'') || {ok:false, message:'Calendar only works in the Android app.'});
   },
-  open_website: async ({query}) => clientTools.web_search({query}),
-  web_search: async ({query}) => {
+  open_website: async ({query}) => openSite(query),
+  weather: async ({place, days}) => { showAction('🌤️ Weather' + (place ? ': ' + place : '')); return getWeather(place, days); },
+  web_search: async ({query}) => {   // only reached when Claude's own internet search is unavailable
+    showAction(`🔎 ${query}`);
+    if(orKey()){ try{ const a = await grokLookup(query); if(a) return a; }catch(e){ logEv('brain', 'grok lookup failed: ' + (e.message || e)); } }
+    const o = await openSite(query);
+    return (o && !/could(n'?t| not)|can only/i.test(o) ? 'Your own internet search is not working right now, so a Google results page was opened on his screen. Tell him in one short line to look there.' : o);
+  },
+  _openSite: async ({query}) => {
     showAction(`🔎 ${query}`);
     const isUrl = /^(https?:\/\/|www\.)|\.[a-z]{2,}(\/|$)/i.test(query) && !/\s/.test(query);
     const url = isUrl ? (query.startsWith('http') ? query : 'https://'+query) : 'https://www.google.com/search?q='+encodeURIComponent(query);
@@ -1458,7 +1499,7 @@ clientTools.show_route = async ({from, to}) => {
 };
 clientTools.close_map = async () => { MapView.close(); return 'Map closed.'; };
 /* ---------- Agent skills, part 1: routines, message reading, driving mode, lists ---------- */
-const BRIEF_PROMPT = "Give Jim his morning brief in about five short sentences: a warm greeting with today's day and date; today's weather in Abu Dhabi (web_search); whether he is on duty today or when his next duty is (shift_schedule); what's on his calendar today (check_calendar); what's still on his to-do list (list_read); any new messages he missed (read_notifications); and any birthday or important date from what you know about him that is today or in the next two days. Skip any part that has nothing to report. End by asking if he needs anything.";
+const BRIEF_PROMPT = "Give Jim his morning brief in about five short sentences: a warm greeting with today's day and date; today's weather in Abu Dhabi (weather tool); whether he is on duty today or when his next duty is (shift_schedule); what's on his calendar today (check_calendar); what's still on his to-do list (list_read); any new messages he missed (read_notifications); and any birthday or important date from what you know about him that is today or in the next two days. Skip any part that has nothing to report. End by asking if he needs anything.";
 const DAY_NUM = {sun:1, mon:2, tue:3, wed:4, thu:5, fri:6, sat:7};
 function daysDigits(d){
   const t = String(d||'').toLowerCase().trim();
@@ -2638,6 +2679,7 @@ const brainKey = () => settings.provider==='openrouter' ? orKey() : getKey();
 let ownMsgs = [];
 
 const TOOL_DEFS = [
+  {name:'weather', description:'Current weather and the forecast for a place (default: Abu Dhabi, where he lives). Use this for any weather question: today, tomorrow, rain, temperature, wind.', input_schema:{type:'object', properties:{place:{type:'string', description:'City, e.g. Dubai, Al Ain, Manila. Leave out for Abu Dhabi.'}, days:{type:'number', description:'How many days of forecast, 1-7 (default 2)'}}}},
   {name:'set_alarm', description:"Set an alarm (24-hour time, Dubai). With no day it goes in the Clock app for the next time it comes up. For a specific day give weekday (e.g. 'monday', 'tomorrow') or date (YYYY-MM-DD): Zenix then rings it on exactly that day. For a weekly repeat give every (e.g. 'monday' or 'monday,wednesday' or 'day'). Always tell him the day and date from the result, never a day you didn't set.", input_schema:{type:'object', properties:{hour:{type:'integer'}, minute:{type:'integer'}, label:{type:'string'}, weekday:{type:'string'}, date:{type:'string', description:'YYYY-MM-DD'}, every:{type:'string'}}, required:['hour','minute']}},
   {name:'set_reminder', description:'Schedule a reminder notification. Convert relative times to minutes from now.', input_schema:{type:'object', properties:{text:{type:'string'}, minutes_from_now:{type:'integer'}}, required:['text','minutes_from_now']}},
   {name:'open_app', description:'Open an app on the phone by name (Facebook, Claude, Gemini, YouTube, Maps...).', input_schema:{type:'object', properties:{app_name:{type:'string'}}, required:['app_name']}},
@@ -2662,7 +2704,7 @@ const TOOL_DEFS = [
   {name:'list_read', description:'Read one list, or all his lists when no name is given.', input_schema:{type:'object', properties:{list:{type:'string'}}}},
   {name:'list_remove', description:"Remove one item from a list (done or bought), or item 'all' to clear the list.", input_schema:{type:'object', properties:{list:{type:'string'}, item:{type:'string'}}, required:['list','item']}},
   {name:'phone_control', description:'Control the phone: flashlight, media volume, Do Not Disturb, battery level, music playback.', input_schema:{type:'object', properties:{action:{type:'string', enum:['flashlight_on','flashlight_off','volume_set','volume_up','volume_down','mute','dnd_on','dnd_off','battery','music_play','music_pause','music_next','music_previous']}, value:{type:'integer', description:'For volume_set: 0-100'}}, required:['action']}},
-  {name:'phone_screen', description:'Work the app that is on the phone screen right now (not Zenix herself): scroll, swipe, go back, go to the home screen, show recent apps, open the notification panel or quick settings, take a screenshot, lock the screen, or tap a button by the name written on it, type into that app\'s own search box (search), search YouTube (search_youtube), find a song or video and start playing it (play_youtube, or play_music for Spotify / YouTube Music), or close the app that is on screen (close_app). You cannot see the screen; if a tap or search fails, say so.', input_schema:{type:'object', properties:{action:{type:'string', enum:['scroll_down','scroll_up','swipe_left','swipe_right','back','home','recents','notifications','quick_settings','screenshot','lock','tap','tap_first','search','search_youtube','play_youtube','play_music','close_app']}, text:{type:'string', description:'For tap: the name on the button, e.g. Like, Follow, Skip. For search and play: the words to search for or the song to play'}, big:{type:'boolean', description:'For scrolling: true for a long scroll'}}, required:['action']}},
+  {name:'phone_screen', description:'Work the app that is on the phone screen right now (not Zenix herself): scroll, swipe, go back, go to the home screen, show recent apps, open the notification panel or quick settings, take a screenshot, lock the screen, or tap a button by the name written on it, type into that app\'s own search box (search: only when another app is open, never to look something up or answer a question), search YouTube (search_youtube), find a song or video and start playing it (play_youtube, or play_music for Spotify / YouTube Music), or close the app that is on screen (close_app). You cannot see the screen; if a tap or search fails, say so.', input_schema:{type:'object', properties:{action:{type:'string', enum:['scroll_down','scroll_up','swipe_left','swipe_right','back','home','recents','notifications','quick_settings','screenshot','lock','tap','tap_first','search','search_youtube','play_youtube','play_music','close_app']}, text:{type:'string', description:'For tap: the name on the button, e.g. Like, Follow, Skip. For search and play: the words to search for or the song to play'}, big:{type:'boolean', description:'For scrolling: true for a long scroll'}}, required:['action']}},
   {name:'set_timer', description:"Start a countdown timer in the phone's Clock app.", input_schema:{type:'object', properties:{minutes:{type:'number'}, seconds:{type:'number'}, label:{type:'string'}}}},
   {name:'navigate', description:'Start Google Maps turn-by-turn driving directions to a place (when he says navigate, take me to, start directions). For just seeing a route or the travel time, use show_route instead.', input_schema:{type:'object', properties:{to:{type:'string'}}, required:['to']}},
   {name:'where_am_i', description:"Find where he is right now (street, area, city) from the phone's location.", input_schema:{type:'object', properties:{}}},
@@ -2677,6 +2719,8 @@ const TOOL_DEFS = [
 const WEB_SEARCH = {type:'web_search_20250305', name:'web_search', max_uses:3,
   user_location:{type:'approximate', city:'Abu Dhabi', country:'AE', timezone:'Asia/Dubai'}};
 let webSearchOn = true;   // retried every time the app opens
+let webSearchWhy = '';    // Anthropic's own words when it refused the search
+const LOOK_UP = {name:'web_search', description:'Look something up on the internet (news, prices, scores, opening hours, exchange rates, events). Gives you the facts to tell him.', input_schema:{type:'object', properties:{query:{type:'string'}}, required:['query']}};
 
 function ownSystem(){
   const name = settings.name || 'Jim';
@@ -2703,7 +2747,7 @@ Use your phone tools instead of just talking about them. Maps: show_map and show
 
 Answer everything yourself: you know a huge amount — recipes (adobo, sinigang, kare-kare...), cooking steps, how-tos, explanations, history, science, health, tech, advice, maths. Answer from your own knowledge, fully and directly. Never say "I can't tell you here" or "let me search Google", and never open Google to answer a question. For recipes and step-by-step things, give the real answer: main ingredients with amounts, then the steps in order, spoken naturally.
 Never put links, web addresses, citation numbers like [1] or source names in your answer: just say the facts. For news, give the key facts (what happened, where, when, how many) in two or three sentences.
-For anything that changes or that you're not sure of (news, weather, prices, scores, opening hours, exchange rates, events), quietly use web_search yourself and tell him the answer in a sentence or two, like a friend would. Never read out links or say "according to source X" unless he asks. Only use open_website when he clearly asks to see or open something on his screen.
+For weather, always use the weather tool. For anything else that changes or that you're not sure of (news, prices, scores, opening hours, exchange rates, events), quietly use web_search yourself and tell him the answer in a sentence or two, like a friend would. Never read out links or say "according to source X" unless he asks. Only use open_website when he clearly asks to see or open something on his screen.
 
 Speed matters: this is a live voice chat, so start your answer straight away. Never repeat or rephrase his question back to him (no "So you want to know...", no "You asked about..."); go straight to the answer. Don't repeat things you already said earlier in the chat, and never say the same sentence twice.${expressiveOn() ? EXPRESSIVE_PROMPT : ''}
 
@@ -2746,7 +2790,7 @@ async function claudeStream(system, messages, onText, signal){
     headers:{'content-type':'application/json','x-api-key':getKey(),'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
     body: JSON.stringify(Object.assign({ model:turnModel(), max_tokens:700, stream:true,
       system:[{type:'text', text:system[0], cache_control:{type:'ephemeral'}}, {type:'text', text:system[1]}],
-      tools: webSearchOn ? TOOL_DEFS.concat([WEB_SEARCH]) : TOOL_DEFS, messages },
+      tools: webSearchOn ? TOOL_DEFS.concat([WEB_SEARCH]) : TOOL_DEFS.concat([LOOK_UP]), messages },
       fastMode ? { thinking:{type:'disabled'}, output_config:{effort:'low'} } : {}))
   }, signal);
   const res = g.res;
@@ -2757,7 +2801,7 @@ async function claudeStream(system, messages, onText, signal){
     if(res.status===429) msg='Claude is busy right now, try again in a moment.';
     if(res.status===529 || res.status===503) msg='Claude is overloaded right now, try again in a moment.';
     if(res.status===400 && /credit/i.test(msg)) msg='Your Claude API account is out of credit. Top up at platform.claude.com.';
-    if(res.status===400 && webSearchOn && /web.?search/i.test(msg)){ webSearchOn=false; store.set('websearch', false); return claudeStream(system, messages, onText, signal); }
+    if(res.status===400 && webSearchOn && /web.?search/i.test(msg)){ webSearchOn=false; webSearchWhy=msg; store.set('websearch', false); logEv('brain', 'Claude refused internet search: ' + msg); return claudeStream(system, messages, onText, signal); }
     if(res.status===400 && fastMode && /thinking|effort|output_config/i.test(msg)){ fastMode=false; store.set('fastmode', false); return claudeStream(system, messages, onText, signal); }
     throw new Error(msg);
   }
@@ -2779,7 +2823,7 @@ async function claudeStream(system, messages, onText, signal){
         else if(cb.type==='text') blocks[ev.index] = {type:'text', text:''};
         else if(cb.type==='thinking') blocks[ev.index] = {type:'server', raw:{type:'thinking', thinking:cb.thinking||'', signature:cb.signature||''}};
         else if(cb.type==='server_tool_use'){ blocks[ev.index] = {type:'server', raw:cb, json:''}; if(off.kind==='talk') $('actionLine').textContent='🔎 Searching the web…'; }
-        else { blocks[ev.index] = {type:'server', raw:cb}; if(cb.type==='web_search_tool_result') u.searches=(u.searches||0)+1; } }
+        else { blocks[ev.index] = {type:'server', raw:cb}; if(cb.type==='web_search_tool_result'){ u.searches=(u.searches||0)+1; if(cb.content && cb.content.error_code){ webSearchWhy = 'search error: ' + cb.content.error_code; logEv('brain', 'Claude internet search error: ' + cb.content.error_code); } } } }
       else if(ev.type==='content_block_delta'){ const b=blocks[ev.index]; if(!b) continue;
         if(ev.delta.type==='text_delta'){ b.text += ev.delta.text; onText && onText(ev.delta.text); }
         else if(ev.delta.type==='input_json_delta'){ b.json = (b.json||'') + ev.delta.partial_json; }
@@ -4528,6 +4572,12 @@ function renderReport(){
       const d = document.createElement('div'); const b = document.createElement('b'); b.textContent = (i.ok ? '✓ ' : '✗ ') + i.t; b.style.color = i.ok ? '' : 'var(--danger)'; const sm = document.createElement('small'); sm.textContent = i.d || ''; d.appendChild(b); d.appendChild(sm); row.appendChild(d); box.appendChild(row); });
   }
 }
+function fetchBrainCheck(){
+  const c = new AbortController(); setTimeout(() => c.abort(), 15000);
+  return fetch('https://api.anthropic.com/v1/messages', {method:'POST', signal:c.signal,
+    headers:{'content-type':'application/json', 'x-api-key':getKey(), 'anthropic-version':'2023-06-01', 'anthropic-dangerous-direct-browser-access':'true'},
+    body: JSON.stringify({model:settings.model, max_tokens:5, tools:[WEB_SEARCH], tool_choice:{type:'none'}, messages:[{role:'user', content:'Say OK'}]})});
+}
 async function runCheck(){
   const items = []; const add = (ok, t, d) => items.push({ok: !!ok, t, d: d || ''});
   const yesN = f => { try{ return !!(Native[f] && Native[f]()==='true'); }catch(e){ return false; } };
@@ -4541,6 +4591,14 @@ async function runCheck(){
         try{ ans = await Promise.race([brainOnce('Reply with the single word OK.', 'Say OK', 8), new Promise((_, rej) => setTimeout(() => rej(new Error('no answer in 15 s')), 15000))]); }catch(e){ err = e.message || String(e); }
         add(!!ans, 'Brain answers', ans ? Math.round(performance.now() - t0) / 1000 + ' s' : 'Failed: ' + err); }
     } else add(true, 'Brain', 'ElevenLabs agent');
+    if(settings.engine==='own' && getKey()){   // Claude's own internet search: a tiny request that carries the search tool but doesn't use it
+      let why = '';
+      try{ const r = await fetchBrainCheck(); if(!r.ok){ const j = await r.json().catch(() => ({})); why = (j.error && j.error.message) || ('answered ' + r.status); } }catch(e){ why = e.name==='AbortError' ? 'no answer in 15 s' : (e.message || String(e)); }
+      if(!why){ webSearchOn = true; webSearchWhy = ''; }
+      else if(/web.?search/i.test(why)){ webSearchOn = false; webSearchWhy = why; }
+      add(!why, 'Internet search (Claude)', !why ? 'Works' : why + (orKey() ? ' · Searches go through Grok instead' : ' · She opens Google instead. Turn on web search in your Claude Console, or add a Grok key'));
+      add(true, 'Weather', 'Own weather service, works on every brain');
+    }
     // ears
     if(settings.ears==='deepgram'){
       if(!dgKey()) add(false, 'Deepgram ears', 'No Deepgram key. Settings → Keys.');
