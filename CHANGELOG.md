@@ -40,3 +40,9 @@ The new features were taken. The package's "safety build" changes that switched 
 
 ## 2.71 – 2.72
 Online/offline failover: ears, brain, voice and phone control each look after themselves. Live status screen.
+
+## Opus 5.5 brain choice
+- Settings → Brain → Claude now has a third choice: Opus · smartest (claude-opus-5-5), next to Haiku and Sonnet.
+- With Smart Brain on and Opus picked, quick questions still go to Haiku so she answers fast; hard ones go to Opus.
+- Cost counter uses Opus prices ($4 in / $20 out per million words-pieces).
+- The top Settings card now updates straight away when you change the Claude model.

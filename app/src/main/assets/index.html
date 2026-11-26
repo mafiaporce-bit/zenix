@@ -393,7 +393,7 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
           <div id="ownBox">
             <div id="claudeBox">
               <p class="sub-label">Model</p>
-              <div class="seg small"><button data-model="claude-haiku-5-5">Haiku · fast</button><button data-model="claude-sonnet-5-5">Sonnet · smarter</button></div>
+              <div class="seg small"><button data-model="claude-haiku-5-5">Haiku · fast</button><button data-model="claude-sonnet-5-5">Sonnet · smarter</button><button data-model="claude-opus-5-5">Opus · smartest</button></div>
             </div>
             <div id="orBox" style="display:none">
               <p class="sub-label">Model</p>
@@ -890,6 +890,7 @@ function routeBrain(text,provider,current,unsupported={}){
  if(provider==='openrouter'){
   const model=complex?'x-ai/grok-4.7':'x-ai/grok-4.3';return unsupported[model]?current:model;
  }
+ if(current==='claude-opus-5-5')return complex?'claude-opus-5-5':'claude-haiku-5-5';   // he picked Opus: hard questions get Opus, quick ones stay fast
  return complex?'claude-sonnet-5-5':'claude-haiku-5-5';
 }
 const groups=[['car','vehicle','automobile','rav4'],['job','work','duty','shift','employment'],['wife','spouse','partner'],['kid','child','son','daughter','children'],['app','application','software','project'],['cost','price','budget','expense','payment'],['doctor','physician','appointment','clinic']];
@@ -2624,7 +2625,7 @@ if(!settings.engine) settings.engine='own';
 if(!settings.model) settings.model='claude-haiku-5-5';
 if(!settings.voice) settings.voice='af_heart';
 let usage = store.get('usage', {inTok:0, outTok:0, cost:0});
-const PRICES = {'claude-haiku-5-5':[0.10,0.50], 'claude-sonnet-5-5':[2,10]};
+const PRICES = {'claude-haiku-5-5':[0.10,0.50], 'claude-sonnet-5-5':[2,10], 'claude-opus-5-5':[4,20]};
 const getKey = () => (store.get('apikey','')||'').trim();
 if(!settings.provider) settings.provider='claude';
 if(!settings.orModel) settings.orModel='x-ai/grok-4.3';
@@ -3211,7 +3212,7 @@ function renderBrain(){
 const vbox = $('voiceBtns');
 KOKORO_VOICES.forEach(([id,label]) => { const b=document.createElement('button'); b.dataset.voice=id; b.textContent=label; vbox.appendChild(b); });
 document.querySelectorAll('[data-engine]').forEach(b => b.onclick = () => { settings.engine=b.dataset.engine; store.set('settings',settings); renderBrain(); toast(settings.engine==='own'?'Own brain: your own key (ElevenLabs only if you pick its voices)':'ElevenLabs: premium Jessica voice (uses credits)'); });
-document.querySelectorAll('[data-model]').forEach(b => b.onclick = () => { settings.model=b.dataset.model; store.set('settings',settings); renderBrain(); });
+document.querySelectorAll('[data-model]').forEach(b => b.onclick = () => { settings.model=b.dataset.model; store.set('settings',settings); renderBrain(); if(typeof renderMe==='function') renderMe(); });
 async function pickVoice(b){
   settings.voice=b.dataset.voice; store.set('settings',settings); renderBrain(); renderHD();
   if(speech.playing || speech.q.length) stopSpeech();
@@ -4047,7 +4048,7 @@ function renderMe(){
   const id = brainId();
   document.querySelectorAll('[data-brain]').forEach(b => b.classList.toggle('sel', b.dataset.brain===id));
   const orLabel = (OR_MODELS.find(m => m[0]===settings.orModel) || [0, settings.orModel])[1];
-  const brainTxt = id==='eleven' ? 'ElevenLabs agent' : id==='openrouter' ? orLabel + ' · OpenRouter' : (settings.model==='claude-sonnet-5-5' ? 'Claude Sonnet' : 'Claude Haiku');
+  const brainTxt = id==='eleven' ? 'ElevenLabs agent' : id==='openrouter' ? orLabel + ' · OpenRouter' : (settings.model==='claude-opus-5-5' ? 'Claude Opus' : settings.model==='claude-sonnet-5-5' ? 'Claude Sonnet' : 'Claude Haiku');
   $('sumBrain').textContent = brainTxt + ((id==='openrouter' && !orKey()) || (id==='claude' && !getKey()) ? ' · key missing' : '');
   $('brainHint').textContent = id==='eleven' ? 'All-in-one ElevenLabs agent with its own voice and ears. Uses ElevenLabs credits.'
     : id==='openrouter' ? 'Grok and other more open AIs through OpenRouter. Pick any voice below.' : 'Claude straight from Anthropic, the quickest replies. Pick any voice below.';

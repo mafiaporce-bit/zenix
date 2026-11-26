@@ -4,6 +4,7 @@ export function routeBrain(text,provider,current,unsupported={}){
  if(provider==='openrouter'){
   const model=complex?'x-ai/grok-4.7':'x-ai/grok-4.3';return unsupported[model]?current:model;
  }
+ if(current==='claude-opus-5-5')return complex?'claude-opus-5-5':'claude-haiku-5-5';   // he picked Opus: hard questions get Opus, quick ones stay fast
  return complex?'claude-sonnet-5-5':'claude-haiku-5-5';
 }
 const groups=[['car','vehicle','automobile','rav4'],['job','work','duty','shift','employment'],['wife','spouse','partner'],['kid','child','son','daughter','children'],['app','application','software','project'],['cost','price','budget','expense','payment'],['doctor','physician','appointment','clinic']];
