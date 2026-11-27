@@ -335,6 +335,7 @@ class ZenixBridge(private val activity: MainActivity) {
     @JavascriptInterface fun stopSpeaking(): String { activity.brain.stopSpeaking(); return ok("stopped") }
     // ---------- "Hey Zenix" wake word ----------
     @JavascriptInterface fun wakeStatus(): String = WakeWordService.status(activity)
+    @JavascriptInterface fun wakeSens(level: String): String { WakeWordService.setSens(activity, level); return ok(WakeWordService.sens(activity)) }
     @JavascriptInterface fun isLocked(): String = if (activity.isLocked()) "true" else "false"
     /** Android 14+: is Zenix allowed to open herself over the lock screen ("full screen notifications")? */
     @JavascriptInterface fun canFullScreen(): String = try {

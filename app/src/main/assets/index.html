@@ -468,6 +468,9 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
           <p class="hint">Say "Zenix" or "Hey Zenix" to start talking, even in another app or with the screen off. It listens on your phone only; nothing is sent until you say it. A voice chat that goes quiet ends by itself.</p>
           <div class="toggle-row"><span class="status-line" style="margin:0" id="wakeState">Off</span><button class="btn-line" id="wakeBtn">Turn on</button></div>
           <p class="status-line" id="wakeDiag" style="display:none"></p>
+          <div style="margin:10px 0 4px"><b>How easily she wakes up</b><small style="display:block;opacity:.7;margin:2px 0 6px">Low: only a clear "Hey Zenix" after a quiet moment. Normal: "Hey Zenix", or a clear "Zenix" on its own, never in the middle of a conversation. High: wakes more easily, but also by mistake more often.</small>
+            <div class="seg small" id="wakeSensBtns"><button data-wsens="low">Low</button><button data-wsens="normal">Normal</button><button data-wsens="high">High</button></div></div>
+          <p class="status-line" id="wakeLast" style="display:none"></p>
           <div class="toggle-row" id="bargeRow"><div><b>Stop her by voice</b><small>While she talks, say "stop", "pause", "continue" or "end"</small></div><button class="toggle" id="bargeToggle" aria-label="Stop her by voice"></button></div>
           <p class="status-line" id="bargeHeard" style="display:none"></p>
           <div id="wakeFix" style="display:none">
@@ -4004,6 +4007,24 @@ document.addEventListener('click', initVoiceViz, {once:true});
 if(settings.wake===undefined) settings.wake=false;
 let wakeGreeting = false;   // true for a moment after "Hey Zenix": the next voice chat greets with "Yes bro?" and ends sooner when quiet
 function wakeSt(){ try{ return JSON.parse(Native.wakeStatus()); }catch(e){ return {}; } }
+const agoS = s => s < 0 ? '' : s < 90 ? s + ' s ago' : s < 5400 ? Math.round(s/60) + ' min ago' : Math.round(s/3600) + ' h ago';
+function wakeLines(w){
+  return {woke: w.lastWake ? agoS(w.lastWakeAgo) + ': heard ' + w.lastWake : 'Not since the app started',
+          missed: w.lastReject ? agoS(w.lastRejectAgo) + ': ' + w.lastReject : ''};
+}
+function renderWakeSens(){
+  const w = wakeSt(), lv = w.sens || 'normal';
+  document.querySelectorAll('[data-wsens]').forEach(b => b.classList.toggle('sel', b.dataset.wsens===lv));
+  const L = wakeLines(w), el = $('wakeLast');
+  if(el && (w.lastWake || w.lastReject)){ el.style.display = ''; el.textContent = 'Last wake-up: ' + L.woke + (L.missed ? ' · Last ignored: ' + L.missed : ''); }
+}
+document.querySelectorAll('[data-wsens]').forEach(b => b.onclick = () => {
+  if(!Native.wakeSens){ toast('This needs the Android app'); return; }
+  Native.wakeSens(b.dataset.wsens); renderWakeSens();
+  toast({low:'Low: only a clear "Hey Zenix"', normal:'Normal sensitivity', high:'High: wakes more easily'}[b.dataset.wsens]);
+});
+setTimeout(renderWakeSens, 800);
+document.querySelector('[data-sec="wake"]') && document.querySelector('[data-sec="wake"]').addEventListener('toggle', renderWakeSens);
 function wakePauseNow(){ if(settings.wake && Native && Native.wakePause){ Native.wakePause(); return new Promise(r=>setTimeout(r,350)); } return Promise.resolve(); }
 const inVoiceChat = () => (off.active && off.kind==='talk') || !!convo || connecting;
 function wakeResumeLater(){
@@ -4815,6 +4836,7 @@ function diagRows(){
     ['Last words understood', Z.lastHeard ? ago(Z.lastHeard.at) + ', by ' + nice(Z.lastHeard.ears).replace(/^The /, 'the ') : 'None yet', true],
     ['Last command done', Z.lastCmd ? '"' + Z.lastCmd.text + '" ' + ago(Z.lastCmd.at) + ', took ' + Z.lastCmd.ms + ' ms' : 'None yet', true],
     ['Errors from services', errs.length ? errs.join(' | ') : 'None', !errs.length],
+    ['Last "Hey Zenix" wake-up', (() => { const w = wakeSt(); if(!w.state) return 'Not available'; const L = wakeLines(w); return L.woke + (L.missed ? ' · last ignored: ' + L.missed : '') + ' · sensitivity: ' + (w.sens || 'normal'); })(), true],
     ['How fast she hears you', (() => { const w = Z.waits || []; if(!w.length) return 'Not measured yet'; const last = w[w.length-1], avg = w.reduce((a, x) => a + x.ms, 0) / w.length;
       return 'Last ' + (last.ms/1000).toFixed(1) + ' s after your last word, average ' + (avg/1000).toFixed(1) + ' s (' + nice(last.ears).replace(/^The /, 'the ') + ')' + (Z.readyMs ? ' · listener started in ' + (Z.readyMs/1000).toFixed(1) + ' s' : ''); })(), !(Z.waits || []).length || (Z.waits || []).slice(-3).every(x => x.ms < 2500)],
     ['Last time her voice was cut', Z.lastCut ? ago(Z.lastCut.at) + ': ' + Z.lastCut.why : 'Not this session', true]

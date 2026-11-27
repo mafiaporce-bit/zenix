@@ -48,6 +48,14 @@ class WakeWordService : Service() {
         @Volatile var lastHeard = ""
         @Volatile var lastHeardAt = 0L
         @Volatile var activeNames = ""
+        // the last time she woke up, and the last near-miss she ignored (shown in Live status, to tune it)
+        @Volatile var lastWake = ""
+        @Volatile var lastWakeAt = 0L
+        @Volatile var lastReject = ""
+        @Volatile var lastRejectAt = 0L
+        private const val PREF_SENS = "wake_sens"
+        fun sens(c: Context): String = c.getSharedPreferences("zenix", Context.MODE_PRIVATE).getString(PREF_SENS, "normal") ?: "normal"
+        fun setSens(c: Context, v: String) { if (v in listOf("low", "normal", "high")) c.getSharedPreferences("zenix", Context.MODE_PRIVATE).edit().putString(PREF_SENS, v).apply() }
         const val ALERT_CHANNEL = "zenix_wake_alert"
         const val ALERT_ID = 11
 
@@ -78,7 +86,9 @@ class WakeWordService : Service() {
             o.put("state", state).put("percent", pct).put("running", current != null)
                 .put("listening", current?.isListening() == true).put("error", lastError)
                 .put("heard", lastHeard).put("heardAgo", if (lastHeardAt > 0) (System.currentTimeMillis() - lastHeardAt) / 1000 else -1)
-                .put("names", activeNames)
+                .put("names", activeNames).put("sens", sens(c))
+                .put("lastWake", lastWake).put("lastWakeAgo", if (lastWakeAt > 0) (System.currentTimeMillis() - lastWakeAt) / 1000 else -1)
+                .put("lastReject", lastReject).put("lastRejectAgo", if (lastRejectAt > 0) (System.currentTimeMillis() - lastRejectAt) / 1000 else -1)
             return o.toString()
         }
 
@@ -181,8 +191,9 @@ class WakeWordService : Service() {
     // ---------- what she listens for ----------
     private val greetWords = listOf("hey", "hi", "okay", "hello")
     // "Zenix" in every way it can come out of the listener; only the ones it really knows are used
-    private val nameWords = listOf("zenix", "xenix", "zenics", "zennix", "xanax", "zinnix")
-    private val soundAlikes = listOf("zen nix", "zen ix", "zen x", "zen ex", "zee nix", "xen ix", "zen next")
+    // ("xanax", "zen x", "zen ex" and "zen next" were dropped: ordinary talk kept turning into them)
+    private val nameWords = listOf("zenix", "xenix", "zenics", "zennix", "zinnix")
+    private val soundAlikes = listOf("zen nix", "zen ix", "zee nix", "xen ix")
 
     /** True/false if the listener's dictionary has the word; null if that can't be checked. */
     private val voskExtra: VoskExtra? by lazy {
@@ -239,28 +250,77 @@ class WakeWordService : Service() {
         override fun onTimeout() {}
     }
 
+    // when the current stretch of sound began, and when the one before it ended (to tell a call from a conversation)
+    private var segStart = 0L
+    private var prevEnd = 0L
+
     private fun check(hyp: String?, key: String) {
         val text = try { JSONObject(hyp ?: "{}").optString(key) } catch (_: Exception) { "" }
         val now = System.currentTimeMillis()
         val clean = text.replace("[unk]", " ").trim().replace(Regex("\\s+"), " ")
         if (clean.isNotEmpty()) { lastHeard = clean; lastHeardAt = now }   // shown in Settings, to check she can hear you
-        // Only a clear, finished "Hey Zenix" said on its own counts: no half-heard guesses (partials),
-        // nothing else heard in the same breath (that's ordinary talking), and the listener sure of every word.
-        if (key != "text") return
-        // a breath or a bit of noise next to it is fine; a whole sentence around it is ordinary talking
-        if (Regex("\\[unk\\]").findAll(text).count() > 2) return
+        if (key != "text") { if (text.isNotBlank() && segStart == 0L) segStart = now; return }
+        // Only a clear, finished "Hey Zenix" counts: no half-heard guesses (partials).
+        val started = if (segStart > 0) segStart else now
+        val quietBefore = started - prevEnd
+        segStart = 0L
+        if (text.trim().split(Regex("\\s+")).count { it.isNotEmpty() } >= 2) prevEnd = now   // a stretch of talking (a lone noise doesn't count)
         if (!wakeRegex.matches(clean)) return
         if (now - lastTrigger < 3000) return
         if (now < quietUntil) return   // just after a chat ended: that was the tail of it, not a new "Hey Zenix"
-        val media = try { getSystemService(android.media.AudioManager::class.java).isMusicActive } catch (_: Exception) { false }
-        val words = try { JSONObject(hyp ?: "{}").optJSONArray("result") } catch (_: Exception) { null }
-        if (words != null && words.length() > 0) {
-            var low = 1.0
-            for (k in 0 until words.length()) low = minOf(low, words.optJSONObject(k)?.optDouble("conf", 1.0) ?: 1.0)
-            if (low < (if (media) 0.85 else 0.6)) return
+        verdict(hyp, text, clean, quietBefore, now)?.let { why ->
+            lastReject = "\"$clean\" ignored: $why"; lastRejectAt = now
+            return
         }
+        lastWake = "\"$clean\"" + confNote(hyp); lastWakeAt = now
         lastTrigger = now
         triggered()
+    }
+
+    private fun confNote(hyp: String?): String {
+        val c = lowConf(hyp) ?: return ""
+        return " (sure: ${(c * 100).toInt()}%)"
+    }
+    private fun lowConf(hyp: String?): Double? {
+        val words = try { JSONObject(hyp ?: "{}").optJSONArray("result") } catch (_: Exception) { null } ?: return null
+        if (words.length() == 0) return null
+        var low = 1.0
+        for (k in 0 until words.length()) low = minOf(low, words.optJSONObject(k)?.optDouble("conf", 1.0) ?: 1.0)
+        return low
+    }
+
+    /**
+     * null = wake up; otherwise why not. How strict depends on the sensitivity he picked:
+     *  low    = only "Hey Zenix", said after a quiet moment, very sure of every word
+     *  normal = "Hey Zenix" (sure) or a very clear "Zenix" on its own; not in the middle of talking
+     *  high   = the old, easy-going rules
+     */
+    private fun verdict(hyp: String?, text: String, clean: String, quietBefore: Long, now: Long): String? {
+        val sens = sens(this)
+        val greeted = clean.contains(' ') && clean.substringBefore(' ') in greetWords
+        val unk = Regex("\\[unk\\]").findAll(text).count()
+        val media = try { getSystemService(android.media.AudioManager::class.java).isMusicActive } catch (_: Exception) { false }
+        val need = when (sens) {
+            "low" -> 0.9
+            "high" -> 0.65
+            else -> if (greeted) 0.8 else 0.9
+        } + (if (media) 0.05 else 0.0)
+        val maxUnk = when (sens) { "low" -> 0; "high" -> 2; else -> if (greeted) 1 else 0 }
+        val quietNeed = when (sens) { "low" -> 1200L; "high" -> 0L; else -> 700L }
+        if (sens == "low" && !greeted) return "only \"Hey Zenix\" wakes her on Low"
+        if (unk > maxUnk) return "other words were said with it"
+        if (quietNeed > 0 && quietBefore < quietNeed) return "it came in the middle of talking"
+        val c = lowConf(hyp)
+        if (c != null && c < minOf(need, 0.97)) return "not sure enough (${(c * 100).toInt()}%, needs ${(minOf(need, 0.97) * 100).toInt()}%)"
+        // a name squeezed out of a tiny blip of sound, or dragged out of a long one, is not someone calling her
+        val words = try { JSONObject(hyp ?: "{}").optJSONArray("result") } catch (_: Exception) { null }
+        if (words != null && words.length() > 0 && sens != "high") {
+            val last = words.optJSONObject(words.length() - 1)
+            val d = (last?.optDouble("end", 0.0) ?: 0.0) - (last?.optDouble("start", 0.0) ?: 0.0)
+            if (d in 0.0001..0.22) return "too short to be her name"
+            if (d > 1.4) return "too long to be her name"
+        }
+        return null
     }
 
     private fun triggered() {

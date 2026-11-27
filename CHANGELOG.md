@@ -63,3 +63,13 @@ Online/offline failover: ears, brain, voice and phone control each look after th
 - Deepgram Flux waits at most 3 s (was 4 s) for the end of a sentence before handing it over.
 - On a connection that keeps dropping, she retries the faster online ears every 25 s at most (was up to 60 s), and as soon as the cloud brain answers she knows the internet works and tries the online ears right after she finishes speaking.
 - Live status has a new line: "How fast she hears you": the wait after your last word for the last sentence and on average, which listener heard you, and how long the phone listener took to start.
+
+## "Hey Zenix" no longer wakes up from ordinary talk
+- Dropped the sound-alikes that ordinary speech kept turning into ("zen next", "zen x", "zen ex", "Xanax").
+- New "How easily she wakes up" setting in Settings → "Hey Zenix": Low, Normal (default), High.
+  - Low: only a clear "Hey Zenix" (90% sure) after a quiet moment.
+  - Normal: "Hey Zenix" (80% sure) or a very clear "Zenix" on its own (90%), never in the middle of talking.
+  - High: the old easy-going rules.
+- With music or a video playing, she has to be 5% more sure.
+- A name squeezed out of a tiny blip of sound, or dragged out of a long one, is ignored.
+- Settings → "Hey Zenix" and Live status show the last wake-up (what she heard, how sure) and the last one she ignored, with why.
