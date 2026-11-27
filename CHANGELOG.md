@@ -79,3 +79,10 @@ Online/offline failover: ears, brain, voice and phone control each look after th
 - She watches Spotify's player: if it's still quiet, she asks the player again, then (with "Control other apps" on) presses Play or taps the first song.
 - She only says "Playing …" when music is really playing, and names the song that started. If it didn't start, she says so.
 - When you call her ("Zenix" / "Hey Zenix"), she says "Hey master, it's Friday night." (the real day and morning / afternoon / evening / night, Dubai time), then listens. Not while music is playing. Switch: Settings → "Hey Zenix" → Greet me when I call her.
+
+## My voice: she knows it's you
+- New Settings → My voice: download the voice fingerprint (about 13 MB, once), then read three sentences. Everything stays on the phone; the recordings become numbers and are thrown away.
+- Only wake for my voice: "Zenix" from a friend or the TV is ignored ("not your voice" shows in Last ignored).
+- Interrupt her by talking: when your voice is heard for about a second while she talks, she stops and listens. Her own voice and other people's don't count. Works even with "Stop her by voice" off.
+- How strict: Relaxed / Normal / Strict. The bar is learned from how alike your own three recordings are.
+- Test my voice, Record again, Delete. Live status shows the last voice check (how much like you, and what was needed).

@@ -93,6 +93,9 @@ class BargeEars(private val activity: MainActivity) {
             val grammar = JSONArray().apply { phrases.keys.forEach { put(it) }; put("[unk]") }.toString()
             rec = Recognizer(VoskShared.get(activity), 16000.0f, grammar)
             try { rec.setWords(true) } catch (_: Throwable) { }   // a confidence score per word: noise that only sounds a bit like "stop" is ignored
+            // "Interrupt her by talking": the listener also works out whose voice it hears (his, or her own echo / someone else)
+            val byVoice = VoiceId.barge(activity) && (try { VoiceId.model(activity)?.let { rec.setSpeakerModel(it); true } ?: false } catch (_: Throwable) { false })
+            var talkSince = 0L
             val size = maxOf(AudioRecord.getMinBufferSize(16000, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT), 6400)
             ar = open(MediaRecorder.AudioSource.VOICE_COMMUNICATION, size) ?: open(MediaRecorder.AudioSource.VOICE_RECOGNITION, size) ?: return
             try { if (AcousticEchoCanceler.isAvailable()) aec = AcousticEchoCanceler.create(ar.audioSessionId)?.also { it.enabled = true } } catch (_: Throwable) { }
@@ -106,8 +109,27 @@ class BargeEars(private val activity: MainActivity) {
                 if (n == 0) continue
                 val finished = rec.acceptWaveForm(buf, n)
                 var confs: List<Double> = emptyList()
+                // he has been making sound for over a second while she talks: check whose voice it is now, without waiting for a pause
+                var forced: String? = null
+                if (byVoice && !finished) {
+                    val p = try { JSONObject(rec.partialResult).optString("partial") } catch (_: Exception) { "" }
+                    if (p.isNotBlank()) { if (talkSince == 0L) talkSince = SystemClock.elapsedRealtime() } else talkSince = 0L
+                    if (talkSince > 0 && SystemClock.elapsedRealtime() - talkSince > 1100) { forced = try { rec.finalResult } catch (_: Exception) { null }; talkSince = 0L }
+                }
+                val full = forced ?: if (finished) (try { rec.result } catch (_: Exception) { "{}" }) else null
+                if (byVoice && full != null) {
+                    val v = VoiceId.vector(full, 60)
+                    if (v != null && VoiceId.isHim(activity, v, "while she talked") == true) {
+                        val nowMs = SystemClock.elapsedRealtime()
+                        if (nowMs - lastFire > 1200) { lastFire = nowMs; activity.runJs("window.zenixBarge && window.zenixBarge('talk')") }
+                        last = ""; hits = 0
+                        continue
+                    }
+                }
+                // not him (her own voice, or someone else): the words still count as a finished phrase for "stop" / "pause"
+                val done = finished || forced != null
                 val raw = try {
-                    if (finished) JSONObject(rec.result).let { j ->
+                    if (done) JSONObject(full ?: rec.result).let { j ->
                         val arr = j.optJSONArray("result")
                         if (arr != null) confs = (0 until arr.length()).map { arr.getJSONObject(it).optDouble("conf", 1.0) }
                         j.optString("text")
@@ -119,10 +141,10 @@ class BargeEars(private val activity: MainActivity) {
                     lastShown = raw; lastShownAt = nowMs
                     activity.runJs("window.zenixBargeHeard && window.zenixBargeHeard(${JSONObject.quote(raw.takeLast(70))})")
                 }
-                val hit = command(raw, finished)
+                val hit = command(raw, done)
                 var fire: String? = null
                 if (hit == null) { last = ""; hits = 0 }
-                else if (finished) {
+                else if (done) {
                     // the whole phrase heard: it counts only when the listener is sure of the command word itself
                     val at = hit.substringBefore(':').toIntOrNull() ?: 0
                     val c = confs.getOrNull(at - 1) ?: 1.0
@@ -142,7 +164,7 @@ class BargeEars(private val activity: MainActivity) {
                         lastFire = nowMs
                         activity.runJs("window.zenixBarge && window.zenixBarge(${JSONObject.quote(fire.substringAfter(':'))})")
                     }
-                    if (!finished) try { rec.reset() } catch (_: Throwable) { }
+                    if (!done) try { rec.reset() } catch (_: Throwable) { }
                     last = ""; hits = 0
                 }
             }

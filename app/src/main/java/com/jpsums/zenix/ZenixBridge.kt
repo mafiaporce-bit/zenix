@@ -335,6 +335,16 @@ class ZenixBridge(private val activity: MainActivity) {
     @JavascriptInterface fun stopSpeaking(): String { activity.brain.stopSpeaking(); return ok("stopped") }
     // ---------- "Hey Zenix" wake word ----------
     @JavascriptInterface fun wakeStatus(): String = WakeWordService.status(activity)
+    // ---------- his voice fingerprint (stays on the phone) ----------
+    @JavascriptInterface fun voiceStatus(): String = VoiceId.status(activity)
+    @JavascriptInterface fun voiceDownload(): String { VoiceId.download(activity); return VoiceId.status(activity) }
+    @JavascriptInterface fun voiceRecord(i: String, secs: String): String {
+        VoiceId.recordSample(activity, i.toIntOrNull() ?: 0, (secs.toIntOrNull() ?: 5).coerceIn(2, 10)) { activity.runJs(it) }; return ok("recording")
+    }
+    @JavascriptInterface fun voiceFinish(): String = VoiceId.finish(activity)
+    @JavascriptInterface fun voiceTest(secs: String): String { VoiceId.test(activity, (secs.toIntOrNull() ?: 4).coerceIn(2, 10)) { activity.runJs(it) }; return ok("recording") }
+    @JavascriptInterface fun voiceSet(key: String, value: String): String { VoiceId.set(activity, key, value); return VoiceId.status(activity) }
+    @JavascriptInterface fun voiceForget(): String { VoiceId.forget(activity); return VoiceId.status(activity) }
     @JavascriptInterface fun wakeSens(level: String): String { WakeWordService.setSens(activity, level); return ok(WakeWordService.sens(activity)) }
     @JavascriptInterface fun isLocked(): String = if (activity.isLocked()) "true" else "false"
     /** Android 14+: is Zenix allowed to open herself over the lock screen ("full screen notifications")? */

@@ -484,6 +484,27 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
           <p class="hint" style="margin:12px 0 0">After restarting the phone, open Zenix once so she starts listening again.</p>
         </div>
       </details>
+      <details class="set-item" data-sec="voiceid">
+        <summary><span class="ico violet"><svg viewBox="0 0 24 24"><path d="M12 3a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V6a3 3 0 0 1 3-3z"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></span><span class="set-t"><b>My voice</b><span id="sumVoiceId"></span></span><svg class="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></summary>
+        <div class="set-body">
+          <p class="hint">Zenix learns what your voice sounds like, so she wakes up only for you and you can interrupt her just by talking. It stays on this phone: the recordings are turned into numbers and thrown away. Not perfect: a cold, a noisy place, or the phone far away can make her miss you.</p>
+          <p class="status-line" id="vidState">Checking…</p>
+          <button class="btn-line" id="vidDownload" style="display:none">Download (about 13 MB)</button>
+          <div id="vidEnroll" style="display:none">
+            <p class="sub-label">Record your voice: read each sentence out loud, normally, phone in your hand</p>
+            <p class="status-line" id="vidLine" style="font-size:17px"></p>
+            <button class="btn-line" id="vidRec">Record sentence 1 of 3</button>
+          </div>
+          <div id="vidOn" style="display:none">
+            <div class="toggle-row"><div><b>Only wake for my voice</b><small>"Zenix" from a friend or the TV won't wake her</small></div><button class="toggle" id="vidWake" aria-label="Only wake for my voice"></button></div>
+            <div class="toggle-row"><div><b>Interrupt her by talking</b><small>When she hears your voice while she talks, she stops and listens. Her own voice and other people's don't count.</small></div><button class="toggle" id="vidBarge" aria-label="Interrupt her by talking"></button></div>
+            <div style="margin:10px 0 4px"><b>How strict</b><small style="display:block;opacity:.7;margin:2px 0 6px">Relaxed if she often misses you, Strict if other voices still get through.</small>
+              <div class="seg small"><button data-vlevel="relaxed">Relaxed</button><button data-vlevel="normal">Normal</button><button data-vlevel="strict">Strict</button></div></div>
+            <div class="toggle-row"><button class="btn-line" id="vidTest">Test my voice</button><button class="btn-line" id="vidRedo">Record again</button><button class="btn-line" id="vidForget">Delete</button></div>
+            <p class="status-line" id="vidResult" style="display:none"></p>
+          </div>
+        </div>
+      </details>
       <details class="set-item" data-sec="orb">
         <summary><span class="ico"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/></svg></span><span class="set-t"><b>Floating orb</b><span id="sumOrb"></span></span><svg class="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></summary>
         <div class="set-body">
@@ -3197,10 +3218,11 @@ async function pumpSpeech(){
 /* ---------- "stop", "pause", "continue", "end" while she is talking ---------- */
 if(settings.barge===undefined) settings.barge = true;
 const speakingNow = () => speech.playing || speech.q.length > 0 || !!speech.paused || !!nativeSpeakResolve || !!off.sayingNative || !!off.pausedText;
-let bargeOn = false, bargeIdleAt = 0;
+let bargeOn = false, bargeIdleAt = 0, voiceBargeCached = false;
+setInterval(() => { try{ voiceBargeCached = !!Native.voiceStatus && voiceBargeOn(); }catch(e){ voiceBargeCached = false; } }, 5000);
 function bargeOff(){ if(bargeOn){ bargeOn = false; try{ Native.bargeStop(); }catch(e){} } }
 setInterval(() => {
-  const want = settings.barge && !!Native.bargeStart && off.active && off.kind==='talk' && !tr.on && speakingNow();
+  const want = (settings.barge || voiceBargeCached) && !!Native.bargeStart && off.active && off.kind==='talk' && !tr.on && speakingNow();
   if(want){ bargeIdleAt = 0; if(!bargeOn){ bargeOn = true; Native.bargeStart(); } }
   else if(bargeOn){ if(!bargeIdleAt) bargeIdleAt = Date.now(); else if(Date.now() - bargeIdleAt > 1500) bargeOff(); }   // short gaps between her sentences don't switch it off
   // paused and forgotten: after 3 minutes she drops what was left and just listens
@@ -3240,7 +3262,9 @@ function stopTalking(){   // "stop" / "cancel": quiet at once, then she listens
 window.zenixBargeHeard = (t) => { const el = $('bargeHeard'); if(!el) return; el.style.display = ''; el.textContent = 'Heard while she talked: "' + String(t||'').replace(/\[unk\]/g, '…') + '"'; };
 window.zenixBarge = (cmd) => {
   logEv('barge', cmd + (speakingNow() ? '' : ' (ignored: she was not talking)'));
-  if(!(off.active && off.kind==='talk') || !settings.barge || !speakingNow()) return;
+  if(!(off.active && off.kind==='talk') || !speakingNow()) return;
+  if(cmd==='talk'){ voiceCut('your voice was heard while she talked'); stopTalking(); return; }   // his voice (fingerprint): she stops and listens
+  if(!settings.barge) return;
   // she is saying that very word herself right now: that was her, not him
   const saying = ((speech.prevText||'') + ' ' + (speech.nowText||'') + ' ' + (off.sayingText||'')).toLowerCase();
   const own = {stop:/\b(?:stop|stops|stopped|cancel|cancell?ed)\b/, pause:/\b(?:pause|paused|pauses)\b/, 'continue':/\b(?:continue|continues|continued|resume)\b/, end:/\b(?:end|ends|ended)\b/}[cmd];
@@ -4007,6 +4031,60 @@ document.addEventListener('click', initVoiceViz, {once:true});
 
 /* ---------- "Hey Zenix" wake word ---------- */
 if(settings.wake===undefined) settings.wake=false;
+/* ---------- My voice: fingerprint so she knows it's him ---------- */
+const VID_LINES = ['Hey Zenix, what is the weather like in Abu Dhabi today?', 'Play some Bruno Mars on Spotify and turn the volume up a bit.', 'Remind me to call my wife when I finish my duty tonight.'];
+let vidStep = -1;
+function vidSt(){ try{ return JSON.parse(Native.voiceStatus()); }catch(e){ return null; } }
+function voiceBargeOn(){ const v = vidSt(); return !!(v && v.enrolled && v.barge && v.state==='ready'); }
+function renderVid(){
+  const v = Native.voiceStatus ? vidSt() : null;
+  const show = (id, on) => { const el = $(id); if(el) el.style.display = on ? '' : 'none'; };
+  if(!v){ $('vidState').textContent = 'Android app only'; ['vidDownload','vidEnroll','vidOn'].forEach(id => show(id, false)); $('sumVoiceId').textContent = ''; return; }
+  const enrolling = vidStep >= 0;
+  show('vidDownload', v.state!=='ready' && v.state!=='downloading' && v.state!=='unpacking');
+  show('vidEnroll', v.state==='ready' && (!v.enrolled || enrolling));
+  show('vidOn', v.state==='ready' && v.enrolled && !enrolling);
+  $('vidState').textContent = !v.listenerReady ? 'First turn on "Hey Zenix" once on Wi-Fi (it downloads the offline listener this needs).'
+    : v.state==='downloading' ? 'Downloading… ' + (v.percent || 0) + '%' : v.state==='unpacking' ? 'Setting up…' : v.state==='failed' ? 'Download failed. Try again on Wi-Fi.'
+    : v.state!=='ready' ? 'Not downloaded yet.' : !v.enrolled ? 'Ready to learn your voice.'
+    : 'Knows your voice' + (v.lastScore >= 0 ? ' · last check (' + v.lastWhere + '): ' + v.lastScore + '% like you, needs ' + v.lastNeed + '%' : '');
+  $('sumVoiceId').textContent = v.enrolled ? (v.onWake || v.barge ? 'On' : 'Learned, off') : '';
+  if(v.enrolled){ $('vidWake').classList.toggle('on', !!v.onWake); $('vidBarge').classList.toggle('on', !!v.barge);
+    document.querySelectorAll('[data-vlevel]').forEach(b => b.classList.toggle('sel', b.dataset.vlevel===(v.level || 'normal'))); }
+  if(enrolling){ $('vidLine').textContent = '"' + VID_LINES[vidStep] + '"'; $('vidRec').textContent = 'Record sentence ' + (vidStep + 1) + ' of 3'; }
+  else if(v.state==='ready' && !v.enrolled){ vidStep = 0; renderVid(); }
+  if(v.state==='downloading' || v.state==='unpacking') setTimeout(renderVid, 1500);
+}
+function vidMicFree(){ if(inVoiceChat()){ toast('End the voice chat first'); return false; } if(settings.wake && Native.wakePause) Native.wakePause(); return true; }
+function vidMicBack(){ if(settings.wake && Native.wakeResume) setTimeout(() => { if(!inVoiceChat()) Native.wakeResume(); }, 600); }
+$('vidDownload').onclick = () => { Native.voiceDownload(); toast('Downloading the voice fingerprint'); setTimeout(renderVid, 800); };
+$('vidRec').onclick = () => {
+  if(vidStep < 0 || !vidMicFree()) return;
+  const b = $('vidRec'); b.disabled = true; let left = 6; b.textContent = 'Speak now… ' + left;
+  const t = setInterval(() => { left--; if(left > 0) b.textContent = 'Speak now… ' + left; else clearInterval(t); }, 1000);
+  Native.voiceRecord(String(vidStep), '6');
+};
+window.zenixVoiceRec = (i, ok, msg) => {
+  $('vidRec').disabled = false;
+  if(!ok){ vidMicBack(); toast(msg || 'Try that one again'); renderVid(); return; }
+  if(i < 2){ vidStep = i + 1; renderVid(); return; }
+  vidMicBack();
+  let r = {}; try{ r = JSON.parse(Native.voiceFinish()); }catch(e){}
+  vidStep = r.ok ? -1 : 0;
+  toast(r.ok ? 'Got your voice. Only you can wake her now, and you can interrupt her by talking.' : (r.message || 'Try again'));
+  if(r.ok && settings.wake && Native.wakePause){ Native.wakePause(); vidMicBack(); }   // the "Hey Zenix" listener restarts with the fingerprint
+  renderVid();
+};
+$('vidTest').onclick = () => { if(!vidMicFree()) return; const el = $('vidResult'); el.style.display = ''; el.textContent = 'Say anything for 4 seconds…'; Native.voiceTest('4'); };
+window.zenixVoiceTest = (ok, msg, pct, need) => { vidMicBack(); const el = $('vidResult'); el.style.display = ''; el.textContent = ok ? msg + ' ' + pct + '% like your recording (needs ' + need + '%).' : msg; renderVid(); };
+$('vidRedo').onclick = () => { vidStep = 0; renderVid(); };
+$('vidForget').onclick = () => { Native.voiceForget(); vidStep = -1; toast('Your voice was deleted from this phone'); if(settings.wake && Native.wakePause){ Native.wakePause(); vidMicBack(); } renderVid(); };
+const vidToggle = (key, el) => () => { const v = vidSt() || {}; Native.voiceSet(key, String(!v[key])); if(key==='onWake' && settings.wake && Native.wakePause){ Native.wakePause(); vidMicBack(); } renderVid(); };
+$('vidWake').onclick = vidToggle('onWake'); $('vidBarge').onclick = vidToggle('barge');
+document.querySelectorAll('[data-vlevel]').forEach(b => b.onclick = () => { Native.voiceSet('level', b.dataset.vlevel); renderVid(); });
+document.querySelector('[data-sec="voiceid"]').addEventListener('toggle', renderVid);
+setTimeout(renderVid, 900);
+
 /* what she says when he calls her: "Hey master, it's Friday night." (Dubai time) */
 function wakeHello(d){
   d = d || new Date();
@@ -4367,7 +4445,7 @@ renderAgent();
 
 
 /* ---------- Easier Zenix: setup checklist, everyday settings, chat chips, welcome guide ---------- */
-const EVERYDAY = ['brain','voice','wake','mem','routines','lists','intel','report'];
+const EVERYDAY = ['brain','voice','wake','voiceid','mem','routines','lists','intel','report'];
 (() => {
   const list = $('everyList');
   EVERYDAY.forEach(k => { const d = document.querySelector('.set-item[data-sec="' + k + '"]'); if(d) list.appendChild(d); });
@@ -4852,6 +4930,8 @@ function diagRows(){
     ['Last command done', Z.lastCmd ? '"' + Z.lastCmd.text + '" ' + ago(Z.lastCmd.at) + ', took ' + Z.lastCmd.ms + ' ms' : 'None yet', true],
     ['Errors from services', errs.length ? errs.join(' | ') : 'None', !errs.length],
     ['Last "Hey Zenix" wake-up', (() => { const w = wakeSt(); if(!w.state) return 'Not available'; const L = wakeLines(w); return L.woke + (L.missed ? ' · last ignored: ' + L.missed : '') + ' · sensitivity: ' + (w.sens || 'normal'); })(), true],
+    ['My voice', (() => { const v = Native.voiceStatus ? vidSt() : null; if(!v) return 'Not available'; if(!v.enrolled) return v.state==='ready' ? 'Not recorded yet (Settings → My voice)' : 'Not set up';
+      return (v.onWake ? 'Wakes only for you' : 'Wakes for anyone') + ' · ' + (v.barge ? 'interrupt by talking on' : 'interrupt by talking off') + ' · ' + v.level + (v.lastScore >= 0 ? ' · last check ' + (v.lastAgo >= 0 ? agoS(v.lastAgo) : '') + ' (' + v.lastWhere + '): ' + v.lastScore + '% like you, needs ' + v.lastNeed + '%' + (v.lastOk ? ' ✓' : ' ✗') : ''); })(), true],
     ['How fast she hears you', (() => { const w = Z.waits || []; if(!w.length) return 'Not measured yet'; const last = w[w.length-1], avg = w.reduce((a, x) => a + x.ms, 0) / w.length;
       return 'Last ' + (last.ms/1000).toFixed(1) + ' s after your last word, average ' + (avg/1000).toFixed(1) + ' s (' + nice(last.ears).replace(/^The /, 'the ') + ')' + (Z.readyMs ? ' · listener started in ' + (Z.readyMs/1000).toFixed(1) + ' s' : ''); })(), !(Z.waits || []).length || (Z.waits || []).slice(-3).every(x => x.ms < 2500)],
     ['Last time her voice was cut', Z.lastCut ? ago(Z.lastCut.at) + ': ' + Z.lastCut.why : 'Not this session', true]

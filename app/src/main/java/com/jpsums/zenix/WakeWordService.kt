@@ -229,6 +229,8 @@ class WakeWordService : Service() {
                 if (model == null) model = Model(modelDir(this).absolutePath)
                 val rec = Recognizer(model!!, 16000.0f, grammarFor(model!!))
                 try { rec.setWords(true) } catch (_: Throwable) { }   // gives a confidence score per word
+                // "Only wake for my voice": the listener also works out whose voice it was
+                if (VoiceId.onWake(this)) try { VoiceId.model(this)?.let { rec.setSpeakerModel(it) } } catch (_: Throwable) { }
                 main.post {
                     if (paused || speech != null) { rec.close(); return@post }
                     try {
@@ -272,10 +274,25 @@ class WakeWordService : Service() {
             lastReject = "\"$clean\" ignored: $why"; lastRejectAt = now
             return
         }
-        lastWake = "\"$clean\"" + confNote(hyp); lastWakeAt = now
+        voiceVeto(hyp, clean)?.let { why ->
+            lastReject = "\"$clean\" ignored: $why"; lastRejectAt = now
+            return
+        }
+        lastWake = "\"$clean\"" + confNote(hyp) + voiceNote(); lastWakeAt = now
         lastTrigger = now
         triggered()
     }
+
+    /** "Only wake for my voice": null = fine, otherwise why not. */
+    private fun voiceVeto(hyp: String?, clean: String): String? {
+        if (!VoiceId.onWake(this)) return null
+        val him = VoiceId.isHim(this, VoiceId.vector(hyp, 25), "wake", short = true)
+        if (him == true) return null
+        if (him == null) return if (VoiceId.level(this) == "strict") "too short to check it was your voice" else null
+        return "not your voice (${VoiceId.pct(this, VoiceId.lastScore)}% like your recording, needs ${VoiceId.pct(this, VoiceId.lastNeed)}%)"
+    }
+    private fun voiceNote(): String = if (VoiceId.onWake(this) && VoiceId.lastWhere == "wake" && System.currentTimeMillis() - VoiceId.lastAt < 3000)
+        ", your voice: ${VoiceId.pct(this, VoiceId.lastScore)}%" else ""
 
     private fun confNote(hyp: String?): String {
         val c = lowConf(hyp) ?: return ""
