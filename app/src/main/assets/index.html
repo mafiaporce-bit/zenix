@@ -2311,7 +2311,7 @@ function earsFail(reason, o){
 function goOfflineEars(reason, withRecent){
   Z.ears = 'offline'; Z.since = Date.now(); Z.reason = String(reason).slice(0, 120); Z.count++; Z.okStreak = 0;
   // an internet that keeps coming and going: wait longer each time before trusting it again
-  Z.backoff = (Date.now() - Z.lastRecover < 60000) ? Math.min(60000, Math.max(20000, Z.backoff*2)) : 8000;
+  Z.backoff = (Date.now() - Z.lastRecover < 60000) ? Math.min(25000, Math.max(15000, Z.backoff*2)) : 8000;
   Z.nextTry = Date.now() + Math.max(10000, Z.backoff);
   srErrs = 0; off.langFallback = '';
   logEv('ears', 'switched to offline ears (' + Z.reason + ')');
@@ -2355,7 +2355,7 @@ setInterval(() => {
     if(Z.recovering || now < Z.nextTry) return;
     Z.recovering = true;
     probeNet(2000).then(ok => {
-      if(!ok){ Z.okStreak = 0; Z.backoff = Math.min(60000, Math.round(Z.backoff*1.6)); Z.nextTry = Date.now() + Z.backoff; Z.recovering = false; return; }
+      if(!ok){ Z.okStreak = 0; Z.backoff = Math.min(25000, Math.round(Z.backoff*1.6)); Z.nextTry = Date.now() + Z.backoff; Z.recovering = false; return; }
       if(++Z.okStreak < 2){ Z.nextTry = Date.now() + 3000; Z.recovering = false; return; }   // it has to stay up, not just blink
       return tryOnlineEars().then(r => {
         Z.recovering = false;
@@ -2365,7 +2365,7 @@ setInterval(() => {
           logEv('ears', 'the internet is back but Deepgram is not: using the phone\'s online listening for now');
           try{ Native.stopListening(); }catch(e){} setTimeout(offListen, 150); return;
         }
-        Z.okStreak = 0; Z.backoff = Math.min(60000, Math.round(Z.backoff*1.6)); Z.nextTry = Date.now() + Z.backoff; logEv('ears', 'the internet answers but the online listener doesn\'t yet: staying on offline ears');
+        Z.okStreak = 0; Z.backoff = Math.min(25000, Math.round(Z.backoff*1.6)); Z.nextTry = Date.now() + Z.backoff; logEv('ears', 'the internet answers but the online listener doesn\'t yet: staying on offline ears');
       });
     }).catch(() => { Z.recovering = false; });
     return;
@@ -2463,7 +2463,7 @@ function offListen(){
   setOrb('listening'); $('modeLabel').textContent = listenLabel();
   if(Native.setOrbMode) Native.setOrbMode('listening');
   if(!off.quietSince) off.quietSince = Date.now();
-  off.earsAt = Date.now();
+  off.earsAt = Date.now(); Z.askedAt = Date.now();
   if(tr.on){   // translator: the phone listens in whichever language is due
     $('modeLabel').textContent = tr.turn==='me' ? 'Your turn · English' : 'Their turn · ' + tr.name + ' (tap the ring to skip)';
     const lang = tr.turn==='me' ? listenLang() : tr.stt;
@@ -2477,7 +2477,7 @@ function offListen(){
   else Native.startListening(listenLang());
 }
 let srErrs = 0;
-window.zenixOnListening = () => { srErrs = 0; off.earsAt = Date.now(); if(off.active && off.kind==='talk' && !tr.on) $('modeLabel').textContent = listenLabel();
+window.zenixOnListening = () => { srErrs = 0; off.earsAt = Date.now(); if(Z.askedAt){ Z.readyMs = Date.now() - Z.askedAt; Z.askedAt = 0; } if(off.active && off.kind==='talk' && !tr.on) $('modeLabel').textContent = listenLabel();
   if(Z.t0 && Z.ears==='offline'){ Z.failoverMs = Math.round(performance.now() - Z.t0); Z.t0 = 0; logEv('ears', 'offline ears listening ' + Z.failoverMs + ' ms after the failure'); } };
 let partialTimer=null;
 const HANGING = /\b(and|or|but|so|because|cause|at|to|the|a|an|for|with|from|of|in|on|into|about|around|like|um+|uh+|uhm|er|ah|my|your|his|her|is|are|was|if|when|then|that|this|can|could|would|will|maybe|also|plus|please|ng|sa|na|yung|ang|mga|kasi|tapos|pero|para|si|ni|kay)$/i;
@@ -2485,13 +2485,20 @@ function endWait(t){ const w=(t||'').trim().toLowerCase().replace(/[.,!?…]+$/,
 window.zenixOnPartial = (t) => {
   if(dict.on){ dict.partial(t); return; }
   if(!(off.active && off.kind==='talk')) return;
-  off.earsAt = Date.now(); Z.partialAt = Date.now();
+  off.earsAt = Date.now(); Z.partialAt = Z.wordAt = Date.now();
   $('liveLine').textContent='You: '+t;
   clearTimeout(partialTimer);
   if(t && t.trim()){ off.quietSince = Date.now(); partialTimer = setTimeout(()=>{ if(Native.finishListening) Native.finishListening(); }, endWait(t)); }
 };
+/* how long after his last word she had the whole sentence, per listener: shown in Live status */
+function noteHeard(){
+  if(!Z.wordAt || Date.now() - Z.wordAt > 15000) return;
+  const ms = Date.now() - Z.wordAt; Z.wordAt = 0;
+  (Z.waits = Z.waits || []).push({ms, ears:earsName()}); if(Z.waits.length > 6) Z.waits.shift();
+}
 window.zenixOnSpeech = async (t) => {
   if(dict.on){ dict.done(t); return; }
+  if(t && off.active && off.kind==='talk') noteHeard();
   clearTimeout(partialTimer);
   if(!off.active || off.kind!=='talk') return;
   const heardBy = earsName();
@@ -3253,7 +3260,9 @@ async function ownRespond(text, speakIt, after, opts={}){
   if(!opts.quiet){ turnStart = performance.now(); turnTok = 0; turnSearched = false; $('modeLabel').textContent = 'Thinking…'; setOrb('thinking'); }
   speech.streamOpen = true; speech.onIdle = after || null;
   let full = '';
-  try{ full = await ownTurn(text, speakIt, opts); if(full) Z.cloudAI = {state:'ok', err:'', at:Date.now()}; }
+  try{ full = await ownTurn(text, speakIt, opts); if(full){ Z.cloudAI = {state:'ok', err:'', at:Date.now()};
+      // the cloud brain just answered, so the internet works: on offline ears, try the faster online ears as soon as she has finished
+      if(Z.ears==='offline' && Date.now() - Z.since > 5000){ Z.okStreak = Math.max(Z.okStreak, 1); Z.nextTry = Math.min(Z.nextTry, Date.now() + 500); } } }
   catch(e){
     if(e.name==='AbortError' || (opts.isCancelled && opts.isCancelled())) return;
     const why = String((e && e.message) || e);
@@ -3430,7 +3439,7 @@ window.zenixDGMsg = (txt) => {
   if(m.type==='TurnInfo'){
     if(dg.paused) return;
     const t = (m.transcript||'').trim();
-    if(m.event==='Update' || m.event==='StartOfTurn'){ if(t && t!==dg.lastT){ dg.lastT=t; dg.lastHeard=performance.now(); off.quietSince=Date.now(); } if(t && off.kind==='talk') $('liveLine').textContent = 'You: '+t; }
+    if(m.event==='Update' || m.event==='StartOfTurn'){ if(t && t!==dg.lastT){ dg.lastT=t; dg.lastHeard=performance.now(); off.quietSince=Date.now(); Z.wordAt=Date.now(); } if(t && off.kind==='talk') $('liveLine').textContent = 'You: '+t; }
     else if(m.event==='EagerEndOfTurn'){ if(t) dgEager(t); }
     else if(m.event==='TurnResumed'){ dgCancelEager(); }
     else if(m.event==='EndOfTurn'){ if(t) dgFinal(t); }
@@ -3490,7 +3499,7 @@ function dgCancelEager(){ if(specTurn){ const s=specTurn; specTurn=null; s.cance
 function dgFinal(t){
   turnEars = dg.lastHeard ? (performance.now()-dg.lastHeard)/1000 : 0; dg.lastHeard=0; dg.lastT='';
   dgPause(); off.quietSince = 0;
-  if(specTurn && normT(specTurn.text)===normT(t)){ const s=specTurn; specTurn=null; addMsg('user', t); $('liveLine').textContent='You: '+t; s.confirm(); return; }
+  if(specTurn && normT(specTurn.text)===normT(t)){ noteHeard(); const s=specTurn; specTurn=null; addMsg('user', t); $('liveLine').textContent='You: '+t; s.confirm(); return; }
   dgCancelEager();
   if(window.zenixOnSpeech) window.zenixOnSpeech(t);
 }
@@ -4806,6 +4815,8 @@ function diagRows(){
     ['Last words understood', Z.lastHeard ? ago(Z.lastHeard.at) + ', by ' + nice(Z.lastHeard.ears).replace(/^The /, 'the ') : 'None yet', true],
     ['Last command done', Z.lastCmd ? '"' + Z.lastCmd.text + '" ' + ago(Z.lastCmd.at) + ', took ' + Z.lastCmd.ms + ' ms' : 'None yet', true],
     ['Errors from services', errs.length ? errs.join(' | ') : 'None', !errs.length],
+    ['How fast she hears you', (() => { const w = Z.waits || []; if(!w.length) return 'Not measured yet'; const last = w[w.length-1], avg = w.reduce((a, x) => a + x.ms, 0) / w.length;
+      return 'Last ' + (last.ms/1000).toFixed(1) + ' s after your last word, average ' + (avg/1000).toFixed(1) + ' s (' + nice(last.ears).replace(/^The /, 'the ') + ')' + (Z.readyMs ? ' · listener started in ' + (Z.readyMs/1000).toFixed(1) + ' s' : ''); })(), !(Z.waits || []).length || (Z.waits || []).slice(-3).every(x => x.ms < 2500)],
     ['Last time her voice was cut', Z.lastCut ? ago(Z.lastCut.at) + ': ' + Z.lastCut.why : 'Not this session', true]
   ];
 }

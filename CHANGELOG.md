@@ -58,3 +58,8 @@ Online/offline failover: ears, brain, voice and phone control each look after th
 - Online and Kokoro voices: if the sound is blocked, errors, stalls for 3.5 s, or is paused by the phone, she tries once more and then the phone voice says the rest of that sentence instead of dropping it.
 - "Stop her by voice" is stricter: "pause" and "end" need the listener to be sure of the word, and "stop" must be heard steadily for about a third of a second, so noise or her own voice can't cut her off.
 - Live status has a new line: "Last time her voice was cut", with the reason.
+
+## She hears you faster (part 2 of the voice fix)
+- Deepgram Flux waits at most 3 s (was 4 s) for the end of a sentence before handing it over.
+- On a connection that keeps dropping, she retries the faster online ears every 25 s at most (was up to 60 s), and as soon as the cloud brain answers she knows the internet works and tries the online ears right after she finishes speaking.
+- Live status has a new line: "How fast she hears you": the wait after your last word for the last sentence and on average, which listener heard you, and how long the phone listener took to start.

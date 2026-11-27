@@ -40,7 +40,7 @@ class DeepgramEars(private val activity: MainActivity) {
         flux = useFlux
         openWithMic = withMic
         val url = if (useFlux)
-            "wss://api.deepgram.com/v2/listen?model=flux-general-en&encoding=linear16&sample_rate=16000&eot_threshold=0.75&eager_eot_threshold=0.5&eot_timeout_ms=4000"
+            "wss://api.deepgram.com/v2/listen?model=flux-general-en&encoding=linear16&sample_rate=16000&eot_threshold=0.75&eager_eot_threshold=0.5&eot_timeout_ms=3000"
         else "wss://api.deepgram.com/v1/listen?model=nova-3&language=$lang&encoding=linear16&sample_rate=16000&channels=1" +
             "&smart_format=true&interim_results=true&endpointing=350&utterance_end_ms=1000&vad_events=true"
         // names and words she should get right ("Zenix", his family, his places): Deepgram listens for them specially
