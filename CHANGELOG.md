@@ -51,3 +51,10 @@ Online/offline failover: ears, brain, voice and phone control each look after th
 - New weather tool (Open-Meteo, free, no key): "what's the weather" works on every brain, for Abu Dhabi or any city, up to 7 days.
 - If Anthropic refuses Claude's own internet search, searches go through Grok (when a Grok key is saved), otherwise she opens a Google results page. She no longer uses the phone's in-app search box to look things up.
 - Check Zenix has a new "Internet search (Claude)" line that shows Anthropic's exact reason when search is refused. The check does not spend a search.
+
+## She finishes her sentences (part 1 of the voice fix)
+- Phone voice: each sentence has its own id, so a late "done" signal from an earlier sentence can no longer cut the current one off. Her time limit no longer cuts her off while the phone says she is still talking.
+- If the phone voice breaks mid-sentence (often a network voice on weak data), the phone's offline voice says the rest from where she stopped.
+- Online and Kokoro voices: if the sound is blocked, errors, stalls for 3.5 s, or is paused by the phone, she tries once more and then the phone voice says the rest of that sentence instead of dropping it.
+- "Stop her by voice" is stricter: "pause" and "end" need the listener to be sure of the word, and "stop" must be heard steadily for about a third of a second, so noise or her own voice can't cut her off.
+- Live status has a new line: "Last time her voice was cut", with the reason.

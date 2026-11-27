@@ -1582,7 +1582,7 @@ window.zenixRoutine = (txt) => {
   const title = r.title || 'Routine';
   addMsg('sys', '⏰ ' + title); renderRoutines();
   if(inVoiceChat()){ toast('⏰ ' + title); return; }            // already talking: the notification stays for later
-  if(!brainKey()){ toast('⏰ ' + title); if(Native.speak) Native.speak(title, 'en-US'); return; }
+  if(!brainKey()){ toast('⏰ ' + title); if(Native.speak) ttsSay(title, 'en-US'); return; }
   if(off.active) endOffline(true);
   document.querySelector('nav button[data-view="talk"]').click();
   wakeGreeting = true; off.trusted = true;
@@ -1595,7 +1595,7 @@ window.zenixIncoming = (app, who, group, text) => {
   addMsg('sys', `💬 ${from}: ${text}`);
   if(inVoiceChat()){ toast('💬 New message from ' + who); return; }
   const say = `Message from ${from}. ${text}`;
-  if(!brainKey()){ if(Native.speak) Native.speak(say, 'en-US'); return; }
+  if(!brainKey()){ if(Native.speak) ttsSay(say, 'en-US'); return; }
   if(off.active) endOffline(true);
   ownMsgs.push({role:'user', content:`[Driving mode: a new ${app} message just arrived from ${who}${group ? ' in the group "' + group + '"' : ''}: "${text}". You are reading it aloud to Jim.]`});
   ownMsgs.push({role:'assistant', content: say + ' Want to reply?'});
@@ -1605,7 +1605,7 @@ window.zenixIncoming = (app, who, group, text) => {
 window.zenixDriving = (on) => {
   driveCache.t = 0; renderDrive();
   addMsg('sys', on ? '🚗 Driving mode on' : '🚗 Driving mode off');
-  if(on && !inVoiceChat() && Native.speak) Native.speak('Driving mode on. I will read your messages to you.', 'en-US');
+  if(on && !inVoiceChat() && Native.speak) ttsSay('Driving mode on. I will read your messages to you.', 'en-US');
 };
 /* ---------- Agent skills, part 2: phone controls, camera, translator, shifts, site checks ---------- */
 const NA = {ok:false, message:'That only works in the Android app.'};
@@ -2453,7 +2453,7 @@ function offlineSay(text, speakIt){
     speech.onIdle = () => { if(off.endAfterSpeak){ off.endAfterSpeak=false; endOffline(); } else if(off.kind==='talk') offListen(); else setOrb('idle'); };
     speakEnqueue(text); return;
   }
-  if(speakIt){ setOrb('speaking'); $('modeLabel').textContent='Zenix is speaking'; if(Native.setOrbMode) Native.setOrbMode('speaking'); off.sayingNative = true; off.sayingText = text; Native.speak(text, settings.offlineLang); }
+  if(speakIt){ setOrb('speaking'); $('modeLabel').textContent='Zenix is speaking'; if(Native.setOrbMode) Native.setOrbMode('speaking'); off.sayingNative = true; off.sayingText = text; ttsSay(text, settings.offlineLang); }
   else if(off.kind==='talk') offListen();
   else idleLook();
 }
@@ -2583,7 +2583,9 @@ window.zenixOnSpeechError = (code, skipNetCheck) => {
     : (code===1 || code===2) ? 'Listening needs the internet. Check your connection.' : code===3 ? 'Another app is using the microphone.' : 'Mic problem ('+code+'). Tap Talk again.');
   endOffline(); endedNote('The microphone stopped.');
 };
-window.zenixOnSpeakDone = () => {
+window.zenixOnSpeakDone = (id, err) => {
+  if(id && ttsId && id !== ttsId){ logEv('voice', 'ignored a late "done" from an earlier sentence'); return; }
+  if(err) voiceCut('phone voice: ' + err);
   if(nativeSpeakResolve){ const r=nativeSpeakResolve; nativeSpeakResolve=null; r(); return; }
   if(speech.paused || off.pausedText) return;   // paused on purpose: she waits for "continue"
   if(!off.sayingNative && speech.muted) return;   // the voice he just stopped: he is already being listened to
@@ -3088,8 +3090,18 @@ function loadKokoro(){
 }
 function isTagalog(t){ return (t.match(/\b(ako|ikaw|ka|mo|ko|ng|nang|sa|ang|mga|naman|po|sige|kasi|lang|talaga|grabe|bukas|ngayon|tayo|kayo|siya|hindi|oo|wala|meron|kuya|ate|pare|tara)\b/gi)||[]).length >= 3; }
 const speech = { q:[], playing:false, streamOpen:false, onIdle:null, audio:new Audio() };
-let nativeSpeakResolve = null;
-function nativeSay(text, lang){ return new Promise(res => { nativeSpeakResolve = res; Native.speak(text, lang); setTimeout(()=>{ if(nativeSpeakResolve===res){ nativeSpeakResolve=null; res(); } }, 4000 + text.length*120); }); }
+let nativeSpeakResolve = null, ttsId = '';
+/* the phone's voice: remembers which sentence is playing, so a late "done" from an older one can't cut the new one off */
+function ttsSay(text, lang){ let r = {}; try{ r = JSON.parse(Native.speak(text, lang) || '{}') || {}; }catch(e){} ttsId = r.id || ''; return ttsId; }
+function nativeSay(text, lang){ return new Promise(res => { nativeSpeakResolve = res; ttsSay(text, lang);
+  const soft = Date.now() + 4000 + text.length*120, hard = Date.now() + 90000;
+  const tick = () => { if(nativeSpeakResolve!==res) return;
+    let busy = false; try{ busy = !!Native.ttsBusy && Native.ttsBusy()==='true'; }catch(e){}
+    if(Date.now() < soft || (busy && Date.now() < hard)) return void setTimeout(tick, 700);   // still talking: never cut her off on a timer
+    logEv('voice', 'phone voice sent no "done" signal: moved on'); nativeSpeakResolve=null; res(); };
+  setTimeout(tick, 1000); }); }
+function voiceCut(why){ Z.lastCut = {why, at:Date.now()}; logEv('voice', why); }
+window.zenixVoiceNote = t => voiceCut(t);
 function speakEnqueue(text){
   if(speech.muted) return;   // he said "stop": the rest of this answer stays unsaid
   text = splitLinks(text).text.replace(/[*_#`>]/g,'').replace(/\s+/g,' ').trim();
@@ -3106,6 +3118,35 @@ function speakEnqueue(text){
   if(!usePhone){ item.wav = genChain = genChain.then(() => kokoro.generate(text, {voice:settings.voice})).catch(() => null); }
   else if(settings.voice!=='phone' && !cloudVoice && !kokoro){ loadKokoro().catch(()=>{}); }
   speech.q.push(item); pumpSpeech();
+}
+/* what is left of a sentence after the first part (0..1) was heard, from a word boundary a little before that point */
+function restOf(text, pos){
+  if(!pos || pos < 0.08) return text;
+  const words = text.split(' '); const k = Math.max(0, Math.floor(words.length * pos) - 1);
+  return words.slice(k).join(' ');
+}
+function playClip(audio){
+  return new Promise(async res => {
+    const a = speech.audio, url = URL.createObjectURL(audio.toBlob());
+    if(typeof vizCtx!=='undefined' && vizCtx && vizCtx.state!=='running'){ try{ await vizCtx.resume(); }catch(e){} }
+    let last = -1, stuckSince = 0, retried = false, done = false, iv = 0;
+    const fin = why => { if(done) return; done = true; clearInterval(iv); a.onended = a.onerror = a.onpause = null;
+      const pos = why==='ended' ? 1 : why==='blocked' ? 0 : (a.duration && isFinite(a.duration) ? a.currentTime / a.duration : 0);
+      setTimeout(() => URL.revokeObjectURL(url), 0); res({why, pos}); };
+    const again = why => { if(done) return; if(!speech.playing) return fin('stopped'); if(speech.paused) return;
+      if(retried) return fin(why); retried = true; setTimeout(() => { if(!done && speech.playing && !speech.paused) a.play().catch(() => fin(why)); }, 250); };
+    a.onended = () => fin('ended');
+    a.onerror = () => fin('error');
+    a.onpause = () => { if(a.ended) return; if(!speech.playing) return fin('stopped'); again('paused by the phone'); };
+    iv = setInterval(() => {
+      if(!speech.playing) return fin('stopped');
+      if(speech.paused || a.paused){ stuckSince = 0; return; }
+      if(a.currentTime !== last){ last = a.currentTime; stuckSince = 0; }
+      else if(!stuckSince) stuckSince = Date.now();
+      else if(Date.now() - stuckSince > 3500) fin('stalled');
+    }, 400);
+    a.src = url; a.play().catch(() => again('blocked'));
+  });
 }
 async function pumpSpeech(){
   if(speech.playing || speech.hold || speech.paused) return;
@@ -3126,10 +3167,13 @@ async function pumpSpeech(){
     // a cloud voice that takes too long is skipped for the phone's own voice, so she never goes silent
     const audio = item.wav ? await Promise.race([item.wav, new Promise(r => setTimeout(() => r(null), Z.net.state==='ok' && netFresh(30000) ? 9000 : 5000))]) : null;
     if(audio){
-      const url = URL.createObjectURL(audio.toBlob());
-      if(typeof vizCtx!=='undefined' && vizCtx && vizCtx.state!=='running'){ try{ await vizCtx.resume(); }catch(e){} }
-      await new Promise(res => { speech.audio.onended = res; speech.audio.onerror = res; speech.audio.src = url; speech.audio.play().catch(res); });
-      URL.revokeObjectURL(url);
+      const r = await playClip(audio);
+      // the clip broke off (blocked, error, stalled on weak data, paused by the system): the phone voice says the rest
+      if(r.why!=='ended' && r.why!=='stopped' && speech.playing && !speech.muted && Native && Native.speak){
+        const rest = restOf(item.text, r.pos);
+        voiceCut('online voice ' + r.why + (r.pos ? ' at ' + Math.round(r.pos*100) + '%' : '') + ': phone voice said the rest');
+        const plain = stripTags(rest); if(plain) await nativeSay(plain, isTagalog(plain) ? 'fil-PH' : 'en-US');
+      }
     } else if(Native && Native.speak){
       const plain = stripTags(item.text); if(plain) await nativeSay(plain, isTagalog(plain) ? 'fil-PH' : 'en-US');
     }
@@ -3168,7 +3212,7 @@ function resumeSpeech(){
   if(!speech.paused && !off.pausedText) return;
   speech.paused = false;
   setOrb('speaking'); $('modeLabel').textContent = 'Zenix is speaking'; if(Native.setOrbMode) Native.setOrbMode('speaking');
-  if(off.pausedText){ const t = off.pausedText; off.pausedText = ''; off.sayingNative = true; off.sayingText = t; Native.speak(t, settings.offlineLang); return; }
+  if(off.pausedText){ const t = off.pausedText; off.pausedText = ''; off.sayingNative = true; off.sayingText = t; ttsSay(t, settings.offlineLang); return; }
   if(speech.playing && speech.audio.src && speech.audio.paused && !speech.audio.ended){ speech.audio.play().catch(() => { speech.playing = false; pumpSpeech(); }); return; }
   pumpSpeech();
 }
@@ -3190,6 +3234,8 @@ window.zenixBarge = (cmd) => {
   const own = {stop:/\b(?:stop|stops|stopped|cancel|cancell?ed)\b/, pause:/\b(?:pause|paused|pauses)\b/, 'continue':/\b(?:continue|continues|continued|resume)\b/, end:/\b(?:end|ends|ended)\b/}[cmd];
   if(own && own.test(saying) && !speech.paused && !off.pausedText) return;
   if(cmd==='continue'){ resumeSpeech(); return; }
+  const heard = ($('bargeHeard') && $('bargeHeard').textContent || '').replace(/^Heard while she talked: /, '');
+  if(cmd!=='continue') voiceCut('"' + cmd + '" heard while she talked' + (heard ? ' (' + heard + ')' : ''));
   if(cmd==='pause'){ pauseSpeech(); return; }
   if(cmd==='stop'){ stopTalking(); return; }
   if(cmd==='end'){ speech.paused = false; off.pausedText = ''; stopSpeech(); endOffline(true); addMsg('sys', 'Voice chat ended'); idleLook(); }
@@ -3231,7 +3277,7 @@ async function ownRespond(text, speakIt, after, opts={}){
 
 $('orbWrap').addEventListener('click', () => {
   if(off.active && (speech.playing || speech.q.length)){
-    const after = speech.onIdle; speech.muted = true; off.pausedText = ''; stopSpeech(); toast('Okay, I\'m listening');
+    const after = speech.onIdle; speech.muted = true; off.pausedText = ''; stopSpeech(); voiceCut('you tapped the circle'); toast('Okay, I\'m listening');
     if(off.kind==='talk') offListen(); else if(after) after();
   } else if(off.active && off.kind==='talk' && tr.on && !off.thinking){ tr.turn = tr.turn==='me' ? 'them' : 'me'; tr.miss = 0; try{ Native.stopListening(); }catch(e){} setTimeout(offListen, 250); }   // translator: tap to pass the turn
   else if(off.active && off.kind==='talk' && off.brain){ offListen(); }
@@ -4759,7 +4805,8 @@ function diagRows(){
     ['Time to switch', Z.failoverMs ? Z.failoverMs + ' ms' : 'Not measured yet', true],
     ['Last words understood', Z.lastHeard ? ago(Z.lastHeard.at) + ', by ' + nice(Z.lastHeard.ears).replace(/^The /, 'the ') : 'None yet', true],
     ['Last command done', Z.lastCmd ? '"' + Z.lastCmd.text + '" ' + ago(Z.lastCmd.at) + ', took ' + Z.lastCmd.ms + ' ms' : 'None yet', true],
-    ['Errors from services', errs.length ? errs.join(' | ') : 'None', !errs.length]
+    ['Errors from services', errs.length ? errs.join(' | ') : 'None', !errs.length],
+    ['Last time her voice was cut', Z.lastCut ? ago(Z.lastCut.at) + ': ' + Z.lastCut.why : 'Not this session', true]
   ];
 }
 function safeWake(){ try{ return !!(settings.wake && wakeSt().running); }catch(e){ return false; } }

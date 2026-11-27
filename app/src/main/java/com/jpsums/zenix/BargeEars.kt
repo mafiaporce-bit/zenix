@@ -92,6 +92,7 @@ class BargeEars(private val activity: MainActivity) {
         try {
             val grammar = JSONArray().apply { phrases.keys.forEach { put(it) }; put("[unk]") }.toString()
             rec = Recognizer(VoskShared.get(activity), 16000.0f, grammar)
+            try { rec.setWords(true) } catch (_: Throwable) { }   // a confidence score per word: noise that only sounds a bit like "stop" is ignored
             val size = maxOf(AudioRecord.getMinBufferSize(16000, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT), 6400)
             ar = open(MediaRecorder.AudioSource.VOICE_COMMUNICATION, size) ?: open(MediaRecorder.AudioSource.VOICE_RECOGNITION, size) ?: return
             try { if (AcousticEchoCanceler.isAvailable()) aec = AcousticEchoCanceler.create(ar.audioSessionId)?.also { it.enabled = true } } catch (_: Throwable) { }
@@ -104,8 +105,13 @@ class BargeEars(private val activity: MainActivity) {
                 if (n < 0) break
                 if (n == 0) continue
                 val finished = rec.acceptWaveForm(buf, n)
+                var confs: List<Double> = emptyList()
                 val raw = try {
-                    if (finished) JSONObject(rec.result).optString("text") else JSONObject(rec.partialResult).optString("partial")
+                    if (finished) JSONObject(rec.result).let { j ->
+                        val arr = j.optJSONArray("result")
+                        if (arr != null) confs = (0 until arr.length()).map { arr.getJSONObject(it).optDouble("conf", 1.0) }
+                        j.optString("text")
+                    } else JSONObject(rec.partialResult).optString("partial")
                 } catch (_: Exception) { "" }
                 // shown in Settings, so it's easy to see what this listener really hears
                 val nowMs = SystemClock.elapsedRealtime()
@@ -116,10 +122,20 @@ class BargeEars(private val activity: MainActivity) {
                 val hit = command(raw, finished)
                 var fire: String? = null
                 if (hit == null) { last = ""; hits = 0 }
-                else if (finished) { fire = hit; last = ""; hits = 0 }
+                else if (finished) {
+                    // the whole phrase heard: it counts only when the listener is sure of the command word itself
+                    val at = hit.substringBefore(':').toIntOrNull() ?: 0
+                    val c = confs.getOrNull(at - 1) ?: 1.0
+                    if (c >= 0.8) fire = hit
+                    else activity.runJs("window.zenixBargeHeard && window.zenixBargeHeard(${JSONObject.quote("(not sure, ignored) " + raw.takeLast(60))})")
+                    last = ""; hits = 0
+                }
                 else {
                     if (hit == last) hits++ else { last = hit; hits = 1 }
-                    if (hits >= 4) fire = hit          // the same word in the same place for ~0.2 s: it's real, not a passing guess
+                    // while she talks, only "stop" may act before the phrase is finished, and only after holding steady ~0.35 s;
+                    // "pause" and "end" wait for the finished phrase with a good score ("continue" only matters while she is quiet)
+                    val cmd = hit.substringAfter(':')
+                    if ((cmd == "stop" && hits >= 7) || (cmd == "continue" && hits >= 4)) fire = hit
                 }
                 if (fire != null) {
                     if (nowMs - lastFire > 1200) {

@@ -43,9 +43,12 @@ class OfflineBrain(private val activity: MainActivity) {
         tts = TextToSpeech(activity) { status -> ttsReady = status == TextToSpeech.SUCCESS }
         tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
             override fun onStart(utteranceId: String?) {}
-            override fun onDone(utteranceId: String?) { js("window.zenixOnSpeakDone && window.zenixOnSpeakDone()") }
+            // where she has got to in the sentence, so a voice that breaks can carry on from there
+            override fun onRangeStart(utteranceId: String?, start: Int, end: Int, frame: Int) { if (utteranceId == curId) curPos = curBase + start }
+            override fun onDone(utteranceId: String?) { if (utteranceId == curId) told("") }
             @Deprecated("Deprecated in Java")
-            override fun onError(utteranceId: String?) { js("window.zenixOnSpeakDone && window.zenixOnSpeakDone()") }
+            override fun onError(utteranceId: String?) { failed(utteranceId, -1) }
+            override fun onError(utteranceId: String?, errorCode: Int) { failed(utteranceId, errorCode) }
         })
     }
 
@@ -205,16 +208,55 @@ class OfflineBrain(private val activity: MainActivity) {
     @Volatile var voiceName: String = ""
     @Volatile var rate: Float = 1.05f
 
-    fun speak(text: String, lang: String) {
+    // the sentence being said now: its id for the page, its text, and how far she has got
+    @Volatile private var curId = ""
+    @Volatile private var pageId = ""
+    @Volatile private var curText = ""
+    @Volatile private var curLang = ""
+    @Volatile private var curPos = 0
+    @Volatile private var curBase = 0
+    @Volatile private var retried = false
+    private var seq = 0L
+
+    private fun told(err: String) {
+        val id = pageId; curId = ""
+        js("window.zenixOnSpeakDone && window.zenixOnSpeakDone(${JSONObject.quote(id)}, ${JSONObject.quote(err)})")
+    }
+    /** The voice broke (often a network voice on weak data): the phone's own offline voice says the rest, once. */
+    private fun failed(id: String?, code: Int) {
+        if (id == null || id != curId) return
+        val rest = curText.substring(minOf(curPos, curText.length)).trim()
+        if (!retried && rest.length > 1) {
+            retried = true
+            val t = tts ?: return told("error $code")
+            try {
+                val lang = Locale.forLanguageTag(curLang).language
+                t.voices?.firstOrNull { it.locale.language == lang && !it.isNetworkConnectionRequired && !it.features.contains(TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED) }?.let { t.voice = it }
+            } catch (_: Exception) {}
+            curBase = curPos
+            curId = "z" + (++seq) + "r"
+            t.speak(rest, TextToSpeech.QUEUE_FLUSH, null, curId)
+            js("window.zenixVoiceNote && window.zenixVoiceNote(${JSONObject.quote("phone voice broke (error $code): the offline voice said the rest")})")
+            return
+        }
+        told("error $code")
+    }
+
+    /** Says one sentence; returns its id, which comes back with window.zenixOnSpeakDone when it has really finished. */
+    fun speak(text: String, lang: String): String {
         val t = tts
-        if (t == null || !ttsReady) { js("window.zenixOnSpeakDone && window.zenixOnSpeakDone()"); return }
+        val id = "z" + System.currentTimeMillis() + "-" + (++seq)
+        if (t == null || !ttsReady) { pageId = id; curId = ""; js("window.zenixOnSpeakDone && window.zenixOnSpeakDone(${JSONObject.quote(id)}, 'not ready')"); return id }
         try {
             val chosen = if (voiceName.isNotEmpty() && lang.startsWith("en")) t.voices?.firstOrNull { it.name == voiceName } else null   // other languages (translator) use that language's own voice
             if (chosen != null) t.voice = chosen else t.language = Locale.forLanguageTag(lang)
             t.setSpeechRate(rate)
         } catch (_: Exception) {}
-        t.speak(text, TextToSpeech.QUEUE_FLUSH, null, "z" + System.currentTimeMillis())
+        pageId = id; curId = id; curText = text; curLang = lang; curPos = 0; curBase = 0; retried = false
+        t.speak(text, TextToSpeech.QUEUE_FLUSH, null, id)
+        return id
     }
+    fun isSpeaking(): Boolean = try { tts?.isSpeaking == true } catch (_: Exception) { false }
 
     /** High-quality English voices installed on the phone, best first. */
     fun listVoices(): String {
@@ -232,7 +274,7 @@ class OfflineBrain(private val activity: MainActivity) {
         return arr.toString()
     }
 
-    fun stopSpeaking() { try { tts?.stop() } catch (_: Exception) {} }
+    fun stopSpeaking() { curId = ""; try { tts?.stop() } catch (_: Exception) {} }
 
     fun shutdown() {
         try { recognizer?.destroy() } catch (_: Exception) {}

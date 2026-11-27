@@ -330,7 +330,8 @@ class ZenixBridge(private val activity: MainActivity) {
         micTurns.execute { try { barge.stopAndWait() } catch (_: Throwable) { }; try { activity.ears.takeMicBack() } catch (_: Throwable) { } }
         return ok("ok")
     }
-    @JavascriptInterface fun speak(text: String, lang: String): String { activity.brain.speak(text, lang); return ok("speaking") }
+    @JavascriptInterface fun speak(text: String, lang: String): String { val id = activity.brain.speak(text, lang); return JSONObject().put("ok", true).put("message", "speaking").put("id", id).toString() }
+    @JavascriptInterface fun ttsBusy(): String = activity.brain.isSpeaking().toString()
     @JavascriptInterface fun stopSpeaking(): String { activity.brain.stopSpeaking(); return ok("stopped") }
     // ---------- "Hey Zenix" wake word ----------
     @JavascriptInterface fun wakeStatus(): String = WakeWordService.status(activity)
