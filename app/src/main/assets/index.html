@@ -471,6 +471,7 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
           <div style="margin:10px 0 4px"><b>How easily she wakes up</b><small style="display:block;opacity:.7;margin:2px 0 6px">Low: only a clear "Hey Zenix" after a quiet moment. Normal: "Hey Zenix", or a clear "Zenix" on its own, never in the middle of a conversation. High: wakes more easily, but also by mistake more often.</small>
             <div class="seg small" id="wakeSensBtns"><button data-wsens="low">Low</button><button data-wsens="normal">Normal</button><button data-wsens="high">High</button></div></div>
           <p class="status-line" id="wakeLast" style="display:none"></p>
+          <div class="toggle-row"><div><b>Greet me when I call her</b><small>"Hey master, it's Friday night." Then she listens. Off: a short buzz instead.</small></div><button class="toggle" id="wakeGreetToggle" aria-label="Greet me when I call her"></button></div>
           <div class="toggle-row" id="bargeRow"><div><b>Stop her by voice</b><small>While she talks, say "stop", "pause", "continue" or "end"</small></div><button class="toggle" id="bargeToggle" aria-label="Stop her by voice"></button></div>
           <p class="status-line" id="bargeHeard" style="display:none"></p>
           <div id="wakeFix" style="display:none">
@@ -2626,6 +2627,7 @@ function startOffline(kind, brain='offline'){
       const intro = off.intro; off.intro = null;
       if(intro && intro.ask) ownRespond(intro.ask, true, () => offListen());   // a routine: she does it and says the result
       else if(intro && intro.say){ speech.onIdle = () => offListen(); speakEnqueue(intro.say); }   // she has something to tell him (a message while driving…)
+      else if(off.fromWake && !off.wakeMedia && settings.wakeGreet !== false){ speech.onIdle = () => offListen(); speakEnqueue(wakeHello()); }   // "Hey master, it's Friday night." then she listens
       else { if(off.fromWake && !off.wakeMedia && Native.buzz) Native.buzz('45'); offListen(); }   // no greeting: she listens at once (a tiny buzz after "Hey Zenix" says she's ready)
       wakeGreeting = false;
     } else { wakeGreeting = false; offListen(); }
@@ -2716,7 +2718,7 @@ const TOOL_DEFS = [
   {name:'list_read', description:'Read one list, or all his lists when no name is given.', input_schema:{type:'object', properties:{list:{type:'string'}}}},
   {name:'list_remove', description:"Remove one item from a list (done or bought), or item 'all' to clear the list.", input_schema:{type:'object', properties:{list:{type:'string'}, item:{type:'string'}}, required:['list','item']}},
   {name:'phone_control', description:'Control the phone: flashlight, media volume, Do Not Disturb, battery level, music playback.', input_schema:{type:'object', properties:{action:{type:'string', enum:['flashlight_on','flashlight_off','volume_set','volume_up','volume_down','mute','dnd_on','dnd_off','battery','music_play','music_pause','music_next','music_previous']}, value:{type:'integer', description:'For volume_set: 0-100'}}, required:['action']}},
-  {name:'phone_screen', description:'Work the app that is on the phone screen right now (not Zenix herself): scroll, swipe, go back, go to the home screen, show recent apps, open the notification panel or quick settings, take a screenshot, lock the screen, or tap a button by the name written on it, type into that app\'s own search box (search: only when another app is open, never to look something up or answer a question), search YouTube (search_youtube), find a song or video and start playing it (play_youtube, or play_music for Spotify / YouTube Music), or close the app that is on screen (close_app). You cannot see the screen; if a tap or search fails, say so.', input_schema:{type:'object', properties:{action:{type:'string', enum:['scroll_down','scroll_up','swipe_left','swipe_right','back','home','recents','notifications','quick_settings','screenshot','lock','tap','tap_first','search','search_youtube','play_youtube','play_music','close_app']}, text:{type:'string', description:'For tap: the name on the button, e.g. Like, Follow, Skip. For search and play: the words to search for or the song to play'}, big:{type:'boolean', description:'For scrolling: true for a long scroll'}}, required:['action']}},
+  {name:'phone_screen', description:'Work the app that is on the phone screen right now (not Zenix herself): scroll, swipe, go back, go to the home screen, show recent apps, open the notification panel or quick settings, take a screenshot, lock the screen, or tap a button by the name written on it, type into that app\'s own search box (search: only when another app is open, never to look something up or answer a question), search YouTube (search_youtube), find a song or video and start playing it (play_youtube, or play_music for Spotify / YouTube Music: for play_music write text as "artist: NAME" when he only names a singer or band (it plays that artist\'s songs), or "SONG by ARTIST" / "song: SONG" for one song; then say only what the result says — it tells you if the music really started, so never say it is playing before that), or close the app that is on screen (close_app). You cannot see the screen; if a tap or search fails, say so.', input_schema:{type:'object', properties:{action:{type:'string', enum:['scroll_down','scroll_up','swipe_left','swipe_right','back','home','recents','notifications','quick_settings','screenshot','lock','tap','tap_first','search','search_youtube','play_youtube','play_music','close_app']}, text:{type:'string', description:'For tap: the name on the button, e.g. Like, Follow, Skip. For search and play: the words to search for or the song to play'}, big:{type:'boolean', description:'For scrolling: true for a long scroll'}}, required:['action']}},
   {name:'set_timer', description:"Start a countdown timer in the phone's Clock app.", input_schema:{type:'object', properties:{minutes:{type:'number'}, seconds:{type:'number'}, label:{type:'string'}}}},
   {name:'navigate', description:'Start Google Maps turn-by-turn driving directions to a place (when he says navigate, take me to, start directions). For just seeing a route or the travel time, use show_route instead.', input_schema:{type:'object', properties:{to:{type:'string'}}, required:['to']}},
   {name:'where_am_i', description:"Find where he is right now (street, area, city) from the phone's location.", input_schema:{type:'object', properties:{}}},
@@ -4005,6 +4007,16 @@ document.addEventListener('click', initVoiceViz, {once:true});
 
 /* ---------- "Hey Zenix" wake word ---------- */
 if(settings.wake===undefined) settings.wake=false;
+/* what she says when he calls her: "Hey master, it's Friday night." (Dubai time) */
+function wakeHello(d){
+  d = d || new Date();
+  const parts = new Intl.DateTimeFormat('en-GB', {timeZone:'Asia/Dubai', weekday:'long', hour:'numeric', hourCycle:'h23'}).formatToParts(d);
+  const day = (parts.find(p => p.type==='weekday') || {}).value || '', h = +((parts.find(p => p.type==='hour') || {}).value || 12);
+  const part = h >= 5 && h < 12 ? 'morning' : h >= 12 && h < 17 ? 'afternoon' : h >= 17 && h < 21 ? 'evening' : 'night';
+  // after midnight it is still "Friday night" until 5 in the morning
+  const shown = h < 5 ? new Intl.DateTimeFormat('en-GB', {timeZone:'Asia/Dubai', weekday:'long'}).format(new Date(d.getTime() - 6*3600000)) : day;
+  return `Hey ${(settings.callMe || 'master').trim()}, it's ${shown} ${part}.`;
+}
 let wakeGreeting = false;   // true for a moment after "Hey Zenix": the next voice chat greets with "Yes bro?" and ends sooner when quiet
 function wakeSt(){ try{ return JSON.parse(Native.wakeStatus()); }catch(e){ return {}; } }
 const agoS = s => s < 0 ? '' : s < 90 ? s + ' s ago' : s < 5400 ? Math.round(s/60) + ' min ago' : Math.round(s/3600) + ' h ago';
@@ -4024,6 +4036,9 @@ document.querySelectorAll('[data-wsens]').forEach(b => b.onclick = () => {
   toast({low:'Low: only a clear "Hey Zenix"', normal:'Normal sensitivity', high:'High: wakes more easily'}[b.dataset.wsens]);
 });
 setTimeout(renderWakeSens, 800);
+function renderWakeGreet(){ const b = $('wakeGreetToggle'); if(b) b.classList.toggle('on', settings.wakeGreet !== false); }
+$('wakeGreetToggle').onclick = () => { settings.wakeGreet = settings.wakeGreet === false; store.set('settings', settings); renderWakeGreet(); if(settings.wakeGreet) toast(wakeHello()); };
+renderWakeGreet();
 document.querySelector('[data-sec="wake"]') && document.querySelector('[data-sec="wake"]').addEventListener('toggle', renderWakeSens);
 function wakePauseNow(){ if(settings.wake && Native && Native.wakePause){ Native.wakePause(); return new Promise(r=>setTimeout(r,350)); } return Promise.resolve(); }
 const inVoiceChat = () => (off.active && off.kind==='talk') || !!convo || connecting;

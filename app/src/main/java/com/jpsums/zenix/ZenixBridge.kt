@@ -181,10 +181,10 @@ class ZenixBridge(private val activity: MainActivity) {
                 val pm = activity.packageManager
                 val order = if (action == "play_ytmusic") listOf("com.google.android.apps.youtube.music", "com.spotify.music") else listOf("com.spotify.music", "com.google.android.apps.youtube.music")
                 val pkg = order.firstOrNull { try { pm.getPackageInfo(it, 0); true } catch (_: Exception) { false } }
-                val i = Intent(android.provider.MediaStore.INTENT_ACTION_MEDIA_PLAY_FROM_SEARCH)
-                    .putExtra(android.provider.MediaStore.EXTRA_MEDIA_FOCUS, "vnd.android.cursor.item/*").putExtra(android.app.SearchManager.QUERY, arg)
-                if (pkg != null) i.setPackage(pkg)
-                if (pkg != null && launch(i)) back(true, "Playing $arg.") else playOnYoutube()   // no music app: use YouTube
+                if (pkg == null) { playOnYoutube(); return ok("running") }   // no music app: use YouTube
+                // asks the app to play, then checks it really plays (and taps a song if it only shows results)
+                val tapper: (((Boolean) -> Unit) -> Unit)? = if (svc == null) null else { cb -> svc.run("music_first", "") { okk, _ -> cb(okk) } }
+                MusicPlayer(activity, ::launch).play(pkg, arg, tapper, back)
             }
             else ->
                 if (svc == null) back(false, if (ControlService.isOn(activity)) "Phone control is still starting. Try again in a moment." else "Zenix phone control is off. It can be turned on in Zenix's Settings under Control other apps.")

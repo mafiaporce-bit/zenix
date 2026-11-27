@@ -73,3 +73,9 @@ Online/offline failover: ears, brain, voice and phone control each look after th
 - With music or a video playing, she has to be 5% more sure.
 - A name squeezed out of a tiny blip of sound, or dragged out of a long one, is ignored.
 - Settings → "Hey Zenix" and Live status show the last wake-up (what she heard, how sure) and the last one she ignored, with why.
+
+## Spotify really plays, and a greeting when you call her
+- "Play Bruno Mars" asks Spotify for that artist; "play Uptown Funk by Bruno Mars" asks for that song.
+- She watches Spotify's player: if it's still quiet, she asks the player again, then (with "Control other apps" on) presses Play or taps the first song.
+- She only says "Playing …" when music is really playing, and names the song that started. If it didn't start, she says so.
+- When you call her ("Zenix" / "Hey Zenix"), she says "Hey master, it's Friday night." (the real day and morning / afternoon / evening / night, Dubai time), then listens. Not while music is playing. Switch: Settings → "Hey Zenix" → Greet me when I call her.

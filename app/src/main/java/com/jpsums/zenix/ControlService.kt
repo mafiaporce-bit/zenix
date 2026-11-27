@@ -60,6 +60,7 @@ class ControlService : AccessibilityService() {
                     "tap_first" -> tapFirst(done)
                     "search" -> search(arg, done)
                     "youtube_first" -> youtubeFirst(0, done)
+                    "music_first" -> musicFirst(done)
                     "close_app" -> closeFront(done)
                     else -> done(false, "I don't know that screen action.")
                 }
@@ -273,6 +274,18 @@ class ControlService : AccessibilityService() {
             }
         }
         done(false, "I can't tell which one is first on this screen.")
+    }
+
+    /** Spotify / YouTube Music results or artist page: press its Play button, or else the first song in the list. */
+    private fun musicFirst(done: (Boolean, String) -> Unit) {
+        val (_, h) = screen()
+        val nodes = all(rootInActiveWindow).filter { it.isVisibleToUser && !mine(it) && bounds(it).let { r -> r.bottom > 0 && r.top < h * 0.92 } }
+        val play = nodes.firstOrNull { n -> label(n).lowercase().let { l -> l == "play" || l == "shuffle play" || l.startsWith("play artist") || l.startsWith("play songs") } }
+        if (play != null && click(play)) { done(true, "Pressed Play."); return }
+        val song = nodes.filter { n -> label(n).let { l -> l.startsWith("Song •") || l.startsWith("Song ·") || l.startsWith("Song,") || l == "Song" } }
+            .minByOrNull { bounds(it).top }
+        if (song != null && click(song)) { done(true, "Started the first song."); return }
+        done(false, "I couldn't find a song to start on this screen.")
     }
 
     /** After a YouTube search: start the first real video (not an ad). */
